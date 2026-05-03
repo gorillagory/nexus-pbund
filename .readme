@@ -1,0 +1,18 @@
+# FILE: pbund/README.md
+
+# pbund (Nexus Code Bundler)
+
+A lightweight Python CLI tool designed to bundle, document, and analyze the Nexus System architecture for seamless Gemini context feeding.
+
+## Setup
+
+1. Ensure Python 3.x is installed on your system.
+2. Place the `pbund` directory inside your root project folder.
+
+## Usage
+
+Navigate into the `pbund` folder and run the script using Python.
+
+```bash
+cd pbund
+python bundle.py <command>

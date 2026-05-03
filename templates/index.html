@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <title>Nexus OS v6.4 Copilot</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="/static/style.css">
+
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.0/dist/mermaid.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+<body class="py-4">
+
+    <div class="modal fade" id="settingsModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content bg-dark border-secondary">
+                <div class="modal-header border-secondary">
+                    <h5 class="modal-title text-white fw-bold">
+                        <i class="bi bi-gear-fill me-2 text-secondary"></i>System Settings
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label text-secondary small fw-bold">ACTIVE PROVIDER</label>
+                            <select id="input-provider" class="form-select bg-black border-secondary text-white">
+                                <option value="auto">Auto</option>
+                                <option value="gemini">Gemini</option>
+                                <option value="openai">OpenAI</option>
+                            </select>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label text-secondary small fw-bold">MODEL SELECTION MODE</label>
+                            <select id="input-model-selection-mode" class="form-select bg-black border-secondary text-white">
+                                <option value="auto">Auto</option>
+                                <option value="manual">Manual Override</option>
+                            </select>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label text-secondary small fw-bold">GEMINI API KEY</label>
+                            <input type="password" id="input-gemini-api-key" class="form-control bg-black border-secondary text-white font-monospace">
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label text-secondary small fw-bold">OPENAI API KEY</label>
+                            <input type="password" id="input-openai-api-key" class="form-control bg-black border-secondary text-white font-monospace">
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label text-secondary small fw-bold">MANUAL GEMINI MODEL</label>
+                            <input type="text" id="input-gemini-model" class="form-control bg-black border-secondary text-white font-monospace" placeholder="optional">
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label text-secondary small fw-bold">MANUAL OPENAI MODEL</label>
+                            <input type="text" id="input-openai-model" class="form-control bg-black border-secondary text-white font-monospace" placeholder="optional">
+                        </div>
+
+                        <div class="col-md-6">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <label class="form-label text-secondary small fw-bold mb-0">CURATED GEMINI MODELS</label>
+                                <small id="gemini-model-summary" class="text-secondary"></small>
+                            </div>
+                            <div id="gemini-model-preview" class="form-control bg-black border-secondary text-secondary font-monospace" style="height: 220px; overflow:auto;"></div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <label class="form-label text-secondary small fw-bold mb-0">CURATED OPENAI MODELS</label>
+                                <small id="openai-model-summary" class="text-secondary"></small>
+                            </div>
+                            <div id="openai-model-preview" class="form-control bg-black border-secondary text-secondary font-monospace" style="height: 220px; overflow:auto;"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal-footer border-secondary">
+                    <button type="button" class="btn btn-outline-secondary btn-sm fw-bold px-3" data-bs-dismiss="modal">CANCEL</button>
+                    <button type="button" class="btn btn-danger btn-sm fw-bold px-4" onclick="NexusSettings.refreshModelPreview()">REFRESH MODELS</button>
+                    <button type="button" class="btn btn-danger btn-sm fw-bold px-4" onclick="NexusSettings.save()">SAVE SETTINGS</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast-container">
+        <div id="nexusToast" class="toast align-items-center border-0 text-white" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="d-flex">
+                <div class="toast-body" id="toast-message"></div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+            </div>
+        </div>
+    </div>
+
+    <div class="container-fluid px-4">
+        <header class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-3 border-secondary-subtle">
+            <div class="d-flex align-items-center gap-3">
+                <div class="bg-danger px-2 py-1 rounded text-black fw-black">N</div>
+                <div>
+                    <h1 class="h4 fw-black mb-0 text-white tracking-tighter">NEXUS <span class="text-danger">OS</span></h1>
+                    <small class="text-secondary fw-bold text-uppercase" style="font-size: 0.55rem; letter-spacing: 3px;">Copilot Control Surface</small>
+                </div>
+            </div>
+
+            <div class="d-flex gap-2 align-items-center">
+                <div id="status" class="badge rounded-pill border border-secondary text-secondary font-monospace p-2 me-2">Initializing...</div>
+
+                <select id="active-provider-switch" class="form-select form-select-sm bg-black border-secondary text-white" style="width: 120px;" onchange="NexusSettings.switchProvider(this.value)">
+                    <option value="auto">Auto</option>
+                    <option value="gemini">Gemini</option>
+                    <option value="openai">OpenAI</option>
+                </select>
+
+                <button class="btn btn-outline-secondary btn-sm btn-nexus px-3" onclick="NexusExplorer.copyAllPathsWithNumbers()">
+                    <i class="bi bi-list-ol me-2"></i>Copy List
+                </button>
+
+                <button class="btn btn-outline-secondary btn-sm" onclick="NexusSettings.open()" title="Settings">
+                    <i class="bi bi-gear-fill"></i>
+                </button>
+            </div>
+        </header>
+
+        <div class="row g-4">
+            <div class="col-md-4 col-lg-3">
+                <div id="recent-container"></div>
+
+                <div class="card bg-dark border-secondary mb-3">
+                    <div class="card-header border-secondary p-0 bg-black overflow-hidden">
+                        <ul class="nav nav-tabs border-0">
+                            <li class="nav-item flex-fill">
+                                <button class="nav-link active w-100 py-3 small fw-bold rounded-0" id="tab-arch-btn" onclick="NexusApp.setTab('arch')">EXPLORER</button>
+                            </li>
+                            <li class="nav-item flex-fill">
+                                <button class="nav-link w-100 py-3 small fw-bold rounded-0" id="tab-chat-btn" onclick="NexusApp.setTab('chat')">CHAT</button>
+                            </li>
+                            <li class="nav-item flex-fill">
+                                <button class="nav-link w-100 py-3 small fw-bold rounded-0" id="tab-scripts-btn" onclick="NexusApp.setTab('scripts')">SCRIPTS</button>
+                            </li>
+                            <li class="nav-item flex-fill">
+                                <button class="nav-link w-100 py-3 small fw-bold rounded-0" id="tab-map-btn" onclick="NexusApp.setTab('map')">MAP</button>
+                            </li>
+                        </ul>
+                    </div>
+                    <div class="card-body sidebar p-2" id="file-list"></div>
+                </div>
+
+                <div class="card bg-dark border-secondary p-3">
+                    <div class="input-group mb-3">
+                        <input type="text" id="number-input" class="form-control form-control-sm bg-black border-secondary text-white font-monospace" placeholder="1, 5, 22..." onkeyup="if(event.key==='Enter')NexusExplorer.selectByNumbers()">
+                        <button class="btn btn-danger btn-sm fw-bold px-3" onclick="NexusExplorer.selectByNumbers()">SELECT</button>
+                    </div>
+
+                    <div class="row g-2">
+                        <div class="col-9">
+                            <button class="btn btn-danger btn-sm btn-nexus w-100 py-2" onclick="NexusExplorer.bundleSelected()">
+                                <i class="bi bi-file-zip me-2"></i>Build Bundle
+                            </button>
+                        </div>
+                        <div class="col-3">
+                            <button class="btn btn-outline-secondary btn-sm btn-nexus w-100 py-2" onclick="NexusExplorer.clearSelections()">
+                                <i class="bi bi-trash3"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-8 col-lg-9">
+                <div id="inspector" class="card bg-dark border-secondary p-4 shadow-lg overflow-auto">
+                    <div class="h-100 d-flex flex-column align-items-center justify-content-center text-secondary opacity-50">
+                        <i class="bi bi-terminal-split display-1 mb-3"></i>
+                        <p class="text-uppercase small tracking-widest font-monospace">System Ready.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/core.js"></script>
+    <script src="/static/js/settings.js"></script>
+    <script src="/static/js/explorer.js"></script>
+    <script src="/static/js/inspector.js"></script>
+    <script src="/static/js/scripts.js"></script>
+    <script src="/static/js/chat.js"></script>
+    <script src="/static/js/map.js"></script>
+    <script src="/static/js/app.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

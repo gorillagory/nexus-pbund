@@ -1,0 +1,28 @@
+body { background-color: #0d1117; color: #c9d1d9; font-family: 'Segoe UI', system-ui, sans-serif; }
+.sidebar { height: 62vh; overflow-y: auto; scrollbar-width: thin; border-radius: 8px; }
+.file-item { cursor: pointer; font-size: 0.8rem; padding: 6px 12px; border-bottom: 1px solid #21262d; border-left: 4px solid transparent; }
+.file-item:hover { background-color: #21262d; color: #58a6ff; }
+.file-item.selected { background-color: rgba(88, 166, 255, 0.1); border-left: 4px solid #58a6ff !important; color: #58a6ff; }
+.file-item.selected .file-index { color: #58a6ff; }
+.file-index { color: #f85149; font-family: 'Cascadia Code', monospace; font-weight: bold; width: 35px; display: inline-block; font-size: 0.75rem; }
+.file-checkbox { transform: scale(1.1); margin-right: 12px; cursor: pointer; }
+.layer-header { cursor: pointer; font-size: 0.85rem; font-weight: 900; color: #f85149; border-bottom: 1px solid #30363d; padding: 12px 8px; display: flex; justify-content: space-between; }
+.role-header { cursor: pointer; font-size: 0.7rem; font-weight: 800; color: #8b949e; margin-top: 12px; display: flex; align-items: center; gap: 8px; padding-left: 8px; }
+.recent-box { border: 1px solid #da3633; background: rgba(218, 54, 51, 0.08); border-radius: 8px; padding: 12px; margin-bottom: 20px; }
+pre { background: #010409; border: 1px solid #30363d; color: #7ee787; font-size: 0.75rem; padding: 1.25rem; border-radius: 8px; white-space: pre-wrap; }
+.btn-nexus { font-size: 0.7rem; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; }
+.toast-container { position: fixed; bottom: 24px; right: 24px; z-index: 2000; }
+#inspector { min-height: 82vh; border-radius: 12px; }
+#mindmap-container { background: #0d1117; min-height: 600px; overflow: auto; border-radius: 8px; }
+
+/* Engineering Markdown Styles */
+.md-content h3 { font-size: 1rem; color: #58a6ff; font-weight: 900; margin-top: 2rem; margin-bottom: 1rem; border-bottom: 1px solid #30363d; padding-bottom: 8px; text-transform: uppercase; letter-spacing: 1px; }
+.md-content p, .md-content li { font-size: 0.85rem; color: #c9d1d9; line-height: 1.6; }
+.md-content ul { padding-left: 1.2rem; }
+.md-content table { width: 100%; margin-bottom: 1.5rem; border-collapse: collapse; font-size: 0.8rem; border-radius: 6px; overflow: hidden; }
+.md-content th, .md-content td { padding: 10px 12px; border: 1px solid #30363d; }
+.md-content th { background-color: #161b22; color: #58a6ff; font-family: monospace; text-transform: uppercase; font-weight: bold; }
+.md-content tbody tr:nth-child(even) { background-color: rgba(22, 27, 34, 0.5); }
+.md-content tbody tr:hover { background-color: rgba(88, 166, 255, 0.1); }
+.md-content .mermaid { background: #010409; padding: 1rem; border: 1px solid #30363d; border-radius: 8px; margin-bottom: 1.5rem; text-align: center; overflow: auto; }
+.mermaid-error { background-color: rgba(218, 54, 51, 0.1); border: 1px solid #da3633; color: #ff7b72; padding: 15px; border-radius: 8px; text-align: left; font-family: monospace; font-size: 0.8rem; }
