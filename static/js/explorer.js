@@ -52,7 +52,7 @@ window.NexusExplorer = {
 
                 const roleHeader = document.createElement("div");
                 roleHeader.className = "role-header text-uppercase ps-3";
-                roleHeader.innerHTML = `<i class="bi bi-folder2 text-danger"></i> ${role}s`;
+                roleHeader.innerHTML = `<i class="bi bi-folder2 text-primary"></i> ${role}s`;
                 roleHeader.onclick = (event) => {
                     event.stopPropagation();
                     NexusState.expandedStates[roleId] = !NexusState.expandedStates[roleId];

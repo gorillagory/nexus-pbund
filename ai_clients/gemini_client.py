@@ -1,3 +1,5 @@
+import json
+
 import requests
 
 from ai_clients.base import BaseAIClient
@@ -47,7 +49,7 @@ class GeminiClient(BaseAIClient):
 
         return models[0] if models else None
 
-    def generate(self, prompt, model=None):
+    def generate(self, prompt, model=None, timeout=None):
         if not self.api_key:
             raise ValueError("Gemini API key missing.")
 
@@ -73,7 +75,7 @@ class GeminiClient(BaseAIClient):
             params={"key": self.api_key},
             headers={"Content-Type": "application/json"},
             json=payload,
-            timeout=120,
+            timeout=timeout or 120,
         )
 
         if response.status_code != 200:
@@ -87,3 +89,55 @@ class GeminiClient(BaseAIClient):
             "raw": data,
             "text": text,
         }
+
+    def generate_stream(self, prompt, model=None, timeout=None):
+        if not self.api_key:
+            raise ValueError("Gemini API key missing.")
+
+        active_model = model or self.discover_best_model()
+        if not active_model:
+            raise ValueError("No Gemini model available.")
+
+        url = (
+            "https://generativelanguage.googleapis.com/v1beta/"
+            f"{active_model}:streamGenerateContent"
+        )
+        payload = {
+            "contents": [
+                {
+                    "parts": [
+                        {
+                            "text": prompt
+                        }
+                    ]
+                }
+            ]
+        }
+
+        with requests.post(
+            url,
+            params={"key": self.api_key, "alt": "sse"},
+            headers={"Content-Type": "application/json"},
+            json=payload,
+            stream=True,
+            timeout=timeout or 120,
+        ) as response:
+            if response.status_code != 200:
+                raise RuntimeError(
+                    f"Gemini API Error: {response.status_code} {response.text}"
+                )
+
+            for line in response.iter_lines(decode_unicode=True):
+                if not line or not line.startswith("data:"):
+                    continue
+
+                data = json.loads(line[len("data:"):].strip())
+                candidates = data.get("candidates", [])
+                if not candidates:
+                    continue
+
+                parts = candidates[0].get("content", {}).get("parts", [])
+                for part in parts:
+                    text = part.get("text")
+                    if text:
+                        yield text

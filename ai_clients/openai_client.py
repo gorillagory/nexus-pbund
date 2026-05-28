@@ -1,3 +1,5 @@
+import json
+
 import requests
 
 from ai_clients.base import BaseAIClient
@@ -49,7 +51,7 @@ class OpenAIClient(BaseAIClient):
 
         return models[0] if models else None
 
-    def generate(self, prompt, model=None):
+    def generate(self, prompt, model=None, timeout=None):
         if not self.api_key:
             raise ValueError("OpenAI API key missing.")
 
@@ -67,7 +69,7 @@ class OpenAIClient(BaseAIClient):
                 "model": active_model,
                 "input": prompt,
             },
-            timeout=120,
+            timeout=timeout or 120,
         )
 
         if response.status_code != 200:
@@ -81,6 +83,47 @@ class OpenAIClient(BaseAIClient):
             "raw": data,
             "text": text,
         }
+
+    def generate_stream(self, prompt, model=None, timeout=None):
+        if not self.api_key:
+            raise ValueError("OpenAI API key missing.")
+
+        active_model = model or self.discover_best_model()
+        if not active_model:
+            raise ValueError("No OpenAI model available.")
+
+        with requests.post(
+            self.RESPONSES_URL,
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {self.api_key}",
+            },
+            json={
+                "model": active_model,
+                "input": prompt,
+                "stream": True,
+            },
+            stream=True,
+            timeout=timeout or 120,
+        ) as response:
+            if response.status_code != 200:
+                raise RuntimeError(
+                    f"OpenAI API Error: {response.status_code} {response.text}"
+                )
+
+            for line in response.iter_lines(decode_unicode=True):
+                if not line or not line.startswith("data:"):
+                    continue
+
+                payload = line[len("data:"):].strip()
+                if payload == "[DONE]":
+                    break
+
+                event = json.loads(payload)
+                if event.get("type") == "response.output_text.delta":
+                    yield event.get("delta", "")
+                elif event.get("type") == "error":
+                    raise RuntimeError(event.get("message", "OpenAI streaming error."))
 
     def _extract_text(self, data):
         output = data.get("output", [])

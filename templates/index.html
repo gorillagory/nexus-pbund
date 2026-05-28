@@ -1,8 +1,9 @@
 <!DOCTYPE html>
-<html lang="en" data-bs-theme="dark">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Nexus OS v6.4 Copilot</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Nexus OS | Enterprise Dashboard</title>
 
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
@@ -10,86 +11,148 @@
 
     <script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.0/dist/mermaid.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 </head>
-<body class="py-4">
-
+<body class="bg-light text-dark">
     <div class="modal fade" id="settingsModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-lg">
-            <div class="modal-content bg-dark border-secondary">
-                <div class="modal-header border-secondary">
-                    <h5 class="modal-title text-white fw-bold">
+            <div class="modal-content bg-white border">
+                <div class="modal-header">
+                    <h5 class="modal-title fw-semibold">
                         <i class="bi bi-gear-fill me-2 text-secondary"></i>System Settings
                     </h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
-
                 <div class="modal-body">
                     <div class="row g-3">
                         <div class="col-md-6">
                             <label class="form-label text-secondary small fw-bold">ACTIVE PROVIDER</label>
-                            <select id="input-provider" class="form-select bg-black border-secondary text-white">
+                            <select id="input-provider" class="form-select">
                                 <option value="auto">Auto</option>
                                 <option value="gemini">Gemini</option>
                                 <option value="openai">OpenAI</option>
                             </select>
                         </div>
-
                         <div class="col-md-6">
                             <label class="form-label text-secondary small fw-bold">MODEL SELECTION MODE</label>
-                            <select id="input-model-selection-mode" class="form-select bg-black border-secondary text-white">
+                            <select id="input-model-selection-mode" class="form-select">
                                 <option value="auto">Auto</option>
                                 <option value="manual">Manual Override</option>
                             </select>
                         </div>
-
                         <div class="col-md-6">
                             <label class="form-label text-secondary small fw-bold">GEMINI API KEY</label>
-                            <input type="password" id="input-gemini-api-key" class="form-control bg-black border-secondary text-white font-monospace">
+                            <input type="password" id="input-gemini-api-key" class="form-control font-monospace">
                         </div>
-
                         <div class="col-md-6">
                             <label class="form-label text-secondary small fw-bold">OPENAI API KEY</label>
-                            <input type="password" id="input-openai-api-key" class="form-control bg-black border-secondary text-white font-monospace">
+                            <input type="password" id="input-openai-api-key" class="form-control font-monospace">
                         </div>
-
                         <div class="col-md-6">
                             <label class="form-label text-secondary small fw-bold">MANUAL GEMINI MODEL</label>
-                            <input type="text" id="input-gemini-model" class="form-control bg-black border-secondary text-white font-monospace" placeholder="optional">
+                            <input type="text" id="input-gemini-model" class="form-control font-monospace" placeholder="optional">
                         </div>
-
                         <div class="col-md-6">
                             <label class="form-label text-secondary small fw-bold">MANUAL OPENAI MODEL</label>
-                            <input type="text" id="input-openai-model" class="form-control bg-black border-secondary text-white font-monospace" placeholder="optional">
+                            <input type="text" id="input-openai-model" class="form-control font-monospace" placeholder="optional">
                         </div>
-
                         <div class="col-md-6">
                             <div class="d-flex justify-content-between align-items-center mb-1">
                                 <label class="form-label text-secondary small fw-bold mb-0">CURATED GEMINI MODELS</label>
                                 <small id="gemini-model-summary" class="text-secondary"></small>
                             </div>
-                            <div id="gemini-model-preview" class="form-control bg-black border-secondary text-secondary font-monospace" style="height: 220px; overflow:auto;"></div>
+                            <div id="gemini-model-preview" class="form-control bg-light text-secondary font-monospace model-preview"></div>
                         </div>
-
                         <div class="col-md-6">
                             <div class="d-flex justify-content-between align-items-center mb-1">
                                 <label class="form-label text-secondary small fw-bold mb-0">CURATED OPENAI MODELS</label>
                                 <small id="openai-model-summary" class="text-secondary"></small>
                             </div>
-                            <div id="openai-model-preview" class="form-control bg-black border-secondary text-secondary font-monospace" style="height: 220px; overflow:auto;"></div>
+                            <div id="openai-model-preview" class="form-control bg-light text-secondary font-monospace model-preview"></div>
                         </div>
                     </div>
                 </div>
-
-                <div class="modal-footer border-secondary">
-                    <button type="button" class="btn btn-outline-secondary btn-sm fw-bold px-3" data-bs-dismiss="modal">CANCEL</button>
-                    <button type="button" class="btn btn-danger btn-sm fw-bold px-4" onclick="NexusSettings.refreshModelPreview()">REFRESH MODELS</button>
-                    <button type="button" class="btn btn-danger btn-sm fw-bold px-4" onclick="NexusSettings.save()">SAVE SETTINGS</button>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary btn-sm px-3" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-outline-primary btn-sm px-4" onclick="NexusSettings.refreshModelPreview()">Refresh Models</button>
+                    <button type="button" class="btn btn-primary btn-sm px-4" onclick="NexusSettings.save()">Save Settings</button>
                 </div>
             </div>
         </div>
     </div>
 
-    <div class="toast-container">
+    <div class="modal fade" id="canvasModal" tabindex="-1" aria-labelledby="canvasModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-centered">
+            <div class="modal-content bg-white border-0 shadow">
+                <div class="modal-header px-4 py-3">
+                    <div>
+                        <h3 class="modal-title h5 text-dark mb-1 fw-semibold" id="canvasModalLabel">Live Context Canvas</h3>
+                        <p class="text-secondary small mb-0">Workspace brain, architecture, and delivery state.</p>
+                    </div>
+                    <div class="d-flex align-items-center gap-2 ms-auto">
+                        <button type="button" id="refresh-canvas-btn" class="btn btn-outline-primary btn-sm" onclick="NexusApp.refreshContextCanvas()">
+                            <i class="bi bi-arrow-repeat me-2"></i>Refresh Canvas
+                        </button>
+                        <button type="button" class="btn-close ms-2" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                </div>
+                <ul class="nav nav-tabs px-4 pt-3 border-bottom" id="context-canvas-tabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="context-brain-tab" data-bs-toggle="tab" data-bs-target="#context-brain-pane" type="button" role="tab">Project Brain</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="context-architecture-tab" data-bs-toggle="tab" data-bs-target="#context-architecture-pane" type="button" role="tab">Architecture (Mermaid)</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="context-tasks-tab" data-bs-toggle="tab" data-bs-target="#context-tasks-pane" type="button" role="tab">Active Tasks</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="context-telemetry-tab" data-bs-toggle="tab" data-bs-target="#context-telemetry-pane" type="button" role="tab">Telemetry & Logs</button>
+                    </li>
+                </ul>
+                <div class="modal-body p-4 tab-content context-pane-scroll canvas-modal-content" id="context-canvas-content">
+                    <div class="tab-pane fade show active md-content" id="context-brain-pane" role="tabpanel" aria-labelledby="context-brain-tab">
+                        <p class="text-secondary">Open Copilot to load the project brain.</p>
+                    </div>
+                    <div class="tab-pane fade text-center" id="context-architecture-pane" role="tabpanel" aria-labelledby="context-architecture-tab">
+                        <p class="text-secondary">Open Copilot to load architecture.</p>
+                    </div>
+                    <div class="tab-pane fade" id="context-tasks-pane" role="tabpanel" aria-labelledby="context-tasks-tab">
+                        <p class="text-secondary">Open Copilot to load active tasks.</p>
+                    </div>
+                    <div class="tab-pane fade" id="context-telemetry-pane" role="tabpanel" aria-labelledby="context-telemetry-tab">
+                        <div class="d-flex justify-content-between align-items-center gap-3 mb-3">
+                            <h4 class="h6 fw-semibold mb-0">Recent Telemetry</h4>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="NexusApp.copyTelemetryLogs()">
+                                <i class="bi bi-clipboard me-2"></i>Copy to Clipboard
+                            </button>
+                        </div>
+                        <pre id="telemetry-log-output" class="bg-light border rounded p-3 small text-start overflow-auto mb-0" style="min-height: 320px; max-height: 520px;">Open Copilot to load telemetry.</pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="confirmActionModal" tabindex="-1" aria-labelledby="confirmActionTitle" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content bg-white border-0 shadow">
+                <div class="modal-header">
+                    <h5 class="modal-title fw-semibold" id="confirmActionTitle">Confirm Action</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p id="confirmActionMessage" class="mb-0 text-secondary"></p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" id="confirmActionNo" class="btn btn-outline-secondary btn-sm px-3">No</button>
+                    <button type="button" id="confirmActionYes" class="btn btn-danger btn-sm px-3">Yes</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast-container position-fixed top-0 end-0 p-3">
         <div id="nexusToast" class="toast align-items-center border-0 text-white" role="alert" aria-live="assertive" aria-atomic="true">
             <div class="d-flex">
                 <div class="toast-body" id="toast-message"></div>
@@ -98,89 +161,429 @@
         </div>
     </div>
 
-    <div class="container-fluid px-4">
-        <header class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-3 border-secondary-subtle">
-            <div class="d-flex align-items-center gap-3">
-                <div class="bg-danger px-2 py-1 rounded text-black fw-black">N</div>
-                <div>
-                    <h1 class="h4 fw-black mb-0 text-white tracking-tighter">NEXUS <span class="text-danger">OS</span></h1>
-                    <small class="text-secondary fw-bold text-uppercase" style="font-size: 0.55rem; letter-spacing: 3px;">Copilot Control Surface</small>
-                </div>
+    <section id="landing-view" class="landing-screen">
+        <div class="container landing-content">
+            <div class="text-center mb-5">
+                <div class="brand-mark mx-auto mb-3">N</div>
+                <h1 class="h3 fw-semibold mb-2">Nexus Workspace</h1>
+                <p class="text-secondary mb-0">Select a project to open the engineering dashboard.</p>
             </div>
-
-            <div class="d-flex gap-2 align-items-center">
-                <div id="status" class="badge rounded-pill border border-secondary text-secondary font-monospace p-2 me-2">Initializing...</div>
-
-                <select id="active-provider-switch" class="form-select form-select-sm bg-black border-secondary text-white" style="width: 120px;" onchange="NexusSettings.switchProvider(this.value)">
-                    <option value="auto">Auto</option>
-                    <option value="gemini">Gemini</option>
-                    <option value="openai">OpenAI</option>
-                </select>
-
-                <button class="btn btn-outline-secondary btn-sm btn-nexus px-3" onclick="NexusExplorer.copyAllPathsWithNumbers()">
-                    <i class="bi bi-list-ol me-2"></i>Copy List
-                </button>
-
-                <button class="btn btn-outline-secondary btn-sm" onclick="NexusSettings.open()" title="Settings">
-                    <i class="bi bi-gear-fill"></i>
-                </button>
-            </div>
-        </header>
-
-        <div class="row g-4">
-            <div class="col-md-4 col-lg-3">
-                <div id="recent-container"></div>
-
-                <div class="card bg-dark border-secondary mb-3">
-                    <div class="card-header border-secondary p-0 bg-black overflow-hidden">
-                        <ul class="nav nav-tabs border-0">
-                            <li class="nav-item flex-fill">
-                                <button class="nav-link active w-100 py-3 small fw-bold rounded-0" id="tab-arch-btn" onclick="NexusApp.setTab('arch')">EXPLORER</button>
-                            </li>
-                            <li class="nav-item flex-fill">
-                                <button class="nav-link w-100 py-3 small fw-bold rounded-0" id="tab-chat-btn" onclick="NexusApp.setTab('chat')">CHAT</button>
-                            </li>
-                            <li class="nav-item flex-fill">
-                                <button class="nav-link w-100 py-3 small fw-bold rounded-0" id="tab-scripts-btn" onclick="NexusApp.setTab('scripts')">SCRIPTS</button>
-                            </li>
-                            <li class="nav-item flex-fill">
-                                <button class="nav-link w-100 py-3 small fw-bold rounded-0" id="tab-map-btn" onclick="NexusApp.setTab('map')">MAP</button>
-                            </li>
-                        </ul>
-                    </div>
-                    <div class="card-body sidebar p-2" id="file-list"></div>
-                </div>
-
-                <div class="card bg-dark border-secondary p-3">
-                    <div class="input-group mb-3">
-                        <input type="text" id="number-input" class="form-control form-control-sm bg-black border-secondary text-white font-monospace" placeholder="1, 5, 22..." onkeyup="if(event.key==='Enter')NexusExplorer.selectByNumbers()">
-                        <button class="btn btn-danger btn-sm fw-bold px-3" onclick="NexusExplorer.selectByNumbers()">SELECT</button>
-                    </div>
-
-                    <div class="row g-2">
-                        <div class="col-9">
-                            <button class="btn btn-danger btn-sm btn-nexus w-100 py-2" onclick="NexusExplorer.bundleSelected()">
-                                <i class="bi bi-file-zip me-2"></i>Build Bundle
-                            </button>
+            <div class="row g-4 align-items-start">
+                <div class="col-xl-3 sticky-top pt-4">
+                    <aside class="server-health-panel">
+                        <div class="card bg-white border-0 shadow-sm mb-3">
+                            <div class="card-body p-3">
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <h2 class="h6 fw-semibold mb-0">Server Health</h2>
+                                    <span class="badge rounded-pill text-bg-light border text-secondary">Live</span>
+                                </div>
+                                <div class="small text-secondary fw-semibold text-uppercase mb-2">Server Info</div>
+                                <dl class="small mb-0 server-info">
+                                    <div><dt>Platform</dt><dd id="health-platform">Loading...</dd></div>
+                                    <div><dt>Uptime</dt><dd id="health-uptime">--</dd></div>
+                                    <div><dt>Network</dt><dd id="health-interface">--</dd></div>
+                                </dl>
+                            </div>
                         </div>
-                        <div class="col-3">
-                            <button class="btn btn-outline-secondary btn-sm btn-nexus w-100 py-2" onclick="NexusExplorer.clearSelections()">
-                                <i class="bi bi-trash3"></i>
-                            </button>
+                        <div class="card bg-white border-0 shadow-sm mb-3">
+                            <div class="card-body p-3">
+                                <h3 class="h6 fw-semibold mb-3">CPU Per Core</h3>
+                                <div class="health-chart health-chart-cpu">
+                                    <canvas id="health-cpu-chart"></canvas>
+                                </div>
+                            </div>
                         </div>
-                    </div>
+                        <div class="card bg-white border-0 shadow-sm mb-3">
+                            <div class="card-body p-3">
+                                <h3 class="h6 fw-semibold mb-3">RAM / Disk</h3>
+                                <div class="health-chart health-chart-doughnut">
+                                    <canvas id="health-storage-chart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card bg-white border-0 shadow-sm">
+                            <div class="card-body p-3">
+                                <h3 class="h6 fw-semibold mb-1">Network Bandwidth</h3>
+                                <p id="health-bandwidth" class="small text-secondary mb-3">Awaiting interval sample...</p>
+                                <div class="health-chart health-chart-network">
+                                    <canvas id="health-network-chart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </aside>
                 </div>
-            </div>
-
-            <div class="col-md-8 col-lg-9">
-                <div id="inspector" class="card bg-dark border-secondary p-4 shadow-lg overflow-auto">
-                    <div class="h-100 d-flex flex-column align-items-center justify-content-center text-secondary opacity-50">
-                        <i class="bi bi-terminal-split display-1 mb-3"></i>
-                        <p class="text-uppercase small tracking-widest font-monospace">System Ready.</p>
+                <div class="col-xl-9 pt-4">
+                    <div class="row g-4">
+                        {% for project in projects %}
+                        <div class="col-md-6">
+                            <div class="card bg-white border-0 shadow-sm h-100 project-card">
+                                <div class="card-body p-4 d-flex flex-column">
+                                    <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
+                                        <div class="d-flex align-items-center gap-3">
+                                            <i class="bi bi-folder2-open fs-4 text-primary"></i>
+                                            <h2 class="h5 fw-semibold mb-0">{{ project.name }}</h2>
+                                        </div>
+                                        <span class="badge rounded-pill branch-badge">
+                                            <i class="bi bi-git me-1"></i>{{ project.branch }}
+                                        </span>
+                                    </div>
+                                    <div class="d-flex flex-wrap gap-2 mb-3">
+                                        {% for stack in project.stack %}
+                                        <span class="stack-logo-badge" title="{{ stack.name }}">
+                                            {% for icon in stack.icons %}
+                                            <img src="https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/{{ icon }}/{{ icon }}-original.svg" alt="{{ stack.name }} logo">
+                                            {% endfor %}
+                                            <span>{{ stack.name }}</span>
+                                        </span>
+                                        {% endfor %}
+                                    </div>
+                                    <p class="project-summary text-secondary small">{{ project.summary }}</p>
+                                    <div class="project-ports mt-auto mb-3">
+                                        <div class="small fw-semibold text-secondary text-uppercase mb-2">Detected Ports</div>
+                                        <div class="d-flex flex-wrap gap-2">
+                                            {% for port in project.ports %}
+                                            <span class="badge port-badge">{{ port.label }}: {{ port.value }}</span>
+                                            {% else %}
+                                            <span class="small text-secondary">None detected</span>
+                                            {% endfor %}
+                                        </div>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        class="btn btn-primary btn-sm align-self-start"
+                                        data-project-name="{{ project.name }}"
+                                        data-workspace-path="{{ project.path }}"
+                                        onclick="NexusApp.switchProject(this.dataset.workspacePath, this)"
+                                    >
+                                        Enter Workspace
+                                    </button>
+                                </div>
+                                <div class="card-footer project-status-footer px-4 py-3">
+                                    {% if project.telemetry.running %}
+                                    <div class="d-flex align-items-center justify-content-between gap-2 small">
+                                        <span class="fw-semibold text-success">
+                                            <span class="status-pulse me-2"></span>Running
+                                        </span>
+                                        <span class="text-secondary font-monospace">
+                                            {{ project.telemetry.ram_mb }} MB RAM | {{ project.telemetry.cpu_percent }}% CPU
+                                        </span>
+                                    </div>
+                                    {% else %}
+                                    <span class="badge rounded-pill offline-badge">Offline</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        {% else %}
+                        <div class="col-12">
+                            <div class="card bg-white border-0 shadow-sm">
+                                <div class="card-body p-5 text-center text-secondary">
+                                    No workspaces found in <span class="font-monospace">~/garage/workspaces/</span>.
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
                     </div>
                 </div>
             </div>
         </div>
+    </section>
+
+    <div id="app-shell" class="d-none">
+        <aside id="app-sidebar" class="app-sidebar bg-light border-end">
+            <div class="px-4 py-4 border-bottom">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="brand-mark brand-mark-sm">N</div>
+                    <div>
+                        <div class="fw-semibold lh-sm">Nexus OS</div>
+                        <small class="text-secondary">Control Center</small>
+                    </div>
+                </div>
+            </div>
+            <div class="px-3 pt-3">
+                <button type="button" id="switch-project-btn" class="nav-link text-start w-100" onclick="NexusApp.showWelcome()">
+                    <i class="bi bi-arrow-left me-3"></i>Switch Project
+                </button>
+            </div>
+            <nav class="nav flex-column px-3 py-4 gap-1" aria-label="Primary navigation">
+                <button type="button" id="tab-dashboard-btn" class="nav-link active text-start" onclick="NexusApp.showView('dashboard')">
+                    <i class="bi bi-grid-1x2 me-3"></i>Dashboard
+                </button>
+                <button type="button" id="tab-resources-btn" class="nav-link text-start" onclick="NexusApp.showView('resources')">
+                    <i class="bi bi-cpu me-3"></i>Resource Monitor
+                </button>
+                <button type="button" id="tab-arch-btn" class="nav-link text-start" onclick="NexusApp.showView('explorer')">
+                    <i class="bi bi-folder2-open me-3"></i>File Explorer
+                </button>
+                <button type="button" id="tab-chat-btn" class="nav-link text-start" onclick="NexusApp.showView('chat')">
+                    <i class="bi bi-chat-square-text me-3"></i>CTO Copilot
+                </button>
+                <button type="button" id="tab-board-btn" class="nav-link text-start" onclick="NexusApp.showView('board')">
+                    <i class="bi bi-kanban me-3"></i>Orchestration Board
+                </button>
+                <button type="button" id="tab-history-btn" class="nav-link text-start" onclick="NexusApp.showView('history')">
+                    <i class="bi bi-clock-history me-3"></i>Project History
+                </button>
+                <button type="button" id="tab-canvas-btn" class="nav-link text-start" onclick="NexusApp.showView('canvas')">
+                    <i class="bi bi-diagram-3 me-3"></i>Architecture Canvas
+                </button>
+                <button type="button" id="tab-agents-btn" class="nav-link text-start" onclick="NexusApp.showView('agents')">
+                    <i class="bi bi-people me-3"></i>Workforce Hub
+                </button>
+            </nav>
+        </aside>
+
+        <main class="app-main">
+            <header class="bg-white border-bottom px-4 py-3 d-flex justify-content-between align-items-center gap-3 flex-wrap">
+                <div>
+                    <h2 id="view-title" class="h5 mb-0 fw-semibold">Dashboard</h2>
+                    <small class="text-secondary">Engineering workspace operations</small>
+                </div>
+                <div class="d-flex gap-2 align-items-center flex-wrap">
+                    <select id="workspace-navigator" class="form-select form-select-sm workspace-select" onchange="NexusApp.switchProject(this.value, this)">
+                        <option value="">Select project...</option>
+                    </select>
+                    <select id="active-provider-switch" class="form-select form-select-sm provider-select" onchange="NexusSettings.switchProvider(this.value)">
+                        <option value="auto">Auto</option>
+                        <option value="gemini">Gemini</option>
+                        <option value="openai">OpenAI</option>
+                    </select>
+                    <button class="btn btn-outline-secondary btn-sm" onclick="NexusSettings.open()" title="Settings">
+                        <i class="bi bi-gear-fill"></i>
+                    </button>
+                </div>
+            </header>
+
+            <div class="content-area p-4">
+                <div id="view-dashboard" class="spa-view">
+                    <div class="row g-4 mb-4">
+                        <div class="col-lg-8">
+                            <div class="card bg-white border-0 shadow-sm h-100">
+                                <div class="card-body p-4">
+                                    <h3 class="h5 fw-semibold">Workspace Overview</h3>
+                                    <p class="text-secondary">Monitor synchronization, navigate source files, consult the CTO Copilot, and coordinate delivery tasks.</p>
+                                    <div id="status" class="badge text-bg-light border text-secondary font-monospace p-2">Initializing...</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-lg-4">
+                            <div id="recent-container" class="h-100"></div>
+                        </div>
+                    </div>
+                    <div class="row g-4">
+                        <div class="col-md-4">
+                            <div class="card bg-white border-0 shadow-sm h-100">
+                                <div class="card-body p-4">
+                                    <i class="bi bi-folder2-open fs-3 text-primary"></i>
+                                    <h3 class="h6 fw-semibold mt-3">Explore Codebase</h3>
+                                    <p class="small text-secondary">Review project files and generated engineering context.</p>
+                                    <button class="btn btn-outline-primary btn-sm" onclick="NexusApp.showView('explorer')">Open Explorer</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card bg-white border-0 shadow-sm h-100">
+                                <div class="card-body p-4">
+                                    <i class="bi bi-chat-square-text fs-3 text-primary"></i>
+                                    <h3 class="h6 fw-semibold mt-3">CTO Copilot</h3>
+                                    <p class="small text-secondary">Ask architectural questions using selected project files.</p>
+                                    <button class="btn btn-outline-primary btn-sm" onclick="NexusApp.showView('chat')">Open Copilot</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card bg-white border-0 shadow-sm h-100">
+                                <div class="card-body p-4">
+                                    <i class="bi bi-kanban fs-3 text-primary"></i>
+                                    <h3 class="h6 fw-semibold mt-3">Delivery Board</h3>
+                                    <p class="small text-secondary">Manage tasks from backlog through completion.</p>
+                                    <button class="btn btn-outline-primary btn-sm" onclick="NexusApp.showView('board')">Open Board</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="view-resources" class="spa-view d-none">
+                    <div class="card bg-white border-0 shadow-sm">
+                        <div class="card-header bg-white border-bottom p-4">
+                            <h3 class="h5 mb-1 text-dark">Resource Monitor</h3>
+                            <p class="text-secondary mb-0">Processes running from the active workspace. Refreshes every 5 seconds while open.</p>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th class="px-4 py-3">PID</th>
+                                        <th class="py-3">Process Name</th>
+                                        <th class="py-3">RAM%</th>
+                                        <th class="py-3">CPU%</th>
+                                        <th class="px-4 py-3 text-end">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="resources-table-body">
+                                    <tr>
+                                        <td colspan="5" class="text-center text-secondary py-5">Open this view to load active processes.</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="view-explorer" class="spa-view d-none">
+                    <div class="row g-4">
+                        <div class="col-xl-4">
+                            <div class="card bg-white border-0 shadow-sm mb-3">
+                                <div class="card-header bg-white border-bottom fw-semibold">Project Files</div>
+                                <div class="card-body explorer-list p-2" id="file-list"></div>
+                            </div>
+                            <div class="card bg-white border-0 shadow-sm">
+                                <div class="card-body p-3">
+                                    <div class="input-group mb-3">
+                                        <input type="text" id="number-input" class="form-control form-control-sm font-monospace" placeholder="1, 5, 22..." onkeyup="if(event.key==='Enter')NexusExplorer.selectByNumbers()">
+                                        <button class="btn btn-primary btn-sm" onclick="NexusExplorer.selectByNumbers()">Select</button>
+                                    </div>
+                                    <div class="d-flex gap-2">
+                                        <button class="btn btn-primary btn-sm flex-grow-1" onclick="NexusExplorer.bundleSelected()">
+                                            <i class="bi bi-file-zip me-2"></i>Build Bundle
+                                        </button>
+                                        <button class="btn btn-outline-secondary btn-sm" onclick="NexusExplorer.copyAllPathsWithNumbers()">Copy List</button>
+                                        <button class="btn btn-outline-secondary btn-sm" onclick="NexusExplorer.clearSelections()">
+                                            <i class="bi bi-trash3"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-xl-8">
+                            <div id="inspector" class="card bg-white border-0 shadow-sm p-4 overflow-auto">
+                                <div class="h-100 d-flex flex-column align-items-center justify-content-center text-secondary">
+                                    <i class="bi bi-file-earmark-text display-5 mb-3"></i>
+                                    <p class="small">Select a file to inspect its generated context.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="view-chat" class="spa-view d-none">
+                    <div class="row g-4">
+                        <div class="col-12 d-flex">
+                            <div class="card bg-white border-0 shadow-sm copilot-chat-card w-100 d-flex flex-column">
+                                <div class="border-bottom p-4 pb-3 d-flex justify-content-between align-items-start gap-3 flex-wrap">
+                                    <div>
+                                        <h3 class="h4 text-dark mb-1 fw-semibold">CTO Copilot</h3>
+                                        <p class="text-secondary small mb-0">Orchestrator for architectural direction and delegated execution.</p>
+                                    </div>
+                                    <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#canvasModal" onclick="NexusApp.refreshContextCanvas()">
+                                        <i class="bi bi-layout-text-window-reverse me-2"></i>View Live Canvas
+                                    </button>
+                                </div>
+                                <div id="chat-panel" class="p-4 flex-grow-1 d-flex flex-column"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="view-board" class="spa-view d-none">
+                    <div id="board-panel" class="card bg-white border-0 shadow-sm p-4" aria-live="polite"></div>
+                </div>
+
+                <div id="view-history" class="spa-view d-none p-4">
+                    <div class="card bg-white border-0 shadow-sm">
+                        <div class="card-header bg-white border-bottom p-4 d-flex justify-content-between align-items-center gap-3 flex-wrap">
+                            <div>
+                                <h3 class="h5 mb-1 text-dark">Project History</h3>
+                                <p class="text-secondary mb-0">Recorded decisions and automated activity for this workspace.</p>
+                            </div>
+                            <div class="d-flex align-items-center gap-3">
+                                <button id="sync-rag-btn" type="button" class="btn btn-primary btn-sm" onclick="NexusApp.runProfiler()">
+                                    <i class="bi bi-arrow-repeat me-2"></i>Sync CTO Brain (RAG)
+                                </button>
+                                <span id="history-count" class="badge text-bg-light border text-secondary">0 records</span>
+                            </div>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th class="px-4 py-3">Timestamp</th>
+                                        <th class="py-3">Persona</th>
+                                        <th class="py-3">Action Type</th>
+                                        <th class="px-4 py-3">Content / Decision</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="history-table-body">
+                                    <tr>
+                                        <td colspan="4" class="text-center text-secondary py-5">No history loaded.</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="view-canvas" class="spa-view d-none p-4">
+                    <div class="card bg-white border-0 shadow-sm">
+                        <div class="card-header bg-white border-bottom p-4">
+                            <h3 class="h5 mb-1 text-dark">Architecture Canvas</h3>
+                            <p class="text-secondary mb-0">Rendered system topology from the active workspace.</p>
+                        </div>
+                        <div id="architecture-diagram" class="card-body p-4 text-center text-secondary">
+                            Open this view to load the architecture diagram.
+                        </div>
+                    </div>
+                </div>
+
+                <div id="view-agents" class="spa-view d-none p-4">
+                    <div class="mb-4">
+                        <h3 class="h5 mb-1 text-dark">Workforce Hub</h3>
+                        <p class="text-secondary mb-0">Agent roles, active model allocation, and persistent CTO memory.</p>
+                    </div>
+                    <div class="row g-4">
+                        <div class="col-xl-4">
+                            <div class="card bg-white border-0 shadow-sm h-100">
+                                <div class="card-body p-4">
+                                    <h4 class="h5 text-dark mb-1">CTO Copilot</h4>
+                                    <p class="small text-primary fw-semibold">Orchestrator</p>
+                                    <div class="small text-secondary fw-semibold text-uppercase mb-2">Active Model</div>
+                                    <div id="agent-cto-model" class="small font-monospace bg-light border rounded p-2 mb-3">Loading...</div>
+                                    <div class="small text-secondary fw-semibold text-uppercase mb-2">RAG Habits</div>
+                                    <ul id="agent-cto-habits" class="small text-dark ps-3 mb-3"></ul>
+                                    <div class="small text-secondary fw-semibold text-uppercase mb-2">System Prompt</div>
+                                    <pre id="agent-cto-prompt" class="small bg-light border rounded p-3 text-dark text-wrap mb-0"></pre>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-xl-4">
+                            <div class="card bg-white border-0 shadow-sm h-100">
+                                <div class="card-body p-4">
+                                    <h4 class="h5 text-dark mb-1">Architect</h4>
+                                    <p class="small text-primary fw-semibold">System Design</p>
+                                    <div class="small text-secondary fw-semibold text-uppercase mb-2">Active Model</div>
+                                    <div id="agent-architect-model" class="small font-monospace bg-light border rounded p-2 mb-3">Loading...</div>
+                                    <div class="small text-secondary fw-semibold text-uppercase mb-2">System Prompt</div>
+                                    <pre id="agent-architect-prompt" class="small bg-light border rounded p-3 text-dark text-wrap mb-0"></pre>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-xl-4">
+                            <div class="card bg-white border-0 shadow-sm h-100">
+                                <div class="card-body p-4">
+                                    <h4 class="h5 text-dark mb-1">Tech Lead</h4>
+                                    <p class="small text-primary fw-semibold">Execution</p>
+                                    <div class="small text-secondary fw-semibold text-uppercase mb-2">Active Model</div>
+                                    <div id="agent-tech_lead-model" class="small font-monospace bg-light border rounded p-2 mb-3">Loading...</div>
+                                    <div class="small text-secondary fw-semibold text-uppercase mb-2">System Prompt</div>
+                                    <pre id="agent-tech_lead-prompt" class="small bg-light border rounded p-3 text-dark text-wrap mb-0"></pre>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
     </div>
 
     <script src="/static/js/core.js"></script>
@@ -190,6 +593,7 @@
     <script src="/static/js/scripts.js"></script>
     <script src="/static/js/chat.js"></script>
     <script src="/static/js/map.js"></script>
+    <script src="/static/js/kanban.js"></script>
     <script src="/static/js/app.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>

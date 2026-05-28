@@ -1,3 +1,5 @@
+#tester
+
 const renderer = new marked.Renderer();
 
 renderer.code = function (token_or_text, language) {

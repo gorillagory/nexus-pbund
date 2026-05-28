@@ -86,7 +86,13 @@ class ModelRegistry:
             "openai": openai,
         }
 
-    def choose(self, task_profile="auto", provider_preference="auto", manual_overrides=None):
+    def choose(
+        self,
+        task_profile="auto",
+        provider_preference="auto",
+        manual_overrides=None,
+        use_configured_fallback=True,
+    ):
         manual_overrides = manual_overrides or {}
         task_profile = (task_profile or "auto").strip().lower()
         provider_preference = (provider_preference or "auto").strip().lower()
@@ -96,6 +102,7 @@ class ModelRegistry:
                 provider=provider_preference,
                 task_profile=task_profile,
                 manual_model=manual_overrides.get(provider_preference),
+                use_configured_fallback=use_configured_fallback,
             )
             if resolved:
                 return resolved
@@ -107,18 +114,29 @@ class ModelRegistry:
                 provider=provider,
                 task_profile=task_profile,
                 manual_model=manual_overrides.get(provider),
+                use_configured_fallback=use_configured_fallback,
             )
             if resolved:
                 return resolved
 
         return {
             "provider": "gemini",
-            "model": manual_overrides.get("gemini") or self._fallback_model("gemini", task_profile),
+            "model": manual_overrides.get("gemini") or self._fallback_model(
+                "gemini",
+                task_profile,
+                use_configured_model=use_configured_fallback,
+            ),
             "task_profile": task_profile,
             "selection_mode": "fallback",
         }
 
-    def _choose_for_provider(self, provider, task_profile, manual_model=None):
+    def _choose_for_provider(
+        self,
+        provider,
+        task_profile,
+        manual_model=None,
+        use_configured_fallback=True,
+    ):
         if manual_model:
             return {
                 "provider": provider,
@@ -135,7 +153,11 @@ class ModelRegistry:
 
         chosen = self._pick_best_model(provider, task_profile, curated_models)
         if not chosen:
-            chosen = self._fallback_model(provider, task_profile)
+            chosen = self._fallback_model(
+                provider,
+                task_profile,
+                use_configured_model=use_configured_fallback,
+            )
 
         if not chosen:
             return None
@@ -175,17 +197,36 @@ class ModelRegistry:
             "auto": ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-1.5-flash"],
             "plan": ["gemini-2.5-pro", "gemini-2.5-flash", "gemini-1.5-pro"],
             "analysis": ["gemini-2.5-pro", "gemini-2.5-flash", "gemini-1.5-pro"],
-            "deep": ["gemini-2.5-pro", "gemini-2.5-flash", "gemini-1.5-pro"],
+            "deep": ["gemini-2.5-pro", "gemini-1.5-pro"],
             "coding": ["gemini-2.5-pro", "gemini-2.5-flash", "gemini-1.5-pro"],
             "refactor": ["gemini-2.5-pro", "gemini-2.5-flash", "gemini-1.5-pro"],
         }
 
         patterns = ranked_patterns.get(task_profile, ranked_patterns["auto"])
-        return self._match_by_patterns(models, patterns)
+        return self._match_by_patterns(
+            models,
+            patterns,
+            allow_unmatched=task_profile not in {
+                "fast",
+                "bulk",
+                "plan",
+                "analysis",
+                "deep",
+                "coding",
+                "refactor",
+            },
+        )
 
     def _pick_openai_model(self, task_profile, models):
+        if task_profile in {"plan", "analysis", "deep", "coding", "refactor"}:
+            models = [
+                model
+                for model in models
+                if "mini" not in model.lower() and "nano" not in model.lower()
+            ]
+
         ranked_patterns = {
-            "fast": ["gpt-5.4-mini", "gpt-5", "o4-mini", "o3-mini"],
+            "fast": ["gpt-5.4-mini", "o4-mini", "o3-mini"],
             "bulk": ["gpt-5.4-nano", "gpt-5.4-mini", "o4-mini", "o3-mini"],
             "balanced": ["gpt-5", "gpt-5.4-mini", "o4-mini"],
             "auto": ["gpt-5.5", "gpt-5", "gpt-5.4-mini", "o4"],
@@ -197,9 +238,21 @@ class ModelRegistry:
         }
 
         patterns = ranked_patterns.get(task_profile, ranked_patterns["auto"])
-        return self._match_by_patterns(models, patterns)
+        return self._match_by_patterns(
+            models,
+            patterns,
+            allow_unmatched=task_profile not in {
+                "fast",
+                "bulk",
+                "plan",
+                "analysis",
+                "deep",
+                "coding",
+                "refactor",
+            },
+        )
 
-    def _match_by_patterns(self, models, patterns):
+    def _match_by_patterns(self, models, patterns, allow_unmatched=True):
         lower_map = {model.lower(): model for model in models}
 
         for pattern in patterns:
@@ -207,12 +260,12 @@ class ModelRegistry:
                 if pattern in lowered:
                     return original
 
-        return models[0] if models else None
+        return models[0] if models and allow_unmatched else None
 
-    def _fallback_model(self, provider, task_profile):
+    def _fallback_model(self, provider, task_profile, use_configured_model=True):
         settings_key = f"{provider}_model"
         configured = (self.settings.get(settings_key) or "").strip()
-        if configured:
+        if configured and use_configured_model:
             return configured
 
         if provider == "gemini":
@@ -222,7 +275,7 @@ class ModelRegistry:
 
         if provider == "openai":
             if task_profile in {"fast", "bulk"}:
-                return "gpt-5"
+                return "gpt-5.4-mini"
             return "gpt-5.5"
 
         return None

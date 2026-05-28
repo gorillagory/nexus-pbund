@@ -43,7 +43,7 @@ window.NexusInspector = {
         }
 
         NexusState.currentRawMd = "";
-        ctxDiv.innerHTML = `<div class="alert alert-dark border-secondary text-center small"><i class="bi bi-cpu me-2"></i>No AI context generated. Click Build Context above.</div>`;
+        ctxDiv.innerHTML = `<div class="alert alert-light border text-center small"><i class="bi bi-cpu me-2"></i>No AI context generated. Click Build Context above.</div>`;
     },
 
     async buildContext(path) {
@@ -89,9 +89,9 @@ window.NexusInspector = {
         const inspector = document.getElementById("inspector");
 
         inspector.innerHTML = `
-            <div class="d-flex justify-content-between align-items-start border-bottom border-secondary pb-3 mb-4">
+            <div class="d-flex justify-content-between align-items-start border-bottom pb-3 mb-4">
                 <div>
-                    <h4 class="text-white mb-1 fw-black">${path.split("/").pop()}</h4>
+                    <h4 class="text-dark mb-1 fw-semibold">${path.split("/").pop()}</h4>
                     <code class="text-secondary small font-monospace">${path}</code>
                 </div>
                 <div class="d-flex gap-2">
