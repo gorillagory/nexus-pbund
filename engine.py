@@ -141,6 +141,50 @@ def calculate_prompt_timeout(prompt):
     return min(300, 45 + ((prompt_length + 49) // 50))
 
 
+def extract_json_int_array(text):
+    if not text:
+        return []
+
+    cleaned = str(text).strip()
+    if cleaned.startswith("```") and cleaned.endswith("```"):
+        lines = cleaned.splitlines()
+        if len(lines) >= 2:
+            cleaned = "\n".join(lines[1:-1]).strip()
+
+    start = cleaned.find("[")
+    if start == -1:
+        return []
+
+    depth = 0
+    end = -1
+    for index in range(start, len(cleaned)):
+        char = cleaned[index]
+        if char == "[":
+            depth += 1
+        elif char == "]":
+            depth -= 1
+            if depth == 0:
+                end = index + 1
+                break
+
+    if end == -1:
+        return []
+
+    try:
+        parsed = json.loads(cleaned[start:end])
+    except (TypeError, ValueError):
+        return []
+
+    if not isinstance(parsed, list):
+        return []
+
+    return [
+        item
+        for item in parsed
+        if isinstance(item, int) and not isinstance(item, bool)
+    ]
+
+
 def should_ignore_workspace_path(file_path, workspace_root):
     try:
         absolute_path = os.path.abspath(file_path)
@@ -306,15 +350,20 @@ class NexusEngine:
     def save_settings(self, new_settings):
         allowed_keys = {
             "provider",
+            "api_key",
             "gemini_api_key",
             "gemini_model",
             "openai_api_key",
             "openai_model",
             "model_selection_mode",
         }
+        secret_keys = {"api_key", "gemini_api_key", "openai_api_key"}
 
         for key, value in new_settings.items():
             if key in allowed_keys:
+                submitted_value = "" if value is None else str(value).strip()
+                if key in secret_keys and not submitted_value and self.settings.get(key):
+                    continue
                 self.settings[key] = value
 
         provider = (self.settings.get("provider") or "auto").strip().lower()
@@ -330,7 +379,22 @@ class NexusEngine:
 
         self.model_registry = ModelRegistry(self.settings)
 
-        return {"status": "success", "settings": self.settings}
+        return {"status": "success", "settings": self.public_settings()}
+
+    def public_settings(self):
+        public = dict(self.settings)
+        public.pop("gemini_api_key", None)
+        public.pop("openai_api_key", None)
+        public.pop("api_key", None)
+
+        gemini_key = (self.settings.get("gemini_api_key") or "").strip()
+        openai_key = (self.settings.get("openai_api_key") or "").strip()
+        gemini_env_key = (os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY") or "").strip()
+        openai_env_key = (os.getenv("OPENAI_API_KEY") or "").strip()
+
+        public["gemini_api_key_configured"] = bool(gemini_key or gemini_env_key)
+        public["openai_api_key_configured"] = bool(openai_key or openai_env_key)
+        return public
 
     def list_models(self, provider=None, force=False):
         start_time = time.monotonic()
@@ -618,14 +682,25 @@ class NexusEngine:
             flush=True,
         )
         try:
-            result = await loop.run_in_executor(
-                None,
-                lambda: self._call_ai(
-                    qa_prompt,
-                    task_profile="fast",
-                    agent_role="qa_agent",
+            timeout_seconds = calculate_prompt_timeout(qa_prompt)
+            result = await asyncio.wait_for(
+                loop.run_in_executor(
+                    None,
+                    lambda: self._call_ai(
+                        qa_prompt,
+                        task_profile="fast",
+                        agent_role="qa_agent",
+                    ),
                 ),
+                timeout=timeout_seconds,
             )
+        except asyncio.TimeoutError:
+            print(
+                ">>> [QA LEAD] Completion check timed out after {} seconds.".format(
+                    timeout_seconds
+                )
+            )
+            return []
         except Exception as exception:
             print(f">>> [QA LEAD] Completion check failed: {exception}")
             return []
@@ -637,24 +712,12 @@ class NexusEngine:
             print(f">>> [QA LEAD] Completion check failed: {result.get('message', 'Unknown error.')}")
             return []
 
-        try:
-            completed_ids = json.loads(raw_response)
-        except (TypeError, ValueError) as exception:
-            print(
-                ">>> [QA AGENT ERROR] Failed to parse JSON. AI hallucinated format.",
-                flush=True,
-            )
-            LOGGER.exception("QA agent returned invalid completion JSON.")
-            return []
-
-        if not isinstance(completed_ids, list) or any(
-            not isinstance(task_id, int) or isinstance(task_id, bool)
-            for task_id in completed_ids
-        ):
-            print(">>> [QA LEAD] Invalid completion JSON: expected an integer array.")
-            return []
-
+        completed_ids = extract_json_int_array(raw_response)
         active_ids = {task["id"] for task in task_payload}
+        invalid_ids = sorted({task_id for task_id in completed_ids if task_id not in active_ids})
+        if invalid_ids:
+            print(f">>> [QA LEAD] Ignoring invalid completed task IDs: {invalid_ids}")
+
         resolved_ids = sorted({task_id for task_id in completed_ids if task_id in active_ids})
         if not resolved_ids:
             return []

@@ -52,6 +52,7 @@ IGNORE_DIR_NAMES = {
 
 IGNORE_FILE_NAMES = {
     "scratch.txt",
+    "settings.json",
     ".env",
     ".env.local",
     ".env.production",
@@ -176,6 +177,9 @@ def should_ignore_dir(path, root, output_dir):
 
 def should_ignore_file(path, root, output_file, output_dir, max_file_size_kb):
     if path.name in IGNORE_FILE_NAMES:
+        return True
+
+    if path.name.startswith(".env."):
         return True
 
     if output_file and path.resolve() == output_file.resolve():

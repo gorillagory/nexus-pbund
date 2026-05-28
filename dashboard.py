@@ -22,6 +22,7 @@ from database import get_db
 from engine import NexusWatcher, calculate_prompt_timeout
 from models import ChatSession, Footprint, Message, Task, UserProfile, Workspace
 from src.api.project_routes import projects_blueprint
+from src.services.codex_runner import CodexRunner
 
 
 active_watcher = None
@@ -650,59 +651,33 @@ class AutonomousQueue:
     @classmethod
     def _execute_codex(cls, task, workspace_path):
         prompt = cls._codex_prompt(task["description"])
-        command = ["codex", "exec", prompt]
-        timeout_seconds = calculate_prompt_timeout(prompt)
-        environment = os.environ.copy()
-        environment.update(
-            {
-                "CI": "true",
-                "DEBIAN_FRONTEND": "noninteractive",
-                "PYTHONUNBUFFERED": "1",
-            }
+        result = CodexRunner(timeout_factory=calculate_prompt_timeout).run(
+            prompt,
+            workspace_path,
+            task_id=task.get("id"),
         )
-        start_time = time.monotonic()
-        try:
-            process = subprocess.run(
-                command,
-                cwd=workspace_path,
-                env=environment,
-                stdin=subprocess.DEVNULL,
-                capture_output=True,
-                text=True,
-                timeout=timeout_seconds,
-                check=False,
-                start_new_session=True,
-            )
-        except subprocess.TimeoutExpired as exception:
-            stdout = (
-                exception.stdout.decode("utf-8", errors="replace")
-                if isinstance(exception.stdout, bytes)
-                else (exception.stdout or "")
-            )
-            stderr = (
-                exception.stderr.decode("utf-8", errors="replace")
-                if isinstance(exception.stderr, bytes)
-                else (exception.stderr or "")
-            )
-            error = f"Codex execution timed out after {timeout_seconds} seconds."
+
+        if result.status == "timeout":
+            error = "Codex execution timed out after {} seconds.".format(result.timeout_seconds)
             append_codex_telemetry(
                 {
                     "task_id": task.get("id"),
                     "action": "codex_exec",
-                    "execution_time": round(time.monotonic() - start_time, 3),
-                    "return_code": -1,
-                    "timeout_seconds": timeout_seconds,
-                    "token_usage": _extract_cli_token_usage(f"{stdout}\n{stderr}"),
-                    "stderr": stderr,
+                    "execution_time": round(result.execution_time, 3),
+                    "return_code": result.returncode,
+                    "timeout_seconds": result.timeout_seconds,
+                    "token_usage": result.token_usage,
+                    "stderr": result.stderr,
                     "error": error,
                 },
                 base_dir=workspace_path,
             )
+            exception = TimeoutError(error)
             cls._write_crash_log(
                 workspace_path,
                 exception,
-                stdout=exception.stdout,
-                stderr=exception.stderr,
+                stdout=result.stdout,
+                stderr=result.stderr,
             )
             raise RuntimeError(error) from exception
 
@@ -710,24 +685,24 @@ class AutonomousQueue:
             {
                 "task_id": task.get("id"),
                 "action": "codex_exec",
-                "execution_time": round(time.monotonic() - start_time, 3),
-                "return_code": process.returncode,
-                "timeout_seconds": timeout_seconds,
-                "token_usage": _extract_cli_token_usage(f"{process.stdout}\n{process.stderr}"),
-                "stderr": process.stderr,
-                "error": process.stderr if process.returncode != 0 else "",
+                "execution_time": round(result.execution_time, 3),
+                "return_code": result.returncode,
+                "timeout_seconds": result.timeout_seconds,
+                "token_usage": result.token_usage,
+                "stderr": result.stderr,
+                "error": result.stderr if result.returncode != 0 else "",
             },
             base_dir=workspace_path,
         )
 
-        if process.returncode != 0:
-            error = process.stderr.strip() or process.stdout.strip() or "Codex execution failed."
+        if result.returncode != 0:
+            error = result.stderr.strip() or result.stdout.strip() or "Codex execution failed."
             exception = RuntimeError(error)
             cls._write_crash_log(
                 workspace_path,
                 exception,
-                stdout=process.stdout,
-                stderr=process.stderr,
+                stdout=result.stdout,
+                stderr=result.stderr,
             )
             raise exception
 
@@ -1195,17 +1170,22 @@ class NexusDashboard:
 
             command_prompt = prompt.strip()
             try:
-                process = subprocess.Popen(
-                    ["codex", "exec", command_prompt],
-                    cwd=workspace_path,
-                    stdin=subprocess.DEVNULL,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    text=True,
+                codex_result = CodexRunner(timeout_factory=calculate_prompt_timeout).run(
+                    command_prompt,
+                    workspace_path,
                 )
-                stdout, stderr = process.communicate()
             except OSError as exception:
-                return jsonify({"status": "error", "stdout": "", "stderr": str(exception)}), 500
+                return jsonify(
+                    {
+                        "status": "error",
+                        "stdout": "",
+                        "stderr": str(exception),
+                        "returncode": -1,
+                        "timeout_seconds": 0,
+                        "execution_time": 0,
+                        "token_usage": {},
+                    }
+                ), 500
 
             try:
                 footprint = save_footprints(
@@ -1221,19 +1201,24 @@ class NexusDashboard:
             except Exception:
                 raise
 
-            execution_status = (
-                "success"
-                if process.returncode == 0 and not stderr.strip()
-                else "error"
-            )
+            status_code = 200
+            if codex_result.status == "failed":
+                status_code = 500
+            elif codex_result.status == "timeout":
+                status_code = 504
+
             return jsonify(
                 {
-                    "status": execution_status,
-                    "stdout": stdout,
-                    "stderr": stderr,
+                    "status": codex_result.status,
+                    "stdout": codex_result.stdout,
+                    "stderr": codex_result.stderr,
+                    "returncode": codex_result.returncode,
+                    "timeout_seconds": codex_result.timeout_seconds,
+                    "execution_time": codex_result.execution_time,
+                    "token_usage": codex_result.token_usage,
                     "footprint_id": footprint.id,
                 }
-            ), (200 if execution_status == "success" else 500)
+            ), status_code
 
         @self.app.route("/api/chat-history", methods=["GET"])
         def get_chat_history():
@@ -1357,7 +1342,7 @@ class NexusDashboard:
 
         @self.app.route("/api/settings", methods=["GET"])
         def get_settings():
-            return jsonify(self.engine.settings)
+            return jsonify(self.engine.public_settings())
 
         @self.app.route("/api/settings", methods=["POST"])
         def save_settings():

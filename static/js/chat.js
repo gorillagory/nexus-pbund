@@ -567,7 +567,7 @@ window.NexusChat = {
                 }),
             });
             const data = await response.json();
-            if (!response.ok || data.status !== "success" || (data.stderr || "").trim()) {
+            if (!response.ok || data.status !== "success") {
                 throw new Error((data.stderr || data.stdout || "Codex execution failed.").trim());
             }
 

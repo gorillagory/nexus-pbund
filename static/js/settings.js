@@ -6,9 +6,17 @@ window.NexusSettings = {
 
             document.getElementById("input-provider").value = data.provider || "auto";
             document.getElementById("input-model-selection-mode").value = data.model_selection_mode || "auto";
-            document.getElementById("input-gemini-api-key").value = data.gemini_api_key || "";
+            const geminiKeyEl = document.getElementById("input-gemini-api-key");
+            geminiKeyEl.value = "";
+            geminiKeyEl.placeholder = data.gemini_api_key_configured
+                ? "Configured — leave blank to keep existing key"
+                : "Enter API key";
             document.getElementById("input-gemini-model").value = data.gemini_model || "";
-            document.getElementById("input-openai-api-key").value = data.openai_api_key || "";
+            const openaiKeyEl = document.getElementById("input-openai-api-key");
+            openaiKeyEl.value = "";
+            openaiKeyEl.placeholder = data.openai_api_key_configured
+                ? "Configured — leave blank to keep existing key"
+                : "Enter API key";
             document.getElementById("input-openai-model").value = data.openai_model || "";
 
             this.syncProviderSwitch(data.provider || "auto");
