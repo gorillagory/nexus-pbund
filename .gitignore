@@ -1,11 +1,60 @@
-__pycache__/
-*.pyc
-.venv/
+# Secrets
 .env
+.env.*
+!.env.example
 settings.json
+
+# Nexus generated state
+.nexus/
+.codex/
 output/
 context/
-*.log
+pbund/
+nexus-pbund
+scratch.txt
+
+# PostgreSQL / local data
+.postgres-data/
+.postgress-data/
+postgres-data/
+postgres_data/
+pgdata/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+venv/
+.venv/
+env/
+site-packages/
+
+# JavaScript / frontend deps
+node_modules/
+.npm/
+.pnpm-store/
+
+# Build/cache
+dist/
+build/
+coverage/
+.cache/
+tmp/
+temp/
+logs/
+storage/
+.next/
+.nuxt/
+.turbo/
+.parcel-cache/
+
+# OS/editor
 .DS_Store
+Thumbs.db
 .idea/
 .vscode/
