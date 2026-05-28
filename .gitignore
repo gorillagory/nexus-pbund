@@ -58,3 +58,7 @@ storage/
 Thumbs.db
 .idea/
 .vscode/
+
+# Runtime logs
+autopilot_crash.log
+*.log
