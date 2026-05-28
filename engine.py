@@ -24,6 +24,8 @@ load_dotenv()
 
 LOGGER = logging.getLogger(__name__)
 
+ALLOWED_EXECUTION_MODES = {"manual", "autopilot"}
+
 
 EXCLUDE_DIRS = {
     ".git",
@@ -202,6 +204,16 @@ def should_ignore_workspace_path(file_path, workspace_root):
     return absolute_path.endswith(tuple(EXCLUDE_EXTS))
 
 
+def normalize_execution_mode(value):
+    if value is None:
+        return "manual"
+
+    mode = str(value).strip().lower()
+    if mode in ALLOWED_EXECUTION_MODES:
+        return mode
+    return "manual"
+
+
 class NexusEngine:
     def __init__(self, target_dir):
         self.target_dir = os.path.abspath(target_dir)
@@ -313,6 +325,7 @@ class NexusEngine:
             "openai_api_key": "",
             "openai_model": "",
             "model_selection_mode": "auto",
+            "execution_mode": "manual",
         }
 
         saved = {}
@@ -345,6 +358,8 @@ class NexusEngine:
         if defaults["model_selection_mode"] not in {"auto", "manual"}:
             defaults["model_selection_mode"] = "auto"
 
+        defaults["execution_mode"] = normalize_execution_mode(defaults.get("execution_mode"))
+
         return defaults
 
     def save_settings(self, new_settings):
@@ -356,6 +371,7 @@ class NexusEngine:
             "openai_api_key",
             "openai_model",
             "model_selection_mode",
+            "execution_mode",
         }
         secret_keys = {"api_key", "gemini_api_key", "openai_api_key"}
 
@@ -374,6 +390,8 @@ class NexusEngine:
         if mode not in {"auto", "manual"}:
             self.settings["model_selection_mode"] = "auto"
 
+        self.settings["execution_mode"] = normalize_execution_mode(self.settings.get("execution_mode"))
+
         with open(self.settings_file, "w", encoding="utf-8") as file:
             json.dump(self.settings, file, indent=2)
 
@@ -381,11 +399,20 @@ class NexusEngine:
 
         return {"status": "success", "settings": self.public_settings()}
 
+    def get_execution_mode(self):
+        return normalize_execution_mode(self.settings.get("execution_mode"))
+
+    def set_execution_mode(self, mode):
+        normalized_mode = normalize_execution_mode(mode)
+        self.save_settings({"execution_mode": normalized_mode})
+        return normalized_mode
+
     def public_settings(self):
         public = dict(self.settings)
         public.pop("gemini_api_key", None)
         public.pop("openai_api_key", None)
         public.pop("api_key", None)
+        public["execution_mode"] = self.get_execution_mode()
 
         gemini_key = (self.settings.get("gemini_api_key") or "").strip()
         openai_key = (self.settings.get("openai_api_key") or "").strip()

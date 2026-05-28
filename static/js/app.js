@@ -29,6 +29,7 @@ window.NexusApp = {
         running: false,
         state: "idle",
     },
+    executionMode: "manual",
 
     setTab(tab) {
         const tabViews = {
@@ -867,10 +868,19 @@ window.NexusApp = {
                 <div class="row g-3">
                     <div class="col-md-4">
                         <div class="card bg-light border h-100 p-3">
-                            <div class="d-flex justify-content-between align-items-center gap-2 mb-3">
-                                <h6 class="text-primary fw-bold text-uppercase mb-0">To-Do</h6>
+                            <div class="d-flex justify-content-between align-items-start gap-2 mb-3 flex-wrap">
+                                <div>
+                                    <h6 class="text-primary fw-bold text-uppercase mb-2">To-Do</h6>
+                                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                                        <span id="execution-mode-indicator" class="badge text-bg-warning border">Manual Mode</span>
+                                        <div class="btn-group btn-group-sm" role="group" aria-label="Execution mode">
+                                            <button id="execution-mode-manual-btn" type="button" class="btn btn-outline-secondary" onclick="NexusApp.setExecutionMode('manual')">Manual</button>
+                                            <button id="execution-mode-autopilot-btn" type="button" class="btn btn-outline-secondary" onclick="NexusApp.setExecutionMode('autopilot')">Auto-Pilot</button>
+                                        </div>
+                                    </div>
+                                </div>
                                 <button id="auto-pilot-btn" type="button" class="btn btn-outline-primary btn-sm" onclick="NexusApp.engageAutoPilot()">
-                                    Engage Auto-Pilot
+                                    Auto-Pilot Disabled in Manual Mode
                                 </button>
                             </div>
                             <div id="tasks-todo" class="d-flex flex-column gap-3"></div>
@@ -893,6 +903,7 @@ window.NexusApp = {
         `;
 
         this.renderTasks(NexusState.tasks);
+        this.renderExecutionMode();
         this.updateAutoPilotUI();
     },
 
@@ -977,6 +988,43 @@ window.NexusApp = {
         });
     },
 
+    extractCodexCommand(description) {
+        const match = String(description || "").match(/codex\s+"(?:\\.|[^"\\])*"/);
+        return match ? match[0] : "";
+    },
+
+    async copyTextToClipboard(text) {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            await navigator.clipboard.writeText(text);
+            return;
+        }
+
+        const textarea = document.createElement("textarea");
+        textarea.value = text;
+        textarea.setAttribute("readonly", "");
+        textarea.style.position = "fixed";
+        textarea.style.left = "-9999px";
+        document.body.appendChild(textarea);
+        textarea.select();
+        try {
+            const copied = document.execCommand("copy");
+            if (!copied) {
+                throw new Error("Clipboard copy failed.");
+            }
+        } finally {
+            document.body.removeChild(textarea);
+        }
+    },
+
+    async copyCodexCommand(command) {
+        try {
+            await this.copyTextToClipboard(command);
+            NexusCore.showToast("Codex command copied.", "success");
+        } catch (error) {
+            NexusCore.showToast("Unable to copy Codex command.", "error");
+        }
+    },
+
     createTaskCard(task) {
         const card = document.createElement("div");
         card.className = "card bg-white border p-3";
@@ -1009,6 +1057,18 @@ window.NexusApp = {
 
         const controls = document.createElement("div");
         controls.className = "d-flex flex-wrap gap-2";
+        const codexCommand = this.extractCodexCommand(task.description);
+
+        if (codexCommand) {
+            const copyButton = document.createElement("button");
+            copyButton.type = "button";
+            copyButton.className = "btn btn-outline-secondary btn-sm";
+            copyButton.textContent = "Copy Codex";
+            copyButton.addEventListener("click", () => {
+                this.copyCodexCommand(codexCommand);
+            });
+            controls.appendChild(copyButton);
+        }
 
         const addStatusButton = (label, status, styleClass = "btn-outline-primary") => {
             const button = document.createElement("button");
@@ -1075,9 +1135,88 @@ window.NexusApp = {
         }
     },
 
+    async loadExecutionMode() {
+        try {
+            const response = await fetch("/api/execution-mode");
+            const data = await response.json();
+            if (!response.ok || data.status !== "success") {
+                throw new Error(data.message || "Unable to load execution mode.");
+            }
+
+            this.executionMode = data.execution_mode || "manual";
+            this.renderExecutionMode();
+            this.updateAutoPilotUI();
+        } catch (error) {
+            NexusCore.showToast(`Error: ${error.message}`, "error");
+        }
+    },
+
+    async setExecutionMode(mode) {
+        try {
+            const response = await fetch("/api/execution-mode", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ execution_mode: mode }),
+            });
+            const data = await response.json();
+            if (!response.ok || data.status !== "success") {
+                throw new Error(data.message || "Unable to update execution mode.");
+            }
+
+            this.executionMode = data.execution_mode || "manual";
+            this.renderExecutionMode();
+            this.updateAutoPilotUI();
+            NexusCore.showToast(
+                this.executionMode === "autopilot"
+                    ? "Execution mode set to Auto-Pilot."
+                    : "Execution mode set to Manual.",
+                "success",
+            );
+        } catch (error) {
+            NexusCore.showToast(`Error: ${error.message}`, "error");
+        }
+    },
+
+    renderExecutionMode() {
+        const isAutoPilot = this.executionMode === "autopilot";
+        const label = isAutoPilot ? "Auto-Pilot Mode" : "Manual Mode";
+        const indicatorClass = isAutoPilot
+            ? "badge text-bg-primary border"
+            : "badge text-bg-warning border";
+
+        ["execution-mode-indicator", "execution-mode-header"].forEach((id) => {
+            const indicator = document.getElementById(id);
+            if (!indicator) {
+                return;
+            }
+            indicator.textContent = label;
+            indicator.className = indicatorClass;
+        });
+
+        const manualButton = document.getElementById("execution-mode-manual-btn");
+        const autoPilotButton = document.getElementById("execution-mode-autopilot-btn");
+        if (manualButton) {
+            manualButton.className = isAutoPilot
+                ? "btn btn-outline-secondary"
+                : "btn btn-warning";
+        }
+        if (autoPilotButton) {
+            autoPilotButton.className = isAutoPilot
+                ? "btn btn-primary"
+                : "btn btn-outline-secondary";
+        }
+    },
+
     updateAutoPilotUI() {
         const button = document.getElementById("auto-pilot-btn");
         if (!button) {
+            return;
+        }
+
+        if (this.executionMode !== "autopilot") {
+            button.disabled = true;
+            button.className = "btn btn-outline-secondary btn-sm";
+            button.innerHTML = "Auto-Pilot Disabled in Manual Mode";
             return;
         }
 
@@ -1140,6 +1279,12 @@ window.NexusApp = {
     },
 
     async engageAutoPilot() {
+        if (this.executionMode !== "autopilot") {
+            showToast("Auto-Pilot is disabled while execution mode is manual.", "danger");
+            this.updateAutoPilotUI();
+            return;
+        }
+
         if (!NexusState.currentWorkspaceId) {
             showToast("Select an active workspace before engaging Auto-Pilot.", "danger");
             return;
@@ -1185,6 +1330,8 @@ window.NexusApp = {
         } catch (error) {
             console.error(error);
         }
+
+        await this.loadExecutionMode();
 
         document.addEventListener("shown.bs.collapse", (event) => {
             NexusState.expandedStates[event.target.id] = true;

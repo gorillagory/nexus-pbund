@@ -1051,6 +1051,16 @@ class NexusDashboard:
             active_workspace_id = get_workspace_id(self.engine.target_dir)
             if workspace_id != active_workspace_id:
                 return jsonify({"status": "error", "message": "Workspace is not active."}), 403
+            execution_mode = self.engine.get_execution_mode()
+            if execution_mode != "autopilot":
+                return jsonify(
+                    {
+                        "status": "error",
+                        "message": "Auto-Pilot is disabled while execution mode is manual.",
+                        "execution_mode": execution_mode,
+                        "queue": self.autonomous_queue.status(),
+                    }
+                ), 403
             if not self.autonomous_queue.is_configured():
                 return jsonify(
                     {
@@ -1072,6 +1082,31 @@ class NexusDashboard:
         @self.app.route("/api/tasks/auto-run/status", methods=["GET"])
         def auto_run_status():
             return jsonify({"status": "success", "queue": self.autonomous_queue.status()})
+
+        @self.app.route("/api/execution-mode", methods=["GET"])
+        def get_execution_mode():
+            current_mode = self.engine.get_execution_mode()
+            return jsonify(
+                {
+                    "status": "success",
+                    "execution_mode": current_mode,
+                    "allowed_modes": ["manual", "autopilot"],
+                    "autopilot_allowed": current_mode == "autopilot",
+                }
+            )
+
+        @self.app.route("/api/execution-mode", methods=["POST"])
+        def set_execution_mode():
+            payload = request.json or {}
+            current_mode = self.engine.set_execution_mode(payload.get("execution_mode"))
+            return jsonify(
+                {
+                    "status": "success",
+                    "execution_mode": current_mode,
+                    "allowed_modes": ["manual", "autopilot"],
+                    "autopilot_allowed": current_mode == "autopilot",
+                }
+            )
 
         @self.app.route("/api/footprint", methods=["POST"])
         def create_footprint():
