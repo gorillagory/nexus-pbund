@@ -441,6 +441,242 @@ pre {
     text-align: left;
 }
 
+.factory-console-panel {
+    background: #f8fafc;
+    border: 1px solid #e6edf5;
+    border-radius: 8px;
+    padding: 1rem;
+}
+
+.factory-summary-card,
+.factory-preflight-metric {
+    background: #fff;
+    border: 1px solid #e6edf5;
+    border-radius: 8px;
+    min-height: 78px;
+    padding: 0.85rem;
+}
+
+.factory-summary-label {
+    color: #6c757d;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0;
+    text-transform: uppercase;
+}
+
+.factory-summary-value {
+    font-size: 1rem;
+    font-weight: 700;
+    margin-top: 0.2rem;
+    overflow-wrap: anywhere;
+}
+
+.factory-status-badge {
+    border-radius: 999px;
+    display: inline-flex;
+    font-size: 0.72rem;
+    font-weight: 700;
+    line-height: 1;
+    padding: 0.38rem 0.58rem;
+    text-transform: uppercase;
+}
+
+.factory-status-pass {
+    color: #146c43;
+}
+
+.factory-status-fail {
+    color: #b02a37;
+}
+
+.factory-status-running {
+    color: #0b5ed7;
+}
+
+.factory-status-idle,
+.factory-status-neutral {
+    color: #495057;
+}
+
+.factory-status-badge.factory-status-pass {
+    background: #d1e7dd;
+    border: 1px solid #a3cfbb;
+}
+
+.factory-status-badge.factory-status-fail {
+    background: #f8d7da;
+    border: 1px solid #f1aeb5;
+}
+
+.factory-status-badge.factory-status-running {
+    background: #cfe2ff;
+    border: 1px solid #9ec5fe;
+}
+
+.factory-status-badge.factory-status-idle,
+.factory-status-badge.factory-status-neutral {
+    background: #e9ecef;
+    border: 1px solid #dee2e6;
+}
+
+.factory-state-grid div {
+    align-items: baseline;
+    border-bottom: 1px solid #edf1f5;
+    display: grid;
+    gap: 0.75rem;
+    grid-template-columns: 130px minmax(0, 1fr);
+    padding: 0.45rem 0;
+}
+
+.factory-state-grid div:last-child {
+    border-bottom: 0;
+}
+
+.factory-state-grid dt {
+    color: #6c757d;
+    font-size: 0.78rem;
+    font-weight: 700;
+}
+
+.factory-state-grid dd {
+    color: #212529;
+    margin: 0;
+    overflow-wrap: anywhere;
+}
+
+.factory-guidance-title {
+    color: #212529;
+    font-weight: 700;
+    margin-bottom: 0.45rem;
+}
+
+.factory-guidance-copy {
+    color: #495057;
+    font-size: 0.88rem;
+    line-height: 1.5;
+}
+
+.factory-event-timeline {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.factory-event-item {
+    display: grid;
+    gap: 0.75rem;
+    grid-template-columns: 30px minmax(0, 1fr);
+}
+
+.factory-event-icon {
+    align-items: center;
+    background: #e7f1ff;
+    border: 1px solid #cfe2ff;
+    border-radius: 999px;
+    color: #0d6efd;
+    display: flex;
+    height: 30px;
+    justify-content: center;
+    width: 30px;
+}
+
+.factory-event-body {
+    background: #fff;
+    border: 1px solid #edf1f5;
+    border-radius: 8px;
+    padding: 0.65rem 0.75rem;
+}
+
+.factory-event-head {
+    align-items: baseline;
+    display: flex;
+    gap: 0.75rem;
+    justify-content: space-between;
+}
+
+.factory-event-type {
+    color: #212529;
+    font-weight: 700;
+    overflow-wrap: anywhere;
+}
+
+.factory-event-time,
+.factory-event-meta {
+    color: #6c757d;
+    font-size: 0.76rem;
+}
+
+.factory-event-message {
+    color: #495057;
+    margin-top: 0.25rem;
+    overflow-wrap: anywhere;
+}
+
+.factory-runs-table-wrap {
+    overflow-x: auto;
+}
+
+.factory-runs-table {
+    min-width: 980px;
+}
+
+.factory-runs-table th {
+    color: #6c757d;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+}
+
+.factory-run-preview {
+    max-width: 240px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.factory-changed-files {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    list-style: none;
+    margin: 0.75rem 0 0;
+    padding: 0;
+}
+
+.factory-changed-file {
+    align-items: baseline;
+    background: #fff;
+    border: 1px solid #edf1f5;
+    border-radius: 6px;
+    display: flex;
+    gap: 0.6rem;
+    padding: 0.42rem 0.55rem;
+}
+
+.factory-file-status {
+    color: #0d6efd;
+    font-family: "Cascadia Code", monospace;
+    font-weight: 700;
+}
+
+.factory-diff-stat,
+.factory-preflight-output {
+    background: #fff;
+    border: 1px solid #e6edf5;
+    border-radius: 8px;
+    color: #495057;
+    font-size: 0.78rem;
+    max-height: 240px;
+    min-height: 120px;
+    overflow: auto;
+    padding: 0.75rem;
+    white-space: pre-wrap;
+}
+
+.factory-preflight-details summary {
+    cursor: pointer;
+}
+
 @media (max-width: 767.98px) {
     .landing-screen .sticky-top {
         position: static !important;

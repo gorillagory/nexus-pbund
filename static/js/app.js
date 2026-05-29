@@ -213,42 +213,166 @@ window.NexusApp = {
         }
     },
 
+    escapeHtml(value) {
+        return String(value ?? "")
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#39;");
+    },
+
+    formatFactoryTime(value) {
+        if (!value) return "-";
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return "-";
+        return date.toLocaleString();
+    },
+
+    formatFactoryDuration(value) {
+        if (value === null || value === undefined || value === "") return "-";
+        const number = Number(value);
+        if (Number.isNaN(number)) return String(value);
+        return `${number.toFixed(number < 10 ? 2 : 1)}s`;
+    },
+
+    factoryStatusClass(status) {
+        const normalized = String(status || "unknown").toLowerCase();
+        if (["success", "completed", "done", "pass", "clean"].includes(normalized)) return "factory-status-pass";
+        if (["failed", "fail", "error", "timeout", "dirty", "review"].includes(normalized)) return "factory-status-fail";
+        if (["running", "starting", "active"].includes(normalized)) return "factory-status-running";
+        if (["manual", "idle", "unknown"].includes(normalized)) return "factory-status-idle";
+        return "factory-status-neutral";
+    },
+
+    factoryEventIcon(eventType) {
+        const type = String(eventType || "").toLowerCase();
+        if (type.includes("preflight")) return "bi-shield-check";
+        if (type.includes("failed") || type.includes("timeout")) return "bi-x-circle";
+        if (type.includes("completed") || type.includes("done")) return "bi-check-circle";
+        if (type.includes("started") || type.includes("requested")) return "bi-play-circle";
+        if (type.includes("git")) return "bi-git";
+        if (type.includes("manual")) return "bi-pencil-square";
+        return "bi-record-circle";
+    },
+
+    safeNextAction(factory, git) {
+        const mode = String(factory?.execution_mode || "manual").toLowerCase();
+        if (mode === "autopilot") {
+            return {
+                title: "Autopilot warning",
+                body: "Automatic execution is enabled. Use manual, one_task, or one_packet for controlled factory work.",
+                tone: "factory-status-fail",
+            };
+        }
+        if (mode === "one_packet") {
+            return {
+                title: "Run selected packet only",
+                body: "Review the staged packet, confirm Git state, then use the existing supervised packet control for one selected packet.",
+                tone: "factory-status-pass",
+            };
+        }
+        if (mode === "one_task") {
+            return {
+                title: "Run selected task only",
+                body: "Pick one task from the board and use the existing Run One Task control. No queue automation is implied.",
+                tone: "factory-status-running",
+            };
+        }
+        return {
+            title: git?.is_dirty ? "Review changes first" : "Stage packet or copy commands",
+            body: git?.is_dirty
+                ? "Git has local changes. Review the changed files before staging more work."
+                : "Manual mode is safe for planning, staging a packet, or copying Codex commands without starting execution.",
+            tone: "factory-status-idle",
+        };
+    },
+
     renderFactoryConsole(data) {
         const factory = data?.factory || {};
         const runner = factory.runner || {};
         const git = data?.git || {};
-        const summaryTarget = document.getElementById("factory-console-summary");
-        if (summaryTarget) {
-            summaryTarget.innerHTML = "";
-            [
-                ["Execution Mode", factory.execution_mode || "unknown"],
-                ["Automatic Analysis", factory.automatic_analysis_enabled ? "enabled" : "disabled"],
-                ["Factory State", factory.current_state || "idle"],
-                ["Packet Runner", runner.running ? (runner.message || "running") : (runner.message || "idle")],
-                ["Git State", git.is_dirty ? "dirty" : "clean"],
-                ["Recent Events", factory.recent_event_count || 0],
-                ["Recent Runs", factory.recent_run_count || 0],
-            ].forEach(([label, value]) => {
-                const column = document.createElement("div");
-                column.className = "col-sm-6 col-lg-4";
-                const metric = document.createElement("div");
-                metric.className = "border rounded bg-light p-3 h-100";
-                const labelEl = document.createElement("div");
-                labelEl.className = "text-secondary small";
-                labelEl.textContent = label;
-                const valueEl = document.createElement("div");
-                valueEl.className = "fw-semibold text-dark";
-                valueEl.textContent = String(value);
-                metric.appendChild(labelEl);
-                metric.appendChild(valueEl);
-                column.appendChild(metric);
-                summaryTarget.appendChild(column);
-            });
-        }
+        const events = Array.isArray(data?.recent_events) ? data.recent_events : [];
+        const runs = Array.isArray(data?.recent_runs) ? data.recent_runs : [];
 
+        this.renderFactorySummaryCards(factory, git);
+        this.renderFactoryCurrentState(factory, runner);
+        this.renderFactorySafeActions(factory, git);
         this.renderFactoryGitStatus(git);
-        this.renderFactoryEvents(data?.recent_events || []);
-        this.renderFactoryRuns(data?.recent_runs || []);
+        this.renderFactoryEvents(events);
+        this.renderFactoryRuns(runs);
+    },
+
+    renderFactorySummaryCards(factory, git) {
+        const target = document.getElementById("factory-console-summary");
+        if (!target) return;
+
+        const preflight = this.latestPreflightStatus || {};
+        const cards = [
+            ["Mode", factory?.execution_mode || "unknown", this.factoryStatusClass(factory?.execution_mode || "manual")],
+            ["Automatic Analysis", factory?.automatic_analysis_enabled ? "enabled" : "disabled", factory?.automatic_analysis_enabled ? "factory-status-fail" : "factory-status-pass"],
+            ["Git State", git?.is_dirty ? "dirty" : "clean", this.factoryStatusClass(git?.is_dirty ? "dirty" : "clean")],
+            ["Recent Runs", factory?.recent_run_count ?? 0, "factory-status-neutral"],
+            ["Recent Events", factory?.recent_event_count ?? 0, "factory-status-neutral"],
+            ["Preflight Status", preflight?.local_last_result || "unknown", this.factoryStatusClass(preflight?.local_last_result || "unknown")],
+        ];
+
+        target.innerHTML = "";
+        cards.forEach(([label, value, statusClass]) => {
+            const column = document.createElement("div");
+            column.className = "col-sm-6 col-xl-2";
+            column.innerHTML = `
+                <div class="factory-summary-card">
+                    <div class="factory-summary-label">${this.escapeHtml(label)}</div>
+                    <div class="factory-summary-value ${this.escapeHtml(statusClass)}">${this.escapeHtml(value)}</div>
+                </div>
+            `;
+            target.appendChild(column);
+        });
+    },
+
+    renderFactoryCurrentState(factory, runner) {
+        const target = document.getElementById("factory-current-state-panel");
+        if (!target) return;
+
+        const currentState = runner?.running ? "running" : (factory?.current_state || "idle");
+        const rows = [
+            ["Current state", currentState],
+            ["Runner mode", runner?.mode || "-"],
+            ["Current packet", runner?.work_packet_id || "-"],
+            ["Current task", runner?.current_task_title || runner?.current_task_id || "-"],
+            ["Progress", runner?.total ? `${runner.completed || 0} / ${runner.total}` : "-"],
+            ["Message", runner?.message || "-"],
+        ];
+
+        target.innerHTML = `
+            <div class="d-flex justify-content-between align-items-center gap-2 mb-3">
+                <h4 class="h6 fw-semibold mb-0">Current State</h4>
+                <span class="factory-status-badge ${this.factoryStatusClass(currentState)}">${this.escapeHtml(currentState)}</span>
+            </div>
+            <dl class="factory-state-grid mb-0">
+                ${rows.map(([label, value]) => `
+                    <div>
+                        <dt>${this.escapeHtml(label)}</dt>
+                        <dd>${this.escapeHtml(value)}</dd>
+                    </div>
+                `).join("")}
+            </dl>
+        `;
+    },
+
+    renderFactorySafeActions(factory, git) {
+        const target = document.getElementById("factory-safe-next-actions");
+        if (!target) return;
+        const guidance = this.safeNextAction(factory, git);
+        target.innerHTML = `
+            <div class="d-flex justify-content-between align-items-center gap-2 mb-3">
+                <h4 class="h6 fw-semibold mb-0">Safe Next Actions</h4>
+                <span class="factory-status-badge ${this.escapeHtml(guidance.tone)}">${this.escapeHtml(factory?.execution_mode || "manual")}</span>
+            </div>
+            <div class="factory-guidance-title">${this.escapeHtml(guidance.title)}</div>
+            <p class="factory-guidance-copy mb-0">${this.escapeHtml(guidance.body)}</p>
+        `;
     },
 
     async loadFactoryPreflightStatus() {
@@ -260,6 +384,9 @@ window.NexusApp = {
             }
             this.latestPreflightStatus = data.preflight || {};
             this.renderFactoryPreflightStatus(this.latestPreflightStatus);
+            if (this.latestFactoryConsole) {
+                this.renderFactorySummaryCards(this.latestFactoryConsole.factory || {}, this.latestFactoryConsole.git || {});
+            }
         } catch (error) {
             const target = document.getElementById("factory-preflight-status");
             if (target) {
@@ -277,7 +404,7 @@ window.NexusApp = {
         const commandTarget = document.getElementById("factory-preflight-commands");
         const outputTarget = document.getElementById("factory-preflight-output");
         const result = preflight?.local_last_result || "unknown";
-        const resultClass = result === "pass" ? "text-success" : (result === "fail" ? "text-danger" : "text-secondary");
+        const resultClass = this.factoryStatusClass(result);
         const runTime = preflight?.local_last_run_at
             ? new Date(preflight.local_last_run_at).toLocaleString()
             : "Never";
@@ -288,21 +415,21 @@ window.NexusApp = {
         if (statusTarget) {
             statusTarget.innerHTML = "";
             [
-                ["Workflow File", preflight?.workflow_present ? "present" : "missing", preflight?.workflow_present ? "text-success" : "text-danger"],
+                ["Workflow File", preflight?.workflow_present ? "present" : "missing", preflight?.workflow_present ? "factory-status-pass" : "factory-status-fail"],
                 ["Last Local Result", result.toUpperCase(), resultClass],
-                ["Last Run", runTime, "text-dark"],
-                ["Duration", duration, "text-dark"],
-                ["Run State", preflight?.run_active ? "running" : "idle", preflight?.run_active ? "text-primary" : "text-secondary"],
+                ["Last Run", runTime, "factory-status-neutral"],
+                ["Duration", duration, "factory-status-neutral"],
+                ["Run State", preflight?.run_active ? "running" : "idle", preflight?.run_active ? "factory-status-running" : "factory-status-idle"],
             ].forEach(([label, value, valueClass]) => {
                 const column = document.createElement("div");
                 column.className = "col-sm-6 col-lg";
                 const metric = document.createElement("div");
-                metric.className = "border rounded bg-white p-2 h-100";
+                metric.className = "factory-preflight-metric";
                 const labelEl = document.createElement("div");
-                labelEl.className = "text-secondary small";
+                labelEl.className = "factory-summary-label";
                 labelEl.textContent = label;
                 const valueEl = document.createElement("div");
-                valueEl.className = `fw-semibold ${valueClass}`;
+                valueEl.className = `factory-summary-value ${valueClass}`;
                 valueEl.textContent = String(value);
                 metric.appendChild(labelEl);
                 metric.appendChild(valueEl);
@@ -323,7 +450,7 @@ window.NexusApp = {
 
         if (outputTarget) {
             outputTarget.textContent = preflight?.local_last_output_excerpt || "No preflight output recorded.";
-            outputTarget.className = `border rounded bg-white p-2 small mb-0 ${result === "fail" ? "text-danger" : "text-secondary"}`;
+            outputTarget.className = `factory-preflight-output mb-0 ${result === "fail" ? "text-danger" : "text-secondary"}`;
         }
     },
 
@@ -417,17 +544,24 @@ window.NexusApp = {
 
         if (filesTarget) {
             filesTarget.innerHTML = "";
-            filesTarget.className = "border rounded bg-light p-3 small text-secondary";
+            filesTarget.className = "factory-console-panel small text-secondary";
+            const badge = document.createElement("span");
+            badge.className = `factory-status-badge ${this.factoryStatusClass(git?.is_dirty ? "dirty" : "clean")}`;
+            badge.textContent = git?.is_dirty ? "dirty" : "clean";
+            filesTarget.appendChild(badge);
             if (!changedFiles.length) {
-                filesTarget.textContent = git?.is_dirty ? "Git changes detected." : "Git is clean.";
+                const message = document.createElement("div");
+                message.className = "mt-3";
+                message.textContent = git?.is_dirty ? "Git changes detected." : "Git is clean.";
+                filesTarget.appendChild(message);
             } else {
                 const list = document.createElement("ul");
-                list.className = "list-unstyled mb-0";
+                list.className = "factory-changed-files";
                 changedFiles.slice(0, 20).forEach((file) => {
                     const item = document.createElement("li");
-                    item.className = "d-flex gap-2";
+                    item.className = "factory-changed-file";
                     const status = document.createElement("span");
-                    status.className = "font-monospace text-dark";
+                    status.className = "factory-file-status";
                     status.textContent = file.status || "?";
                     const path = document.createElement("span");
                     path.textContent = file.path || "";
@@ -441,6 +575,7 @@ window.NexusApp = {
 
         if (diffTarget) {
             diffTarget.textContent = git?.diff_stat || git?.diff_stat_error || "No diff stat.";
+            diffTarget.className = "factory-diff-stat mb-0";
         }
     },
 
@@ -448,28 +583,32 @@ window.NexusApp = {
         const target = document.getElementById("factory-events-list");
         if (!target) return;
         target.innerHTML = "";
-        target.className = "border rounded bg-light p-3 small text-secondary";
+        target.className = "factory-console-panel small text-secondary";
         if (!events.length) {
             target.textContent = "No factory events recorded yet.";
             return;
         }
 
         const list = document.createElement("div");
-        list.className = "d-flex flex-column gap-2";
+        list.className = "factory-event-timeline";
         events.slice(0, 10).forEach((event) => {
             const item = document.createElement("div");
-            item.className = "border rounded bg-white p-2";
-            const title = document.createElement("div");
-            title.className = "fw-semibold text-dark";
-            title.textContent = event.event_type || "event";
-            const message = document.createElement("div");
-            message.textContent = event.message || "";
-            const meta = document.createElement("div");
-            meta.className = "text-secondary";
-            meta.textContent = event.created_at ? new Date(event.created_at).toLocaleString() : "";
-            item.appendChild(title);
-            item.appendChild(message);
-            item.appendChild(meta);
+            item.className = "factory-event-item";
+            const linkedIds = [
+                event.task_id ? `task ${event.task_id}` : "",
+                event.execution_run_id ? `run ${event.execution_run_id}` : "",
+            ].filter(Boolean).join(" | ");
+            item.innerHTML = `
+                <div class="factory-event-icon"><i class="bi ${this.escapeHtml(this.factoryEventIcon(event.event_type))}"></i></div>
+                <div class="factory-event-body">
+                    <div class="factory-event-head">
+                        <span class="factory-event-type">${this.escapeHtml(event.event_type || "event")}</span>
+                        <span class="factory-event-time">${this.escapeHtml(this.formatFactoryTime(event.created_at))}</span>
+                    </div>
+                    <div class="factory-event-message">${this.escapeHtml(event.message || "")}</div>
+                    ${linkedIds ? `<div class="factory-event-meta">${this.escapeHtml(linkedIds)}</div>` : ""}
+                </div>
+            `;
             list.appendChild(item);
         });
         target.appendChild(list);
@@ -479,32 +618,51 @@ window.NexusApp = {
         const target = document.getElementById("factory-runs-list");
         if (!target) return;
         target.innerHTML = "";
-        target.className = "border rounded bg-light p-3 small text-secondary";
+        target.className = "factory-console-panel small text-secondary";
         if (!runs.length) {
             target.textContent = "No execution runs recorded yet.";
             return;
         }
 
-        const list = document.createElement("div");
-        list.className = "d-flex flex-column gap-2";
+        const tableWrap = document.createElement("div");
+        tableWrap.className = "factory-runs-table-wrap";
+        const table = document.createElement("table");
+        table.className = "table table-sm align-middle factory-runs-table mb-0";
+        table.innerHTML = `
+            <thead>
+                <tr>
+                    <th>id</th>
+                    <th>task_id</th>
+                    <th>status</th>
+                    <th>return</th>
+                    <th>duration</th>
+                    <th>tokens</th>
+                    <th>cost</th>
+                    <th>started</th>
+                    <th>stdout/stderr preview</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        `;
+        const body = table.querySelector("tbody");
         runs.slice(0, 10).forEach((run) => {
-            const item = document.createElement("div");
-            item.className = "border rounded bg-white p-2";
-            const title = document.createElement("div");
-            title.className = "fw-semibold text-dark";
-            title.textContent = `${run.status || "unknown"} | task ${run.task_id || "-"}`;
-            const meta = document.createElement("div");
-            meta.className = "text-secondary";
-            meta.textContent = [
-                run.returncode !== null && run.returncode !== undefined ? `return ${run.returncode}` : "",
-                run.total_tokens ? `${run.total_tokens} tokens` : "",
-                run.started_at ? new Date(run.started_at).toLocaleString() : "",
-            ].filter(Boolean).join(" | ");
-            item.appendChild(title);
-            item.appendChild(meta);
-            list.appendChild(item);
+            const preview = (run.stderr || run.stdout || "").slice(0, 160);
+            const row = document.createElement("tr");
+            row.innerHTML = `
+                <td class="font-monospace">${this.escapeHtml(run.id || "-")}</td>
+                <td class="font-monospace">${this.escapeHtml(run.task_id || "-")}</td>
+                <td><span class="factory-status-badge ${this.factoryStatusClass(run.status)}">${this.escapeHtml(run.status || "unknown")}</span></td>
+                <td class="font-monospace">${this.escapeHtml(run.returncode ?? "-")}</td>
+                <td>${this.escapeHtml(this.formatFactoryDuration(run.duration_seconds))}</td>
+                <td class="font-monospace">${this.escapeHtml(run.total_tokens ?? "-")}</td>
+                <td class="font-monospace">${this.escapeHtml(run.estimated_cost_usd ?? "-")}</td>
+                <td>${this.escapeHtml(this.formatFactoryTime(run.started_at || run.created_at))}</td>
+                <td class="factory-run-preview">${this.escapeHtml(preview || "-")}</td>
+            `;
+            body.appendChild(row);
         });
-        target.appendChild(list);
+        tableWrap.appendChild(table);
+        target.appendChild(tableWrap);
     },
 
     async submitManualFactoryEvent() {
