@@ -321,6 +321,9 @@
                 <button type="button" id="tab-board-btn" class="nav-link text-start" onclick="NexusApp.showView('board')">
                     <i class="bi bi-kanban me-3"></i>Orchestration Board
                 </button>
+                <button type="button" id="tab-prompts-btn" class="nav-link text-start" onclick="NexusApp.showView('prompt-vault')">
+                    <i class="bi bi-journal-text me-3"></i>Prompt Vault
+                </button>
                 <button type="button" id="tab-history-btn" class="nav-link text-start" onclick="NexusApp.showView('history')">
                     <i class="bi bi-clock-history me-3"></i>Project History
                 </button>
@@ -615,6 +618,111 @@
                             <div id="cost-ledger-summary" class="small text-secondary mt-3">Open Board to load cost tracking.</div>
                         </div>
                         <span class="d-none">/api/work-packets/preview /api/work-packets/stage /api/work-packets/run Copy All Codex Commands Run Packet Supervised Packet Runner</span>
+                    </div>
+                </div>
+
+                <div id="view-prompt-vault" class="spa-view d-none">
+                    <div class="card bg-white border-0 shadow-sm">
+                        <div class="card-header bg-white border-bottom p-4 d-flex justify-content-between align-items-start gap-3 flex-wrap">
+                            <div>
+                                <h3 class="h5 mb-1 text-dark">Prompt Vault</h3>
+                                <p class="text-secondary mb-0">Store, categorize, copy, and refine reusable Codex operator prompts. Copy only; no execution happens here.</p>
+                            </div>
+                            <button type="button" class="btn btn-outline-primary btn-sm" onclick="NexusApp.loadPromptVaultTemplates()">
+                                <i class="bi bi-arrow-repeat me-2"></i>Refresh Prompt Vault
+                            </button>
+                        </div>
+                        <div class="card-body p-4">
+                            <div class="row g-4">
+                                <div class="col-xl-4">
+                                    <div class="prompt-vault-panel mb-3">
+                                        <div class="d-flex justify-content-between align-items-center gap-2 mb-3">
+                                            <h4 class="h6 fw-semibold mb-0">Templates</h4>
+                                            <span id="prompt-vault-count" class="badge text-bg-light border text-secondary">0</span>
+                                        </div>
+                                        <label for="prompt-vault-category-filter" class="form-label small text-secondary mb-1">Category Filter</label>
+                                        <select id="prompt-vault-category-filter" class="form-select form-select-sm mb-3" onchange="NexusApp.loadPromptVaultTemplates()">
+                                            <option value="">All active categories</option>
+                                            <option value="feature">feature</option>
+                                            <option value="bugfix">bugfix</option>
+                                            <option value="upgrade">upgrade</option>
+                                            <option value="refactor">refactor</option>
+                                            <option value="infra">infra</option>
+                                            <option value="testing">testing</option>
+                                            <option value="docs">docs</option>
+                                            <option value="security">security</option>
+                                            <option value="recovery">recovery</option>
+                                            <option value="analysis">analysis</option>
+                                            <option value="schema">schema</option>
+                                            <option value="uiux">uiux</option>
+                                            <option value="discord">discord</option>
+                                            <option value="git">git</option>
+                                            <option value="ci">ci</option>
+                                        </select>
+                                        <div id="prompt-vault-template-list" class="prompt-vault-list text-secondary small">Load templates to begin.</div>
+                                    </div>
+                                    <form id="prompt-vault-form" class="prompt-vault-panel" onsubmit="NexusApp.savePromptTemplate(); return false;">
+                                        <h4 class="h6 fw-semibold mb-3">Create / Edit Template</h4>
+                                        <input id="prompt-template-id" type="hidden">
+                                        <div class="mb-2">
+                                            <label for="prompt-template-title" class="form-label small text-secondary mb-1">Title</label>
+                                            <input id="prompt-template-title" class="form-control form-control-sm" maxlength="255" autocomplete="off">
+                                        </div>
+                                        <div class="row g-2 mb-2">
+                                            <div class="col-7">
+                                                <label for="prompt-template-category" class="form-label small text-secondary mb-1">Category</label>
+                                                <select id="prompt-template-category" class="form-select form-select-sm">
+                                                    <option value="feature">feature</option>
+                                                    <option value="bugfix">bugfix</option>
+                                                    <option value="upgrade">upgrade</option>
+                                                    <option value="refactor">refactor</option>
+                                                    <option value="infra">infra</option>
+                                                    <option value="testing">testing</option>
+                                                    <option value="docs">docs</option>
+                                                    <option value="security">security</option>
+                                                    <option value="recovery">recovery</option>
+                                                    <option value="analysis">analysis</option>
+                                                    <option value="schema">schema</option>
+                                                    <option value="uiux">uiux</option>
+                                                    <option value="discord">discord</option>
+                                                    <option value="git">git</option>
+                                                    <option value="ci">ci</option>
+                                                </select>
+                                            </div>
+                                            <div class="col-5">
+                                                <label for="prompt-template-risk" class="form-label small text-secondary mb-1">Risk</label>
+                                                <select id="prompt-template-risk" class="form-select form-select-sm">
+                                                    <option value="low">low</option>
+                                                    <option value="medium">medium</option>
+                                                    <option value="high">high</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div class="mb-2">
+                                            <label for="prompt-template-description" class="form-label small text-secondary mb-1">Description</label>
+                                            <textarea id="prompt-template-description" class="form-control form-control-sm" rows="2"></textarea>
+                                        </div>
+                                        <div class="mb-2">
+                                            <label for="prompt-template-tags" class="form-label small text-secondary mb-1">Tags</label>
+                                            <input id="prompt-template-tags" class="form-control form-control-sm" placeholder="packet, feature, operator">
+                                        </div>
+                                        <div class="mb-3">
+                                            <label for="prompt-template-body" class="form-label small text-secondary mb-1">Body</label>
+                                            <textarea id="prompt-template-body" class="form-control form-control-sm prompt-template-editor" rows="9"></textarea>
+                                        </div>
+                                        <div class="d-flex gap-2 flex-wrap">
+                                            <button type="submit" class="btn btn-primary btn-sm">Save Template</button>
+                                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="NexusApp.resetPromptTemplateForm()">New Template</button>
+                                        </div>
+                                    </form>
+                                </div>
+                                <div class="col-xl-8">
+                                    <section id="prompt-vault-detail" class="prompt-vault-detail">
+                                        <div class="text-secondary small">Select a Prompt Vault template to view and copy it.</div>
+                                    </section>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 

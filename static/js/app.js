@@ -38,12 +38,15 @@ window.NexusApp = {
     latestFactoryConsole: null,
     latestPreflightStatus: null,
     latestCiStatus: null,
+    promptVaultTemplates: [],
+    selectedPromptTemplate: null,
 
     setTab(tab) {
         const tabViews = {
             arch: "explorer",
             chat: "chat",
             board: "board",
+            prompts: "prompt-vault",
             history: "history",
             canvas: "canvas",
             agents: "agents",
@@ -58,6 +61,7 @@ window.NexusApp = {
             explorer: "arch",
             chat: "chat",
             board: "board",
+            "prompt-vault": "prompts",
             history: "history",
             canvas: "canvas",
             agents: "agents",
@@ -68,6 +72,7 @@ window.NexusApp = {
             explorer: "File Explorer",
             chat: "CTO Copilot",
             board: "Orchestration Board",
+            "prompt-vault": "Prompt Vault",
             history: "Project History",
             canvas: "Architecture Canvas",
             agents: "Workforce Hub",
@@ -103,6 +108,11 @@ window.NexusApp = {
         if (tab === "board") {
             this.renderBoard();
             this.loadAutoPilotStatus();
+            return;
+        }
+
+        if (tab === "prompts") {
+            this.loadPromptVaultTemplates();
             return;
         }
 
@@ -2380,6 +2390,189 @@ window.NexusApp = {
             }
         } finally {
             document.body.removeChild(textarea);
+        }
+    },
+
+    async loadPromptVaultTemplates() {
+        const list = document.getElementById("prompt-vault-template-list");
+        const filter = document.getElementById("prompt-vault-category-filter");
+        const category = filter ? filter.value : "";
+        if (list) {
+            list.textContent = "Loading Prompt Vault templates...";
+        }
+        try {
+            const query = category ? `?category=${encodeURIComponent(category)}` : "";
+            const response = await fetch(`/api/prompt-vault/templates${query}`);
+            const data = await response.json();
+            if (!response.ok || data.status !== "success") {
+                throw new Error(data.message || "Unable to load prompt templates.");
+            }
+            this.promptVaultTemplates = Array.isArray(data.templates) ? data.templates : [];
+            this.renderPromptVaultTemplateList();
+            if (!this.selectedPromptTemplate && this.promptVaultTemplates.length) {
+                this.renderPromptVaultTemplateDetail(this.promptVaultTemplates[0]);
+            }
+        } catch (error) {
+            if (list) {
+                list.textContent = `Prompt Vault unavailable: ${error.message}`;
+            }
+            NexusCore.showToast(`Prompt Vault error: ${error.message}`, "error");
+        }
+    },
+
+    renderPromptVaultTemplateList() {
+        const list = document.getElementById("prompt-vault-template-list");
+        const count = document.getElementById("prompt-vault-count");
+        if (count) {
+            count.textContent = String(this.promptVaultTemplates.length);
+        }
+        if (!list) return;
+        if (!this.promptVaultTemplates.length) {
+            list.innerHTML = '<div class="text-secondary small">No active prompt templates found.</div>';
+            return;
+        }
+        list.innerHTML = this.promptVaultTemplates.map((template) => `
+            <button type="button" class="prompt-vault-list-item" onclick="NexusApp.selectPromptTemplate(${Number(template.id) || 0})">
+                <span class="prompt-vault-list-title">${this.escapeHtml(template.title || "Untitled")}</span>
+                <span class="prompt-vault-list-meta">
+                    <span class="prompt-vault-badge">${this.escapeHtml(template.category || "feature")}</span>
+                    <span class="prompt-vault-badge prompt-vault-risk-${this.escapeHtml(template.risk_level || "medium")}">${this.escapeHtml(template.risk_level || "medium")}</span>
+                </span>
+            </button>
+        `).join("");
+    },
+
+    selectPromptTemplate(templateId) {
+        const template = this.promptVaultTemplates.find((item) => Number(item.id) === Number(templateId));
+        if (template) {
+            this.renderPromptVaultTemplateDetail(template);
+        }
+    },
+
+    renderPromptVaultTemplateDetail(template) {
+        this.selectedPromptTemplate = template || null;
+        const target = document.getElementById("prompt-vault-detail");
+        if (!target) return;
+        if (!template) {
+            target.innerHTML = '<div class="text-secondary small">Select a Prompt Vault template to view and copy it.</div>';
+            return;
+        }
+        const tags = Array.isArray(template.tags) ? template.tags : [];
+        target.innerHTML = `
+            <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-3">
+                <div>
+                    <h4 class="h5 fw-semibold mb-1">${this.escapeHtml(template.title || "Untitled")}</h4>
+                    <div class="d-flex gap-2 flex-wrap">
+                        <span class="prompt-vault-badge">${this.escapeHtml(template.category || "feature")}</span>
+                        <span class="prompt-vault-badge prompt-vault-risk-${this.escapeHtml(template.risk_level || "medium")}">${this.escapeHtml(template.risk_level || "medium")}</span>
+                        <span class="prompt-vault-badge">${this.escapeHtml(template.status || "active")}</span>
+                    </div>
+                </div>
+                <div class="d-flex gap-2 flex-wrap">
+                    <button type="button" class="btn btn-primary btn-sm" onclick="NexusApp.copySelectedPromptTemplate()">Copy Template</button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" onclick="NexusApp.editSelectedPromptTemplate()">Edit</button>
+                    <button type="button" class="btn btn-outline-warning btn-sm" onclick="NexusApp.archiveSelectedPromptTemplate()">Archive</button>
+                </div>
+            </div>
+            <p class="text-secondary small">${this.escapeHtml(template.description || "No description.")}</p>
+            <div class="prompt-vault-template-stats mb-3">
+                <span>success ${this.escapeHtml(template.success_count ?? 0)}</span>
+                <span>failure ${this.escapeHtml(template.failure_count ?? 0)}</span>
+                <span>last used ${this.escapeHtml(this.formatFactoryTime(template.last_used_at))}</span>
+            </div>
+            ${tags.length ? `<div class="prompt-vault-tags mb-3">${tags.map((tag) => `<span>${this.escapeHtml(tag)}</span>`).join("")}</div>` : ""}
+            <pre class="prompt-vault-body">${this.escapeHtml(template.body || "")}</pre>
+        `;
+    },
+
+    promptTemplateFormData() {
+        const tagsText = document.getElementById("prompt-template-tags")?.value || "";
+        return {
+            title: document.getElementById("prompt-template-title")?.value || "",
+            category: document.getElementById("prompt-template-category")?.value || "feature",
+            risk_level: document.getElementById("prompt-template-risk")?.value || "medium",
+            description: document.getElementById("prompt-template-description")?.value || "",
+            body: document.getElementById("prompt-template-body")?.value || "",
+            variables: {},
+            tags: tagsText.split(",").map((tag) => tag.trim()).filter(Boolean),
+        };
+    },
+
+    fillPromptTemplateForm(template) {
+        document.getElementById("prompt-template-id").value = template?.id || "";
+        document.getElementById("prompt-template-title").value = template?.title || "";
+        document.getElementById("prompt-template-category").value = template?.category || "feature";
+        document.getElementById("prompt-template-risk").value = template?.risk_level || "medium";
+        document.getElementById("prompt-template-description").value = template?.description || "";
+        document.getElementById("prompt-template-tags").value = Array.isArray(template?.tags) ? template.tags.join(", ") : "";
+        document.getElementById("prompt-template-body").value = template?.body || "";
+    },
+
+    editSelectedPromptTemplate() {
+        if (!this.selectedPromptTemplate) return;
+        this.fillPromptTemplateForm(this.selectedPromptTemplate);
+        NexusCore.showToast("Template loaded into editor.", "primary");
+    },
+
+    resetPromptTemplateForm() {
+        this.fillPromptTemplateForm(null);
+    },
+
+    async savePromptTemplate() {
+        const templateId = document.getElementById("prompt-template-id")?.value || "";
+        const data = this.promptTemplateFormData();
+        try {
+            const response = await fetch(templateId ? `/api/prompt-vault/templates/${templateId}` : "/api/prompt-vault/templates", {
+                method: templateId ? "PUT" : "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(data),
+            });
+            const payload = await response.json();
+            if (!response.ok || payload.status !== "success") {
+                throw new Error(payload.message || "Unable to save template.");
+            }
+            this.selectedPromptTemplate = payload.template;
+            this.fillPromptTemplateForm(payload.template);
+            await this.loadPromptVaultTemplates();
+            this.renderPromptVaultTemplateDetail(payload.template);
+            NexusCore.showToast("Prompt template saved.", "success");
+        } catch (error) {
+            NexusCore.showToast(`Prompt template error: ${error.message}`, "error");
+        }
+    },
+
+    async copySelectedPromptTemplate() {
+        if (!this.selectedPromptTemplate) return;
+        try {
+            await this.copyTextToClipboard(this.selectedPromptTemplate.body || "");
+            await fetch(`/api/prompt-vault/templates/${this.selectedPromptTemplate.id}/mark-used`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ result: "success" }),
+            });
+            NexusCore.showToast("Prompt template copied.", "success");
+            await this.loadPromptVaultTemplates();
+        } catch (error) {
+            NexusCore.showToast(`Copy Template error: ${error.message}`, "error");
+        }
+    },
+
+    async archiveSelectedPromptTemplate() {
+        if (!this.selectedPromptTemplate) return;
+        try {
+            const response = await fetch(`/api/prompt-vault/templates/${this.selectedPromptTemplate.id}/archive`, {
+                method: "POST",
+            });
+            const payload = await response.json();
+            if (!response.ok || payload.status !== "success") {
+                throw new Error(payload.message || "Unable to archive template.");
+            }
+            this.selectedPromptTemplate = null;
+            this.renderPromptVaultTemplateDetail(null);
+            await this.loadPromptVaultTemplates();
+            NexusCore.showToast("Prompt template archived.", "success");
+        } catch (error) {
+            NexusCore.showToast(`Archive error: ${error.message}`, "error");
         }
     },
 

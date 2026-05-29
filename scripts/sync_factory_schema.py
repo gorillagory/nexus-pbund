@@ -72,6 +72,21 @@ FACTORY_COLUMNS = {
         ("completed_at", "TIMESTAMP WITH TIME ZONE"),
         ("failed_at", "TIMESTAMP WITH TIME ZONE"),
     ],
+    "prompt_templates": [
+        ("title", "VARCHAR(255)"),
+        ("category", "VARCHAR(64)"),
+        ("risk_level", "VARCHAR(64)"),
+        ("description", "TEXT"),
+        ("body", "TEXT"),
+        ("variables_json", "TEXT"),
+        ("tags_json", "TEXT"),
+        ("status", "VARCHAR(32)"),
+        ("success_count", "INTEGER"),
+        ("failure_count", "INTEGER"),
+        ("last_used_at", "TIMESTAMP WITH TIME ZONE"),
+        ("created_at", "TIMESTAMP WITH TIME ZONE"),
+        ("updated_at", "TIMESTAMP WITH TIME ZONE"),
+    ],
 }
 
 

@@ -830,6 +830,99 @@ pre {
     display: block;
 }
 
+.prompt-vault-panel,
+.prompt-vault-detail {
+    background: #fff;
+    border: 1px solid #e6edf5;
+    border-radius: 8px;
+    padding: 1rem;
+}
+
+.prompt-vault-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    max-height: 520px;
+    overflow: auto;
+}
+
+.prompt-vault-list-item {
+    background: #f8fafc;
+    border: 1px solid #edf2f7;
+    border-radius: 8px;
+    color: #212529;
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    padding: 0.7rem;
+    text-align: left;
+}
+
+.prompt-vault-list-item:hover,
+.prompt-vault-list-item:focus {
+    border-color: #0d6efd;
+    outline: none;
+}
+
+.prompt-vault-list-title {
+    font-weight: 700;
+    overflow-wrap: anywhere;
+}
+
+.prompt-vault-list-meta,
+.prompt-vault-tags,
+.prompt-vault-template-stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+}
+
+.prompt-vault-badge,
+.prompt-vault-tags span,
+.prompt-vault-template-stats span {
+    background: #eef4ff;
+    border: 1px solid #dbe8ff;
+    border-radius: 999px;
+    color: #1d4ed8;
+    font-size: 0.76rem;
+    font-weight: 700;
+    padding: 0.18rem 0.5rem;
+}
+
+.prompt-vault-risk-low {
+    background: #e8f8ef;
+    border-color: #c8ebd6;
+    color: #0f6b35;
+}
+
+.prompt-vault-risk-medium {
+    background: #fff8e1;
+    border-color: #f7df8f;
+    color: #795600;
+}
+
+.prompt-vault-risk-high {
+    background: #fdecec;
+    border-color: #f6caca;
+    color: #9f1239;
+}
+
+.prompt-template-editor,
+.prompt-vault-body {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+}
+
+.prompt-vault-body {
+    background: #0f172a;
+    border-radius: 8px;
+    color: #e2e8f0;
+    font-size: 0.82rem;
+    max-height: 680px;
+    overflow: auto;
+    padding: 1rem;
+    white-space: pre-wrap;
+}
+
 @media (max-width: 767.98px) {
     .landing-screen .sticky-top {
         position: static !important;

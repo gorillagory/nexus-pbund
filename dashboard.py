@@ -27,6 +27,7 @@ from models import (
     FactoryEvent,
     Footprint,
     Message,
+    PromptTemplate,
     Task,
     UserProfile,
     WorkPacket,
@@ -47,6 +48,16 @@ from src.services.factory_events import (
     summarize_factory_state,
 )
 from src.services.git_changes import summarize_git_changes
+from src.services.prompt_vault import (
+    archive_prompt_template,
+    create_prompt_template,
+    ensure_default_prompt_templates,
+    get_prompt_template,
+    list_prompt_templates,
+    mark_prompt_template_used,
+    serialize_prompt_template,
+    update_prompt_template,
+)
 from src.services.work_packet_parser import extract_codex_commands, parse_work_packet
 
 
@@ -1873,6 +1884,115 @@ class NexusDashboard:
                 ), 503
 
             return jsonify({"status": "success", "event": serialize_factory_event(event)}), 201
+
+        @self.app.route("/api/prompt-vault/templates", methods=["GET"])
+        def get_prompt_vault_templates():
+            category = request.args.get("category") or None
+            status = request.args.get("status") or "active"
+            db_context = get_db()
+            db = next(db_context)
+            try:
+                ensure_default_prompt_templates(db)
+                templates = list_prompt_templates(db, category=category, status=status)
+                return jsonify(
+                    {
+                        "status": "success",
+                        "templates": [serialize_prompt_template(template) for template in templates],
+                    }
+                )
+            except Exception as exception:
+                return jsonify({"status": "error", "message": "Prompt Vault unavailable: {}".format(exception)}), 503
+            finally:
+                db_context.close()
+
+        @self.app.route("/api/prompt-vault/templates", methods=["POST"])
+        def post_prompt_vault_template():
+            payload = request.get_json(silent=True) or {}
+            if not isinstance(payload, dict):
+                return jsonify({"status": "error", "message": "JSON object is required."}), 400
+            db_context = get_db()
+            db = next(db_context)
+            try:
+                template = create_prompt_template(db, payload)
+                return jsonify({"status": "success", "template": serialize_prompt_template(template)}), 201
+            except ValueError as exception:
+                db.rollback()
+                return jsonify({"status": "error", "message": str(exception)}), 400
+            except Exception as exception:
+                db.rollback()
+                return jsonify({"status": "error", "message": "Template could not be created: {}".format(exception)}), 503
+            finally:
+                db_context.close()
+
+        @self.app.route("/api/prompt-vault/templates/<int:template_id>", methods=["GET"])
+        def get_prompt_vault_template(template_id):
+            db_context = get_db()
+            db = next(db_context)
+            try:
+                template = get_prompt_template(db, template_id)
+                if template is None:
+                    return jsonify({"status": "error", "message": "Prompt template not found."}), 404
+                return jsonify({"status": "success", "template": serialize_prompt_template(template)})
+            finally:
+                db_context.close()
+
+        @self.app.route("/api/prompt-vault/templates/<int:template_id>", methods=["PUT"])
+        def put_prompt_vault_template(template_id):
+            payload = request.get_json(silent=True) or {}
+            if not isinstance(payload, dict):
+                return jsonify({"status": "error", "message": "JSON object is required."}), 400
+            db_context = get_db()
+            db = next(db_context)
+            try:
+                template = get_prompt_template(db, template_id)
+                if template is None:
+                    return jsonify({"status": "error", "message": "Prompt template not found."}), 404
+                template = update_prompt_template(db, template, payload)
+                return jsonify({"status": "success", "template": serialize_prompt_template(template)})
+            except ValueError as exception:
+                db.rollback()
+                return jsonify({"status": "error", "message": str(exception)}), 400
+            except Exception as exception:
+                db.rollback()
+                return jsonify({"status": "error", "message": "Template could not be updated: {}".format(exception)}), 503
+            finally:
+                db_context.close()
+
+        @self.app.route("/api/prompt-vault/templates/<int:template_id>/archive", methods=["POST"])
+        def archive_prompt_vault_template(template_id):
+            db_context = get_db()
+            db = next(db_context)
+            try:
+                template = get_prompt_template(db, template_id)
+                if template is None:
+                    return jsonify({"status": "error", "message": "Prompt template not found."}), 404
+                template = archive_prompt_template(db, template)
+                return jsonify({"status": "success", "template": serialize_prompt_template(template)})
+            except Exception as exception:
+                db.rollback()
+                return jsonify({"status": "error", "message": "Template could not be archived: {}".format(exception)}), 503
+            finally:
+                db_context.close()
+
+        @self.app.route("/api/prompt-vault/templates/<int:template_id>/mark-used", methods=["POST"])
+        def mark_prompt_vault_template_used(template_id):
+            payload = request.get_json(silent=True) or {}
+            result = payload.get("result") or "success"
+            if result not in {"success", "failure"}:
+                return jsonify({"status": "error", "message": "result must be success or failure."}), 400
+            db_context = get_db()
+            db = next(db_context)
+            try:
+                template = get_prompt_template(db, template_id)
+                if template is None:
+                    return jsonify({"status": "error", "message": "Prompt template not found."}), 404
+                template = mark_prompt_template_used(db, template, result)
+                return jsonify({"status": "success", "template": serialize_prompt_template(template)})
+            except Exception as exception:
+                db.rollback()
+                return jsonify({"status": "error", "message": "Template usage could not be recorded: {}".format(exception)}), 503
+            finally:
+                db_context.close()
 
         @self.app.route("/api/kill-process", methods=["POST"])
         def kill_process():
