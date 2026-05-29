@@ -31,6 +31,7 @@ window.NexusApp = {
     },
     executionMode: "manual",
     automaticAnalysisEnabled: false,
+    latestWorkPacketPreview: null,
 
     setTab(tab) {
         const tabViews = {
@@ -866,6 +867,23 @@ window.NexusApp = {
                     <h4 class="text-dark mb-1 fw-semibold">Orchestration Board</h4>
                     <p class="text-secondary small mb-0">Track work across delivery stages for the active workspace.</p>
                 </div>
+                <div class="bg-light border rounded p-3 mb-4">
+                    <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-3">
+                        <div>
+                            <h5 class="text-dark fw-semibold mb-1">Work Packet Manager</h5>
+                            <p class="text-warning small fw-semibold mb-0">Manual Mode: staging and copying only. Codex is not executed.</p>
+                        </div>
+                        <div class="d-flex flex-wrap gap-2">
+                            <button type="button" class="btn btn-outline-primary btn-sm" onclick="NexusApp.previewWorkPacket()">Preview Packet</button>
+                            <button type="button" class="btn btn-primary btn-sm" onclick="NexusApp.stageWorkPacket()">Stage to Kanban</button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="NexusApp.copyAllWorkPacketCodexCommands()">Copy All Codex Commands</button>
+                        </div>
+                    </div>
+                    <textarea id="work-packet-input" class="form-control font-monospace small mb-3" rows="8" placeholder="Paste a work packet containing codex &quot;...&quot; commands"></textarea>
+                    <div id="work-packet-preview" class="border rounded bg-white p-3 small text-secondary">
+                        Preview extracted tasks before staging them to To-Do.
+                    </div>
+                </div>
                 <div class="row g-3">
                     <div class="col-md-4">
                         <div class="card bg-light border h-100 p-3">
@@ -904,6 +922,7 @@ window.NexusApp = {
         `;
 
         this.renderTasks(NexusState.tasks);
+        this.renderWorkPacketPreview(this.latestWorkPacketPreview);
         this.renderExecutionMode();
         this.updateAutoPilotUI();
     },
@@ -994,6 +1013,135 @@ window.NexusApp = {
         return match ? match[0] : "";
     },
 
+    getWorkPacketText() {
+        const input = document.getElementById("work-packet-input");
+        return input ? input.value : "";
+    },
+
+    async previewWorkPacket() {
+        const packetText = this.getWorkPacketText();
+        if (!packetText.trim()) {
+            NexusCore.showToast("Paste a work packet before previewing.", "error");
+            return;
+        }
+
+        try {
+            const response = await fetch("/api/work-packets/preview", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ packet_text: packetText }),
+            });
+            const data = await response.json();
+            if (!response.ok || data.status !== "success") {
+                throw new Error(data.message || "Unable to preview work packet.");
+            }
+
+            this.latestWorkPacketPreview = data.packet;
+            this.renderWorkPacketPreview(data.packet);
+            NexusCore.showToast(`Previewed ${data.task_count} work packet task${data.task_count === 1 ? "" : "s"}.`, "success");
+        } catch (error) {
+            NexusCore.showToast(`Error: ${error.message}`, "error");
+        }
+    },
+
+    async stageWorkPacket() {
+        if (!NexusState.currentWorkspaceId) {
+            NexusCore.showToast("Select an active workspace before staging tasks.", "error");
+            return;
+        }
+
+        const packetText = this.getWorkPacketText();
+        if (!packetText.trim()) {
+            NexusCore.showToast("Paste a work packet before staging.", "error");
+            return;
+        }
+
+        try {
+            const response = await fetch("/api/work-packets/stage", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    workspace_id: NexusState.currentWorkspaceId,
+                    packet_text: packetText,
+                }),
+            });
+            const data = await response.json();
+            if (!response.ok || data.status !== "success") {
+                throw new Error(data.message || "Unable to stage work packet.");
+            }
+
+            await this.loadKanban();
+            NexusCore.showToast(`Staged ${data.created_count} task${data.created_count === 1 ? "" : "s"} to Kanban.`, "success");
+        } catch (error) {
+            NexusCore.showToast(`Error: ${error.message}`, "error");
+        }
+    },
+
+    renderWorkPacketPreview(packet) {
+        const preview = document.getElementById("work-packet-preview");
+        if (!preview) {
+            return;
+        }
+
+        preview.innerHTML = "";
+        if (!packet) {
+            preview.textContent = "Preview extracted tasks before staging them to To-Do.";
+            return;
+        }
+
+        const heading = document.createElement("div");
+        heading.className = "mb-3";
+
+        const title = document.createElement("h6");
+        title.className = "text-dark fw-semibold mb-2";
+        title.textContent = packet.title || "Untitled Work Packet";
+        heading.appendChild(title);
+
+        const meta = document.createElement("div");
+        meta.className = "d-flex flex-wrap gap-2";
+        [
+            `Risk: ${packet.risk_level || "unspecified"}`,
+            `Stop: ${packet.stop_condition || "Stop after packet completion or first failure."}`,
+            `Tasks: ${(packet.tasks || []).length}`,
+        ].forEach((label) => {
+            const badge = document.createElement("span");
+            badge.className = "badge text-bg-light border text-secondary";
+            badge.textContent = label;
+            meta.appendChild(badge);
+        });
+        heading.appendChild(meta);
+        preview.appendChild(heading);
+
+        const tasks = packet.tasks || [];
+        if (!tasks.length) {
+            const empty = document.createElement("p");
+            empty.className = "mb-0 text-secondary";
+            empty.textContent = "No codex tasks found in this packet.";
+            preview.appendChild(empty);
+            return;
+        }
+
+        const list = document.createElement("div");
+        list.className = "d-flex flex-column gap-3";
+        tasks.forEach((task) => {
+            const item = document.createElement("div");
+            item.className = "border rounded p-3";
+
+            const taskTitle = document.createElement("div");
+            taskTitle.className = "fw-semibold text-dark mb-2";
+            taskTitle.textContent = `${task.order || ""}. ${task.title || "Task"}`.trim();
+            item.appendChild(taskTitle);
+
+            const command = document.createElement("pre");
+            command.className = "bg-light border rounded p-2 mb-0 text-wrap";
+            command.textContent = task.codex_command || "";
+            item.appendChild(command);
+
+            list.appendChild(item);
+        });
+        preview.appendChild(list);
+    },
+
     async copyTextToClipboard(text) {
         if (navigator.clipboard && navigator.clipboard.writeText) {
             await navigator.clipboard.writeText(text);
@@ -1023,6 +1171,25 @@ window.NexusApp = {
             NexusCore.showToast("Codex command copied.", "success");
         } catch (error) {
             NexusCore.showToast("Unable to copy Codex command.", "error");
+        }
+    },
+
+    async copyAllWorkPacketCodexCommands() {
+        const tasks = this.latestWorkPacketPreview?.tasks || [];
+        const commands = tasks
+            .map((task) => task.codex_command)
+            .filter((command) => command);
+
+        if (!commands.length) {
+            NexusCore.showToast("Preview a packet with codex commands before copying.", "error");
+            return;
+        }
+
+        try {
+            await this.copyTextToClipboard(commands.join("\n"));
+            NexusCore.showToast("All Codex commands copied.", "success");
+        } catch (error) {
+            NexusCore.showToast("Unable to copy Codex commands.", "error");
         }
     },
 

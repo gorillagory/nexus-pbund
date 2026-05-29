@@ -23,6 +23,7 @@ from engine import NexusWatcher, calculate_prompt_timeout
 from models import ChatSession, Footprint, Message, Task, UserProfile, Workspace
 from src.api.project_routes import projects_blueprint
 from src.services.codex_runner import CodexRunner
+from src.services.work_packet_parser import extract_codex_commands, parse_work_packet
 
 
 active_watcher = None
@@ -988,6 +989,78 @@ class NexusDashboard:
                 db.commit()
                 db.refresh(task)
                 return jsonify(serialize_task(task)), 201
+            except IntegrityError:
+                db.rollback()
+                return jsonify({"status": "error", "message": "Workspace not found."}), 400
+            except Exception:
+                db.rollback()
+                raise
+            finally:
+                db_context.close()
+
+        @self.app.route("/api/work-packets/preview", methods=["POST"])
+        def preview_work_packet():
+            payload = request.json or {}
+            packet_text = payload.get("packet_text")
+
+            if not isinstance(packet_text, str) or not packet_text.strip():
+                return jsonify({"status": "error", "message": "packet_text is required."}), 400
+
+            parsed_packet = parse_work_packet(packet_text)
+            return jsonify(
+                {
+                    "status": "success",
+                    "packet": parsed_packet,
+                    "task_count": len(parsed_packet.get("tasks", [])),
+                    "codex_command_count": len(extract_codex_commands(packet_text)),
+                }
+            )
+
+        @self.app.route("/api/work-packets/stage", methods=["POST"])
+        def stage_work_packet():
+            payload = request.json or {}
+            workspace_id = payload.get("workspace_id")
+            packet_text = payload.get("packet_text")
+
+            if not isinstance(workspace_id, int) or isinstance(workspace_id, bool):
+                return jsonify({"status": "error", "message": "Valid workspace_id is required."}), 400
+            if not isinstance(packet_text, str) or not packet_text.strip():
+                return jsonify({"status": "error", "message": "packet_text is required."}), 400
+
+            parsed_packet = parse_work_packet(packet_text)
+            parsed_tasks = parsed_packet.get("tasks", [])
+            if not parsed_tasks:
+                return jsonify({"status": "error", "message": "No codex tasks found in packet."}), 400
+
+            db_context = get_db()
+            db = next(db_context)
+            try:
+                if db.get(Workspace, workspace_id) is None:
+                    return jsonify({"status": "error", "message": "Workspace not found."}), 400
+
+                tasks = [
+                    Task(
+                        workspace_id=workspace_id,
+                        title=(task.get("title") or "Task {}".format(index))[:255],
+                        description=task.get("description") or "",
+                        status="todo",
+                    )
+                    for index, task in enumerate(parsed_tasks, start=1)
+                ]
+                db.add_all(tasks)
+                db.commit()
+                for task in tasks:
+                    db.refresh(task)
+
+                return jsonify(
+                    {
+                        "status": "success",
+                        "packet_title": parsed_packet.get("title"),
+                        "created_count": len(tasks),
+                        "task_ids": [task.id for task in tasks],
+                        "tasks": [serialize_task(task) for task in tasks],
+                    }
+                )
             except IntegrityError:
                 db.rollback()
                 return jsonify({"status": "error", "message": "Workspace not found."}), 400
