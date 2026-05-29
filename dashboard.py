@@ -56,6 +56,12 @@ SECRET_TEXT_PATTERN = re.compile(
     r"secret|token|sk-[A-Za-z0-9_-]{8,}|AIza[0-9A-Za-z_-]{20,})"
 )
 MANUAL_COST_TEXT_FIELDS = ("provider", "model", "source", "task_id", "notes")
+PREFLIGHT_WORKFLOW_PATH = ".github/workflows/nexus-preflight.yml"
+PREFLIGHT_STATUS_PATH = ".nexus/preflight_status.json"
+PREFLIGHT_QUICK_COMMAND = ["python3", "scripts/nexus_preflight.py", "--quick"]
+PREFLIGHT_STRICT_CI_COMMAND = ["python3", "scripts/nexus_preflight.py", "--quick", "--strict-clean"]
+PREFLIGHT_TIMEOUT_SECONDS = 300
+PREFLIGHT_OUTPUT_EXCERPT_CHARS = 6000
 
 
 def _safe_manual_cost_text(payload, field, max_length, required=False):
@@ -658,6 +664,117 @@ def _send_factory_discord_notification(message):
     return False
 
 
+def _utc_now_iso():
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _preflight_status_file(workspace_path):
+    return os.path.join(os.path.abspath(workspace_path), PREFLIGHT_STATUS_PATH)
+
+
+def _preflight_workflow_file(workspace_path):
+    return os.path.join(os.path.abspath(workspace_path), PREFLIGHT_WORKFLOW_PATH)
+
+
+def _redact_preflight_output(text):
+    if not text:
+        return ""
+    if isinstance(text, bytes):
+        text = text.decode("utf-8", errors="replace")
+    excerpt = text[-PREFLIGHT_OUTPUT_EXCERPT_CHARS:]
+    return SECRET_TEXT_PATTERN.sub("[redacted]", excerpt)
+
+
+def _read_local_preflight_record(workspace_path):
+    status_path = _preflight_status_file(workspace_path)
+    try:
+        with open(status_path, "r", encoding="utf-8") as file:
+            payload = json.load(file)
+    except (OSError, ValueError):
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def _write_local_preflight_record(workspace_path, record):
+    status_path = _preflight_status_file(workspace_path)
+    os.makedirs(os.path.dirname(status_path), exist_ok=True)
+    with open(status_path, "w", encoding="utf-8") as file:
+        json.dump(record, file, ensure_ascii=True, indent=2, sort_keys=True)
+
+
+def _build_preflight_status(workspace_path, run_active=False):
+    record = _read_local_preflight_record(workspace_path)
+    workflow_present = os.path.exists(_preflight_workflow_file(workspace_path))
+    return {
+        "workflow_present": workflow_present,
+        "workflow_path": PREFLIGHT_WORKFLOW_PATH,
+        "local_last_result": record.get("result") or "unknown",
+        "local_last_run_at": record.get("finished_at"),
+        "local_last_duration_seconds": record.get("duration_seconds"),
+        "local_last_output_excerpt": record.get("output_excerpt") or "",
+        "local_last_returncode": record.get("returncode"),
+        "run_active": bool(run_active),
+        "quick_command": " ".join(PREFLIGHT_QUICK_COMMAND),
+        "strict_ci_command": " ".join(PREFLIGHT_STRICT_CI_COMMAND),
+    }
+
+
+def _run_local_quick_preflight(workspace_path):
+    started_at = _utc_now_iso()
+    started_monotonic = time.monotonic()
+    stdout = ""
+    stderr = ""
+    returncode = -1
+    timed_out = False
+    error_message = ""
+
+    try:
+        result = subprocess.run(
+            PREFLIGHT_QUICK_COMMAND,
+            cwd=os.path.abspath(workspace_path),
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=PREFLIGHT_TIMEOUT_SECONDS,
+        )
+        stdout = result.stdout or ""
+        stderr = result.stderr or ""
+        returncode = result.returncode
+    except subprocess.TimeoutExpired as exception:
+        timed_out = True
+        stdout = exception.stdout or ""
+        stderr = exception.stderr or ""
+        returncode = -1
+        error_message = "Local quick preflight timed out after {} seconds.".format(PREFLIGHT_TIMEOUT_SECONDS)
+    except OSError as exception:
+        stderr = str(exception)
+        returncode = -1
+        error_message = str(exception)
+
+    finished_at = _utc_now_iso()
+    duration_seconds = round(time.monotonic() - started_monotonic, 3)
+    output_excerpt = _redact_preflight_output("\n".join([stdout, stderr]).strip())
+    result_label = "pass" if returncode == 0 and "NEXUS_PREFLIGHT_RESULT=PASS" in stdout else "fail"
+    if timed_out:
+        result_label = "fail"
+
+    record = {
+        "result": result_label,
+        "returncode": returncode,
+        "started_at": started_at,
+        "finished_at": finished_at,
+        "duration_seconds": duration_seconds,
+        "stdout_excerpt": _redact_preflight_output(stdout),
+        "stderr_excerpt": _redact_preflight_output(stderr),
+        "output_excerpt": output_excerpt,
+        "timed_out": timed_out,
+        "error": error_message,
+        "command": list(PREFLIGHT_QUICK_COMMAND),
+    }
+    _write_local_preflight_record(workspace_path, record)
+    return record
+
+
 def _execute_factory_task(
     db,
     workspace,
@@ -1243,6 +1360,8 @@ class NexusDashboard:
         self.engine.telemetry_logger = append_codex_telemetry
         self.autonomous_queue = AutonomousQueue()
         self.packet_runner_lock = Lock()
+        self.preflight_run_lock = Lock()
+        self.preflight_run_active = False
         self.packet_runner_state = {
             "running": False,
             "mode": "one_packet",
@@ -1463,6 +1582,67 @@ class NexusDashboard:
                     "git": summarize_git_changes(self.engine.target_dir),
                 }
             )
+
+        @self.app.route("/api/factory/preflight/status", methods=["GET"])
+        def get_factory_preflight_status():
+            with self.preflight_run_lock:
+                run_active = self.preflight_run_active
+            return jsonify(
+                {
+                    "status": "success",
+                    "preflight": _build_preflight_status(self.engine.target_dir, run_active=run_active),
+                }
+            )
+
+        @self.app.route("/api/factory/preflight/run", methods=["POST"])
+        def run_factory_preflight():
+            with self.preflight_run_lock:
+                if self.preflight_run_active:
+                    return jsonify(
+                        {
+                            "status": "error",
+                            "message": "Local quick preflight is already running.",
+                            "preflight": _build_preflight_status(self.engine.target_dir, run_active=True),
+                        }
+                    ), 409
+                self.preflight_run_active = True
+
+            try:
+                record = _run_local_quick_preflight(self.engine.target_dir)
+                event_type = "preflight_run_completed" if record.get("result") == "pass" else "preflight_run_failed"
+                try:
+                    workspace_id = get_workspace_id(self.engine.target_dir)
+                    if workspace_id is not None:
+                        db_context = get_db()
+                        db = next(db_context)
+                        try:
+                            _safe_create_factory_event(
+                                db,
+                                workspace_id,
+                                event_type,
+                                "Local quick preflight {}.".format(record.get("result")),
+                                payload={
+                                    "returncode": record.get("returncode"),
+                                    "duration_seconds": record.get("duration_seconds"),
+                                    "command": record.get("command"),
+                                },
+                            )
+                        finally:
+                            db_context.close()
+                except Exception:
+                    pass
+
+                status_code = 200 if record.get("result") == "pass" else 500
+                return jsonify(
+                    {
+                        "status": "success" if record.get("result") == "pass" else "error",
+                        "preflight": _build_preflight_status(self.engine.target_dir, run_active=False),
+                        "result": record,
+                    }
+                ), status_code
+            finally:
+                with self.preflight_run_lock:
+                    self.preflight_run_active = False
 
         @self.app.route("/api/factory/events/manual", methods=["POST"])
         def create_manual_factory_event():

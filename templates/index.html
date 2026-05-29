@@ -417,6 +417,35 @@
                             <div id="factory-console-summary" class="row g-3 mb-4">
                                 <div class="col-12 text-secondary small">Factory console not loaded.</div>
                             </div>
+                            <div class="border rounded bg-light p-3 mb-4" id="factory-preflight-panel">
+                                <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-3">
+                                    <div>
+                                        <h4 class="h6 fw-semibold mb-1">Preflight / CI Status</h4>
+                                        <p class="small text-secondary mb-0">Local quick preflight and GitHub Actions workflow visibility.</p>
+                                    </div>
+                                    <div class="d-flex gap-2 flex-wrap">
+                                        <button id="factory-preflight-run-btn" type="button" class="btn btn-primary btn-sm" onclick="NexusApp.runFactoryPreflight()">
+                                            <i class="bi bi-play-fill me-2"></i>Run Local Quick Preflight
+                                        </button>
+                                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="NexusApp.loadFactoryPreflightStatus()">
+                                            <i class="bi bi-arrow-repeat me-2"></i>Refresh Preflight Status
+                                        </button>
+                                    </div>
+                                </div>
+                                <div id="factory-preflight-status" class="row g-3 mb-3">
+                                    <div class="col-12 text-secondary small">No preflight status loaded.</div>
+                                </div>
+                                <div class="row g-3">
+                                    <div class="col-lg-6">
+                                        <div class="small text-secondary fw-semibold mb-1">Commands</div>
+                                        <div id="factory-preflight-commands" class="font-monospace small text-secondary">No commands loaded.</div>
+                                    </div>
+                                    <div class="col-lg-6">
+                                        <div class="small text-secondary fw-semibold mb-1">Latest Output Summary</div>
+                                        <pre id="factory-preflight-output" class="border rounded bg-white p-2 small text-secondary mb-0" style="min-height: 110px; max-height: 220px; overflow: auto;">No preflight output recorded.</pre>
+                                    </div>
+                                </div>
+                            </div>
                             <div class="row g-4">
                                 <div class="col-lg-5">
                                     <h4 class="h6 fw-semibold mb-2">Changed Files</h4>

@@ -36,6 +36,7 @@ window.NexusApp = {
     latestStagedWorkPacket: null,
     latestCostLedger: null,
     latestFactoryConsole: null,
+    latestPreflightStatus: null,
 
     setTab(tab) {
         const tabViews = {
@@ -182,6 +183,7 @@ window.NexusApp = {
 
             this.latestFactoryConsole = data;
             this.renderFactoryConsole(data);
+            this.loadFactoryPreflightStatus();
         } catch (error) {
             if (target) {
                 target.innerHTML = "";
@@ -247,6 +249,114 @@ window.NexusApp = {
         this.renderFactoryGitStatus(git);
         this.renderFactoryEvents(data?.recent_events || []);
         this.renderFactoryRuns(data?.recent_runs || []);
+    },
+
+    async loadFactoryPreflightStatus() {
+        try {
+            const response = await fetch("/api/factory/preflight/status");
+            const data = await response.json();
+            if (!response.ok || data.status !== "success") {
+                throw new Error(data.message || "Unable to load preflight status.");
+            }
+            this.latestPreflightStatus = data.preflight || {};
+            this.renderFactoryPreflightStatus(this.latestPreflightStatus);
+        } catch (error) {
+            const target = document.getElementById("factory-preflight-status");
+            if (target) {
+                target.innerHTML = "";
+                const message = document.createElement("div");
+                message.className = "col-12 text-danger small";
+                message.textContent = `Unable to load preflight status: ${error.message}`;
+                target.appendChild(message);
+            }
+        }
+    },
+
+    renderFactoryPreflightStatus(preflight) {
+        const statusTarget = document.getElementById("factory-preflight-status");
+        const commandTarget = document.getElementById("factory-preflight-commands");
+        const outputTarget = document.getElementById("factory-preflight-output");
+        const result = preflight?.local_last_result || "unknown";
+        const resultClass = result === "pass" ? "text-success" : (result === "fail" ? "text-danger" : "text-secondary");
+        const runTime = preflight?.local_last_run_at
+            ? new Date(preflight.local_last_run_at).toLocaleString()
+            : "Never";
+        const duration = preflight?.local_last_duration_seconds !== null && preflight?.local_last_duration_seconds !== undefined
+            ? `${preflight.local_last_duration_seconds}s`
+            : "-";
+
+        if (statusTarget) {
+            statusTarget.innerHTML = "";
+            [
+                ["Workflow File", preflight?.workflow_present ? "present" : "missing", preflight?.workflow_present ? "text-success" : "text-danger"],
+                ["Last Local Result", result.toUpperCase(), resultClass],
+                ["Last Run", runTime, "text-dark"],
+                ["Duration", duration, "text-dark"],
+                ["Run State", preflight?.run_active ? "running" : "idle", preflight?.run_active ? "text-primary" : "text-secondary"],
+            ].forEach(([label, value, valueClass]) => {
+                const column = document.createElement("div");
+                column.className = "col-sm-6 col-lg";
+                const metric = document.createElement("div");
+                metric.className = "border rounded bg-white p-2 h-100";
+                const labelEl = document.createElement("div");
+                labelEl.className = "text-secondary small";
+                labelEl.textContent = label;
+                const valueEl = document.createElement("div");
+                valueEl.className = `fw-semibold ${valueClass}`;
+                valueEl.textContent = String(value);
+                metric.appendChild(labelEl);
+                metric.appendChild(valueEl);
+                column.appendChild(metric);
+                statusTarget.appendChild(column);
+            });
+        }
+
+        if (commandTarget) {
+            commandTarget.innerHTML = "";
+            const quick = document.createElement("div");
+            quick.textContent = `Quick: ${preflight?.quick_command || "-"}`;
+            const ci = document.createElement("div");
+            ci.textContent = `CI: ${preflight?.strict_ci_command || "-"}`;
+            commandTarget.appendChild(quick);
+            commandTarget.appendChild(ci);
+        }
+
+        if (outputTarget) {
+            outputTarget.textContent = preflight?.local_last_output_excerpt || "No preflight output recorded.";
+            outputTarget.className = `border rounded bg-white p-2 small mb-0 ${result === "fail" ? "text-danger" : "text-secondary"}`;
+        }
+    },
+
+    async runFactoryPreflight() {
+        const button = document.getElementById("factory-preflight-run-btn");
+        const originalLabel = button ? button.innerHTML : "";
+        if (button) {
+            button.disabled = true;
+            button.innerHTML = '<span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>Running...';
+        }
+
+        try {
+            const response = await fetch("/api/factory/preflight/run", { method: "POST" });
+            const data = await response.json();
+            if ((!response.ok && !data.preflight) || (data.status !== "success" && data.status !== "error")) {
+                throw new Error(data.message || "Unable to run local quick preflight.");
+            }
+            this.renderFactoryPreflightStatus(data.preflight || {});
+            await this.loadFactoryConsole();
+            const passed = data?.result?.result === "pass" || data.status === "success";
+            NexusCore.showToast(
+                passed ? "Local quick preflight passed." : "Local quick preflight failed.",
+                passed ? "success" : "error",
+            );
+        } catch (error) {
+            NexusCore.showToast(`Preflight error: ${error.message}`, "error");
+            await this.loadFactoryPreflightStatus();
+        } finally {
+            if (button) {
+                button.disabled = false;
+                button.innerHTML = originalLabel || '<i class="bi bi-play-fill me-2"></i>Run Local Quick Preflight';
+            }
+        }
     },
 
     async loadFactoryEvents() {
