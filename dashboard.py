@@ -23,12 +23,71 @@ from engine import NexusWatcher, calculate_prompt_timeout
 from models import ChatSession, Footprint, Message, Task, UserProfile, Workspace
 from src.api.project_routes import projects_blueprint
 from src.services.codex_runner import CodexRunner
+from src.services.cost_ledger import append_cost_event, read_cost_events, summarize_cost_events
 from src.services.work_packet_parser import extract_codex_commands, parse_work_packet
 
 
 active_watcher = None
 active_watcher_lock = Lock()
 telemetry_lock = Lock()
+SECRET_TEXT_PATTERN = re.compile(
+    r"(?i)(api[_ -]?key|authorization|bearer\s+[A-Za-z0-9._~+/=-]+|"
+    r"secret|token|sk-[A-Za-z0-9_-]{8,}|AIza[0-9A-Za-z_-]{20,})"
+)
+MANUAL_COST_TEXT_FIELDS = ("provider", "model", "source", "task_id", "notes")
+
+
+def _safe_manual_cost_text(payload, field, max_length, required=False):
+    value = payload.get(field)
+    if value is None:
+        if required:
+            return None, "{} is required.".format(field)
+        return None, None
+
+    if not isinstance(value, str):
+        return None, "{} must be a string.".format(field)
+
+    value = value.strip()
+    if required and not value:
+        return None, "{} is required.".format(field)
+    if not value:
+        return None, None
+    if len(value) > max_length:
+        return None, "{} is too long.".format(field)
+    if SECRET_TEXT_PATTERN.search(value):
+        return None, "{} must not contain secrets.".format(field)
+
+    return value, None
+
+
+def _safe_manual_cost_int(payload, field):
+    value = payload.get(field)
+    if value in (None, ""):
+        return None, None
+    if isinstance(value, bool):
+        return None, "{} must be a non-negative integer.".format(field)
+    try:
+        coerced = int(value)
+    except (TypeError, ValueError):
+        return None, "{} must be a non-negative integer.".format(field)
+    if coerced < 0:
+        return None, "{} must be a non-negative integer.".format(field)
+    return coerced, None
+
+
+def _safe_manual_cost_float(payload, field):
+    value = payload.get(field)
+    if value in (None, ""):
+        return None, None
+    if isinstance(value, bool):
+        return None, "{} must be a non-negative number.".format(field)
+    try:
+        coerced = float(value)
+    except (TypeError, ValueError):
+        return None, "{} must be a non-negative number.".format(field)
+    if coerced < 0:
+        return None, "{} must be a non-negative number.".format(field)
+    return round(coerced, 6), None
 
 
 def _extract_cli_token_usage(output):
@@ -820,6 +879,80 @@ class NexusDashboard:
                 return jsonify({"status": "error", "message": str(exception)}), 500
 
             return jsonify({"status": "success", "logs": [line.rstrip("\n") for line in lines]})
+
+        @self.app.route("/api/cost-ledger", methods=["GET"])
+        def get_cost_ledger():
+            events = read_cost_events(self.engine.target_dir, limit=100)
+            return jsonify(
+                {
+                    "status": "success",
+                    "events": events,
+                    "summary": summarize_cost_events(events),
+                }
+            )
+
+        @self.app.route("/api/cost-ledger/manual-entry", methods=["POST"])
+        def create_manual_cost_entry():
+            payload = request.get_json(silent=True)
+            if not isinstance(payload, dict):
+                return jsonify({"status": "error", "message": "JSON object is required."}), 400
+
+            allowed_fields = set(MANUAL_COST_TEXT_FIELDS) | {
+                "total_tokens",
+                "estimated_cost_usd",
+            }
+            if any(field not in allowed_fields for field in payload):
+                return jsonify({"status": "error", "message": "Unsupported field present."}), 400
+
+            event = {"source": "manual"}
+            text_limits = {
+                "provider": 100,
+                "model": 120,
+                "source": 80,
+                "task_id": 80,
+                "notes": 1000,
+            }
+            for field in MANUAL_COST_TEXT_FIELDS:
+                value, error = _safe_manual_cost_text(payload, field, text_limits[field])
+                if error:
+                    return jsonify({"status": "error", "message": error}), 400
+                if value is not None:
+                    event[field] = value
+
+            total_tokens, error = _safe_manual_cost_int(payload, "total_tokens")
+            if error:
+                return jsonify({"status": "error", "message": error}), 400
+            if total_tokens is not None:
+                event["total_tokens"] = total_tokens
+
+            estimated_cost_usd, error = _safe_manual_cost_float(
+                payload, "estimated_cost_usd"
+            )
+            if error:
+                return jsonify({"status": "error", "message": error}), 400
+            if estimated_cost_usd is not None:
+                event["estimated_cost_usd"] = estimated_cost_usd
+
+            if total_tokens is None and estimated_cost_usd is None:
+                return jsonify(
+                    {
+                        "status": "error",
+                        "message": "total_tokens or estimated_cost_usd is required.",
+                    }
+                ), 400
+
+            try:
+                append_cost_event(self.engine.target_dir, event)
+                events = read_cost_events(self.engine.target_dir, limit=100)
+            except OSError as exception:
+                return jsonify({"status": "error", "message": str(exception)}), 500
+
+            return jsonify(
+                {
+                    "status": "success",
+                    "summary": summarize_cost_events(events),
+                }
+            ), 201
 
         @self.app.route("/api/kill-process", methods=["POST"])
         def kill_process():

@@ -44,6 +44,27 @@ def _merge_usage_value(usage, key, value):
         return
 
 
+def _parse_cli_token_count(value):
+    if not isinstance(value, str):
+        return None
+
+    normalized = value.replace(",", "")
+    if not normalized.isdigit():
+        return None
+
+    try:
+        return int(normalized)
+    except ValueError:
+        return None
+
+
+def _extract_tokens_used_total(text):
+    match = re.search(r"(?is)\btokens\s+used\b[^\d]{0,80}(\d[\d,]*)", text or "")
+    if not match:
+        return None
+    return _parse_cli_token_count(match.group(1))
+
+
 def _extract_cli_token_usage(output):
     usage = {}
     try:
@@ -92,6 +113,11 @@ def _extract_cli_token_usage(output):
             match = re.search(pattern, text)
             if match:
                 _merge_usage_value(usage, key, match.group(1))
+
+        if "total_tokens" not in usage:
+            total_tokens = _extract_tokens_used_total(text)
+            if total_tokens is not None:
+                usage["total_tokens"] = total_tokens
     except Exception:
         return {}
 

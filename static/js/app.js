@@ -32,6 +32,7 @@ window.NexusApp = {
     executionMode: "manual",
     automaticAnalysisEnabled: false,
     latestWorkPacketPreview: null,
+    latestCostLedger: null,
 
     setTab(tab) {
         const tabViews = {
@@ -884,6 +885,52 @@ window.NexusApp = {
                         Preview extracted tasks before staging them to To-Do.
                     </div>
                 </div>
+                <div class="bg-light border rounded p-3 mb-4">
+                    <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-3">
+                        <div>
+                            <h5 class="text-dark fw-semibold mb-1">Budget Guard</h5>
+                            <p class="text-secondary small mb-0">Budget Guard: manual tracking only. No automatic spending is triggered here.</p>
+                        </div>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="NexusApp.loadCostLedger()">Refresh</button>
+                    </div>
+                    <div id="cost-ledger-summary" class="row g-2 mb-3">
+                        <div class="col-12 small text-secondary">Loading cost tracking...</div>
+                    </div>
+                    <form id="manual-cost-entry-form" class="row g-2 align-items-end" onsubmit="NexusApp.submitManualCostEntry(); return false;">
+                        <div class="col-md-2">
+                            <label for="manual-cost-provider" class="form-label small text-secondary mb-1">Provider</label>
+                            <input id="manual-cost-provider" type="text" class="form-control form-control-sm" maxlength="100" autocomplete="off">
+                        </div>
+                        <div class="col-md-2">
+                            <label for="manual-cost-model" class="form-label small text-secondary mb-1">Model</label>
+                            <input id="manual-cost-model" type="text" class="form-control form-control-sm" maxlength="120" autocomplete="off">
+                        </div>
+                        <div class="col-md-2">
+                            <label for="manual-cost-source" class="form-label small text-secondary mb-1">Source</label>
+                            <input id="manual-cost-source" type="text" class="form-control form-control-sm" maxlength="80" value="manual" autocomplete="off">
+                        </div>
+                        <div class="col-md-2">
+                            <label for="manual-cost-task-id" class="form-label small text-secondary mb-1">Task ID</label>
+                            <input id="manual-cost-task-id" type="text" class="form-control form-control-sm" maxlength="80" autocomplete="off">
+                        </div>
+                        <div class="col-md-2">
+                            <label for="manual-cost-total-tokens" class="form-label small text-secondary mb-1">Total Tokens</label>
+                            <input id="manual-cost-total-tokens" type="number" class="form-control form-control-sm" min="0" step="1" inputmode="numeric">
+                        </div>
+                        <div class="col-md-2">
+                            <label for="manual-cost-estimated-cost" class="form-label small text-secondary mb-1">Cost USD</label>
+                            <input id="manual-cost-estimated-cost" type="number" class="form-control form-control-sm" min="0" step="0.000001" inputmode="decimal">
+                        </div>
+                        <div class="col-md-10">
+                            <label for="manual-cost-notes" class="form-label small text-secondary mb-1">Notes</label>
+                            <input id="manual-cost-notes" type="text" class="form-control form-control-sm" maxlength="1000" autocomplete="off">
+                        </div>
+                        <div class="col-md-2 d-grid">
+                            <button id="manual-cost-submit-btn" type="submit" class="btn btn-primary btn-sm">Add Entry</button>
+                        </div>
+                    </form>
+                    <div id="cost-ledger-events" class="small text-secondary mt-3">No cost events loaded.</div>
+                </div>
                 <div class="row g-3">
                     <div class="col-md-4">
                         <div class="card bg-light border h-100 p-3">
@@ -925,6 +972,8 @@ window.NexusApp = {
         this.renderWorkPacketPreview(this.latestWorkPacketPreview);
         this.renderExecutionMode();
         this.updateAutoPilotUI();
+        this.renderCostLedger(this.latestCostLedger);
+        this.loadCostLedger();
     },
 
     async loadKanban() {
@@ -1140,6 +1189,202 @@ window.NexusApp = {
             list.appendChild(item);
         });
         preview.appendChild(list);
+    },
+
+    formatCostUsd(value) {
+        const amount = Number(value || 0);
+        return `$${amount.toFixed(6)}`;
+    },
+
+    formatTokenCount(value) {
+        return Number(value || 0).toLocaleString();
+    },
+
+    async loadCostLedger() {
+        const summaryTarget = document.getElementById("cost-ledger-summary");
+        if (summaryTarget) {
+            summaryTarget.innerHTML = '<div class="col-12 small text-secondary">Loading cost tracking...</div>';
+        }
+
+        try {
+            const response = await fetch("/api/cost-ledger");
+            const data = await response.json();
+            if (!response.ok || data.status !== "success") {
+                throw new Error(data.message || "Unable to load cost ledger.");
+            }
+
+            this.latestCostLedger = data;
+            this.renderCostLedger(data);
+        } catch (error) {
+            if (summaryTarget) {
+                summaryTarget.innerHTML = "";
+                const message = document.createElement("div");
+                message.className = "col-12 small text-danger";
+                message.textContent = `Unable to load cost tracking: ${error.message}`;
+                summaryTarget.appendChild(message);
+            }
+        }
+    },
+
+    renderCostLedger(data) {
+        const summaryTarget = document.getElementById("cost-ledger-summary");
+        const eventsTarget = document.getElementById("cost-ledger-events");
+        if (!summaryTarget && !eventsTarget) {
+            return;
+        }
+
+        const summary = data?.summary || {};
+        const events = Array.isArray(data?.events) ? data.events : [];
+
+        if (summaryTarget) {
+            summaryTarget.innerHTML = "";
+            [
+                ["Events", summary.event_count || 0],
+                ["Total Tokens", this.formatTokenCount(summary.total_tokens || 0)],
+                ["Input Tokens", this.formatTokenCount(summary.input_tokens || 0)],
+                ["Output Tokens", this.formatTokenCount(summary.output_tokens || 0)],
+                ["Estimated Cost", this.formatCostUsd(summary.estimated_cost_usd || 0)],
+            ].forEach(([label, value]) => {
+                const column = document.createElement("div");
+                column.className = "col-sm-6 col-lg";
+
+                const metric = document.createElement("div");
+                metric.className = "border rounded bg-white p-2 h-100";
+
+                const labelEl = document.createElement("div");
+                labelEl.className = "text-secondary small";
+                labelEl.textContent = label;
+
+                const valueEl = document.createElement("div");
+                valueEl.className = "fw-semibold text-dark";
+                valueEl.textContent = String(value);
+
+                metric.appendChild(labelEl);
+                metric.appendChild(valueEl);
+                column.appendChild(metric);
+                summaryTarget.appendChild(column);
+            });
+        }
+
+        if (eventsTarget) {
+            eventsTarget.innerHTML = "";
+            if (!events.length) {
+                eventsTarget.textContent = "No manual cost events recorded yet.";
+                return;
+            }
+
+            const list = document.createElement("div");
+            list.className = "d-flex flex-column gap-2";
+            events.slice(-5).reverse().forEach((event) => {
+                const item = document.createElement("div");
+                item.className = "border rounded bg-white p-2";
+
+                const line = document.createElement("div");
+                line.className = "d-flex justify-content-between gap-3 flex-wrap";
+
+                const title = document.createElement("span");
+                title.className = "fw-semibold text-dark";
+                title.textContent = [
+                    event.provider || "provider unknown",
+                    event.model || "model unknown",
+                ].join(" / ");
+
+                const cost = document.createElement("span");
+                cost.className = "text-secondary";
+                cost.textContent = `${this.formatTokenCount(event.total_tokens || 0)} tokens | ${this.formatCostUsd(event.estimated_cost_usd || 0)}`;
+
+                const meta = document.createElement("div");
+                meta.className = "text-secondary";
+                meta.textContent = [
+                    event.source || "manual",
+                    event.task_id ? `Task ${event.task_id}` : "",
+                    event.timestamp ? new Date(event.timestamp).toLocaleString() : "",
+                ].filter(Boolean).join(" | ");
+
+                line.appendChild(title);
+                line.appendChild(cost);
+                item.appendChild(line);
+                item.appendChild(meta);
+                if (event.notes) {
+                    const notes = document.createElement("div");
+                    notes.className = "text-secondary mt-1";
+                    notes.textContent = event.notes;
+                    item.appendChild(notes);
+                }
+                list.appendChild(item);
+            });
+            eventsTarget.appendChild(list);
+        }
+    },
+
+    async submitManualCostEntry() {
+        const form = document.getElementById("manual-cost-entry-form");
+        const button = document.getElementById("manual-cost-submit-btn");
+        if (!form) {
+            return;
+        }
+
+        const readValue = (id) => (document.getElementById(id)?.value || "").trim();
+        const payload = {};
+        [
+            ["provider", "manual-cost-provider"],
+            ["model", "manual-cost-model"],
+            ["source", "manual-cost-source"],
+            ["task_id", "manual-cost-task-id"],
+            ["notes", "manual-cost-notes"],
+        ].forEach(([field, id]) => {
+            const value = readValue(id);
+            if (value) {
+                payload[field] = value;
+            }
+        });
+
+        const totalTokens = readValue("manual-cost-total-tokens");
+        const estimatedCost = readValue("manual-cost-estimated-cost");
+        if (totalTokens) {
+            payload.total_tokens = totalTokens;
+        }
+        if (estimatedCost) {
+            payload.estimated_cost_usd = estimatedCost;
+        }
+        if (!totalTokens && !estimatedCost) {
+            NexusCore.showToast("Enter total tokens or estimated cost before adding a manual entry.", "error");
+            return;
+        }
+
+        const originalLabel = button ? button.textContent : "";
+        if (button) {
+            button.disabled = true;
+            button.textContent = "Adding...";
+        }
+
+        try {
+            const response = await fetch("/api/cost-ledger/manual-entry", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
+            });
+            const data = await response.json();
+            if (!response.ok || data.status !== "success") {
+                throw new Error(data.message || "Unable to add manual cost entry.");
+            }
+
+            ["manual-cost-total-tokens", "manual-cost-estimated-cost", "manual-cost-notes"].forEach((id) => {
+                const input = document.getElementById(id);
+                if (input) {
+                    input.value = "";
+                }
+            });
+            await this.loadCostLedger();
+            NexusCore.showToast("Manual cost entry added.", "success");
+        } catch (error) {
+            NexusCore.showToast(`Error: ${error.message}`, "error");
+        } finally {
+            if (button) {
+                button.disabled = false;
+                button.textContent = originalLabel || "Add Entry";
+            }
+        }
     },
 
     async copyTextToClipboard(text) {
