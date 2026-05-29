@@ -173,6 +173,7 @@ class ExecutionRun(Base):
     started_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     finished_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     duration_seconds: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    timeout_seconds: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     provider: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     model: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     input_tokens: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)

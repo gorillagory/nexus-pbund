@@ -16,6 +16,7 @@ window.showToast = function (message, type = "success") {
 window.NexusApp = {
     resourcePollTimer: null,
     healthPollTimer: null,
+    factoryConsolePollTimer: null,
     healthCharts: {},
     lastNetworkSample: null,
     networkSeries: {
@@ -74,6 +75,9 @@ window.NexusApp = {
         if (tab !== "resources") {
             this.stopResourcePolling();
         }
+        if (tab !== "dashboard") {
+            this.stopFactoryConsolePolling();
+        }
 
         NexusState.currentTab = tab;
         document.querySelectorAll(".spa-view").forEach((container) => {
@@ -121,6 +125,7 @@ window.NexusApp = {
 
         if (tab === "dashboard") {
             this.loadFactoryConsole();
+            this.startFactoryConsolePolling();
         }
 
         NexusExplorer.renderList();
@@ -184,6 +189,24 @@ window.NexusApp = {
                 message.textContent = `Unable to load factory console: ${error.message}`;
                 target.appendChild(message);
             }
+        }
+    },
+
+    startFactoryConsolePolling() {
+        if (this.factoryConsolePollTimer) {
+            return;
+        }
+        this.factoryConsolePollTimer = setInterval(() => {
+            if (NexusState.currentTab === "dashboard") {
+                this.loadFactoryConsole();
+            }
+        }, 10000);
+    },
+
+    stopFactoryConsolePolling() {
+        if (this.factoryConsolePollTimer) {
+            clearInterval(this.factoryConsolePollTimer);
+            this.factoryConsolePollTimer = null;
         }
     },
 
@@ -508,6 +531,7 @@ window.NexusApp = {
     showWelcome() {
         this.workspaceActive = false;
         this.stopResourcePolling();
+        this.stopFactoryConsolePolling();
         this.stopAutoPilotPolling();
         NexusState.currentTab = "dashboard";
         NexusState.globalData = null;
@@ -1822,7 +1846,9 @@ window.NexusApp = {
                 button.disabled = false;
                 button.textContent = originalLabel || "Run One Task";
             }
+            await this.loadKanban();
             await this.loadCostLedger();
+            await this.loadFactoryConsole();
         }
     },
 

@@ -122,6 +122,7 @@ def serialize_execution_run(run):
         "started_at": _as_iso(getattr(run, "started_at", None)),
         "finished_at": _as_iso(getattr(run, "finished_at", None)),
         "duration_seconds": _as_float(getattr(run, "duration_seconds", None)),
+        "timeout_seconds": _as_int(getattr(run, "timeout_seconds", None)),
         "provider": _redact_text(getattr(run, "provider", None)),
         "model": _redact_text(getattr(run, "model", None)),
         "input_tokens": _as_int(getattr(run, "input_tokens", None)),
