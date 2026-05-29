@@ -63,6 +63,8 @@ The Factory Console is the operator surface for mode, automatic analysis state, 
 
 Packet 024 added Git Explorer as a read-only dashboard surface for branch, clean/dirty status, recent commits, baseline tags, changed files, diff stat, and bounded redacted diff previews. Git Explorer must not perform git writes. Branch Per Packet remains Packet 025.
 
+Packet 025 added Branch Per Packet as a supervised branch preparation helper. Its only app-level git write is `git switch -c` for a validated `factory/packet-###-safe-slug` branch from clean `main` after explicit operator confirmation. It does not commit, merge, push, reset, clean, rebase, stash, tag, delete branches, or run arbitrary checkout.
+
 ## Recovery Flow
 
 When a run fails:
@@ -88,6 +90,8 @@ GitHub Actions runs quick strict preflight on push and pull request to `main`.
 Use a packet branch, verify locally, commit, fast-forward merge to `main`, verify again, tag a baseline, and push `main` plus the tag.
 
 The dashboard Git Explorer is read-only. Operator/Codex may still perform routine git operations outside the app according to the packet workflow, but the app must not expose commit, merge, branch, tag, push, pull, fetch, reset, clean, rebase, stash, or checkout actions.
+
+Branch Per Packet is the narrow exception for app-level git writes. It may prepare one validated packet branch at a time after clean-worktree checks. Codex operator workflow may still perform verified commit, fast-forward merge, baseline tag, and push outside the app.
 
 ## Safety Rules
 

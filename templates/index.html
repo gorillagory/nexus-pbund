@@ -685,6 +685,31 @@
                                     <pre id="git-explorer-diff-preview" class="git-explorer-diff-preview mb-0">Diff preview is optional and capped.</pre>
                                 </div>
                             </div>
+                            <section id="packet-branch-panel" class="factory-console-panel mt-4">
+                                <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-3">
+                                    <div>
+                                        <h4 class="h6 fw-semibold mb-1">Branch Per Packet</h4>
+                                        <p class="text-secondary small mb-0">Supervised branch preparation only. No commit, merge, push, reset, clean, rebase, stash, tag, or delete actions are available here.</p>
+                                    </div>
+                                    <button type="button" class="btn btn-outline-secondary btn-sm" onclick="NexusApp.loadPacketBranchStatus()">Check Preconditions</button>
+                                </div>
+                                <div class="row g-3">
+                                    <div class="col-lg-4">
+                                        <label for="packet-branch-number" class="form-label small text-secondary mb-1">Packet Number</label>
+                                        <input id="packet-branch-number" class="form-control form-control-sm" inputmode="numeric" maxlength="3" placeholder="025" oninput="NexusApp.loadPacketBranchStatus()">
+                                    </div>
+                                    <div class="col-lg-8">
+                                        <label for="packet-branch-title" class="form-label small text-secondary mb-1">Packet Title / Slug</label>
+                                        <input id="packet-branch-title" class="form-control form-control-sm" maxlength="120" placeholder="Branch Per Packet" oninput="NexusApp.loadPacketBranchStatus()">
+                                    </div>
+                                </div>
+                                <div class="mt-3">
+                                    <div class="factory-summary-label">Suggested Branch</div>
+                                    <div id="packet-branch-suggested" class="font-monospace small text-secondary">Enter packet number and title.</div>
+                                </div>
+                                <div id="packet-branch-status" class="factory-console-panel small text-secondary mt-3">Packet branch status not loaded.</div>
+                                <button id="packet-branch-prepare-button" type="button" class="btn btn-primary btn-sm mt-3" onclick="NexusApp.preparePacketBranch()" disabled>Prepare Packet Branch</button>
+                            </section>
                             <span class="d-none">/api/git-explorer/summary /api/git-explorer/log /api/git-explorer/tags /api/git-explorer/changes /api/git-explorer/diff read-only Git Explorer</span>
                         </div>
                     </div>

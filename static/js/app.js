@@ -39,6 +39,7 @@ window.NexusApp = {
     latestPreflightStatus: null,
     latestCiStatus: null,
     latestGitExplorer: null,
+    latestPacketBranchStatus: null,
     orchestrationInboxItems: [],
     selectedOrchestrationInboxItem: null,
     promptVaultTemplates: [],
@@ -122,6 +123,7 @@ window.NexusApp = {
 
         if (tab === "git") {
             this.loadGitExplorer();
+            this.loadPacketBranchStatus();
             return;
         }
 
@@ -1076,6 +1078,108 @@ window.NexusApp = {
                 target.textContent = `Unable to load diff preview: ${error.message}`;
             }
             NexusCore.showToast(`Diff preview error: ${error.message}`, "error");
+        }
+    },
+
+    packetBranchFormData() {
+        return {
+            packet_number: document.getElementById("packet-branch-number")?.value || "",
+            title: document.getElementById("packet-branch-title")?.value || "",
+        };
+    },
+
+    async loadPacketBranchStatus() {
+        const target = document.getElementById("packet-branch-status");
+        const { packet_number: packetNumber, title } = this.packetBranchFormData();
+        if (target) {
+            target.textContent = "Checking packet branch preconditions...";
+        }
+        try {
+            const params = new URLSearchParams();
+            if (packetNumber) params.set("packet_number", packetNumber);
+            if (title) params.set("title", title);
+            const query = params.toString() ? `?${params.toString()}` : "";
+            const response = await fetch(`/api/packet-branch/status${query}`);
+            const data = await response.json();
+            if (!response.ok || data.status !== "success") {
+                throw new Error(data.message || "Unable to load packet branch status.");
+            }
+            this.latestPacketBranchStatus = data.packet_branch || {};
+            this.renderPacketBranchStatus(this.latestPacketBranchStatus);
+        } catch (error) {
+            if (target) {
+                target.textContent = `Unable to load packet branch status: ${error.message}`;
+                target.className = "factory-console-panel small text-danger";
+            }
+            NexusCore.showToast(`Packet branch error: ${error.message}`, "error");
+        }
+    },
+
+    renderPacketBranchStatus(status) {
+        const target = document.getElementById("packet-branch-status");
+        const branchTarget = document.getElementById("packet-branch-suggested");
+        const prepareButton = document.getElementById("packet-branch-prepare-button");
+        if (branchTarget) {
+            branchTarget.textContent = status?.suggested_branch || status?.validation_error || "Enter packet number and title.";
+        }
+        if (prepareButton) {
+            prepareButton.disabled = !status?.can_prepare;
+        }
+        if (!target) return;
+        const clean = Boolean(status?.is_clean);
+        const current = status?.current_branch || "unknown";
+        const canPrepare = Boolean(status?.can_prepare);
+        const validation = status?.validation_error || "";
+        target.className = "factory-console-panel small text-secondary";
+        target.innerHTML = `
+            <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
+                <div>
+                    <div class="factory-summary-label">Current Branch</div>
+                    <div class="factory-summary-value">${this.escapeHtml(current)}</div>
+                </div>
+                <span class="factory-status-badge ${clean ? "factory-status-pass" : "factory-status-fail"}">${clean ? "clean" : "dirty"}</span>
+            </div>
+            <div class="factory-run-event mt-3">
+                <strong>Precondition</strong>
+                <span>${canPrepare ? "ready to prepare packet branch" : "not ready"}</span>
+            </div>
+            <div class="factory-run-event">
+                <strong>Changed Files</strong>
+                <span>${this.escapeHtml(status?.changed_file_count ?? 0)}</span>
+            </div>
+            ${validation ? `<div class="factory-run-event"><strong>Validation</strong><span>${this.escapeHtml(validation)}</span></div>` : ""}
+        `;
+    },
+
+    async preparePacketBranch() {
+        const status = this.latestPacketBranchStatus || {};
+        const branchName = status.suggested_branch || "the suggested packet branch";
+        if (!(await NexusCore.confirmAction(`Prepare ${branchName}? This only creates and switches to a validated packet branch when the worktree is clean on main.`, {
+            title: "Prepare Packet Branch",
+            confirmLabel: "Prepare Branch",
+            variant: "primary",
+        }))) {
+            return;
+        }
+        try {
+            const response = await fetch("/api/packet-branch/prepare", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    ...this.packetBranchFormData(),
+                    confirm_prepare: true,
+                }),
+            });
+            const data = await response.json();
+            if (!response.ok || data.status !== "success") {
+                throw new Error(data.message || "Unable to prepare packet branch.");
+            }
+            NexusCore.showToast(`Prepared ${data.branch}`, "success");
+            await this.loadPacketBranchStatus();
+            await this.loadGitExplorer();
+        } catch (error) {
+            NexusCore.showToast(`Prepare branch error: ${error.message}`, "error");
+            await this.loadPacketBranchStatus();
         }
     },
 

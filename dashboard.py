@@ -69,6 +69,7 @@ from src.services.orchestration_inbox import (
     serialize_inbox_item,
     update_inbox_item,
 )
+from src.services.packet_branch import packet_branch_status, prepare_packet_branch
 from src.services.prompt_vault import (
     archive_prompt_template,
     create_prompt_template,
@@ -1837,6 +1838,53 @@ class NexusDashboard:
                     "diff": get_diff_preview(self.engine.target_dir, limit=limit),
                 }
             )
+
+        @self.app.route("/api/packet-branch/status", methods=["GET"])
+        def get_packet_branch_status_route():
+            packet_number = request.args.get("packet_number")
+            title = request.args.get("title")
+            return jsonify(
+                {
+                    "status": "success",
+                    "packet_branch": packet_branch_status(
+                        self.engine.target_dir,
+                        packet_number=packet_number,
+                        title=title,
+                    ),
+                }
+            )
+
+        @self.app.route("/api/packet-branch/prepare", methods=["POST"])
+        def prepare_packet_branch_route():
+            payload = request.get_json(silent=True) or {}
+            if not isinstance(payload, dict):
+                return jsonify({"status": "error", "message": "JSON object is required."}), 400
+
+            try:
+                result = prepare_packet_branch(
+                    self.engine.target_dir,
+                    packet_number=payload.get("packet_number"),
+                    title=payload.get("title") or payload.get("slug"),
+                    confirm_prepare=payload.get("confirm_prepare") is True,
+                )
+            except ValueError as exception:
+                return jsonify({"status": "error", "message": str(exception)}), 400
+            if not result.get("ok"):
+                return jsonify(
+                    {
+                        "status": "error",
+                        "message": result.get("message") or "Packet branch could not be prepared.",
+                        "branch": result.get("branch"),
+                    }
+                ), 400
+
+            return jsonify(
+                {
+                    "status": "success",
+                    "message": result.get("message"),
+                    "branch": result.get("branch"),
+                }
+            ), 201
 
         @self.app.route("/api/factory/ci-status", methods=["GET"])
         def get_factory_ci_status():
