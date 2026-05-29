@@ -41,6 +41,7 @@ from src.services.factory_events import (
     create_factory_event,
     get_recent_execution_runs,
     get_recent_factory_events,
+    serialize_changed_file,
     serialize_execution_run,
     serialize_factory_event,
     summarize_factory_state,
@@ -1578,6 +1579,50 @@ class NexusDashboard:
                 }
             )
 
+        @self.app.route("/api/factory/runs/<int:run_id>", methods=["GET"])
+        def get_factory_run_details(run_id):
+            try:
+                active_workspace_id = get_workspace_id(self.engine.target_dir)
+                db_context = get_db()
+                db = next(db_context)
+                try:
+                    run = db.get(ExecutionRun, run_id)
+                    if run is None or run.workspace_id != active_workspace_id:
+                        return jsonify({"status": "error", "message": "Execution run not found."}), 404
+                    task = db.get(Task, run.task_id) if run.task_id else None
+                    changed_files = (
+                        db.execute(
+                            select(ExecutionChangedFile)
+                            .where(ExecutionChangedFile.execution_run_id == run_id)
+                            .order_by(ExecutionChangedFile.id.asc())
+                        )
+                        .scalars()
+                        .all()
+                    )
+                    events = (
+                        db.execute(
+                            select(FactoryEvent)
+                            .where(FactoryEvent.execution_run_id == run_id)
+                            .order_by(FactoryEvent.created_at.desc(), FactoryEvent.id.desc())
+                        )
+                        .scalars()
+                        .all()
+                    )
+                finally:
+                    db_context.close()
+            except Exception as exception:
+                return jsonify({"status": "error", "message": "Run details unavailable: {}".format(exception)}), 503
+
+            return jsonify(
+                {
+                    "status": "success",
+                    "run": serialize_execution_run(run),
+                    "task": serialize_task(task) if task is not None else None,
+                    "changed_files": [serialize_changed_file(changed_file) for changed_file in changed_files],
+                    "events": [serialize_factory_event(event) for event in events],
+                }
+            )
+
         @self.app.route("/api/factory/git-status", methods=["GET"])
         def get_factory_git_status():
             return jsonify(
@@ -1875,6 +1920,155 @@ class NexusDashboard:
             except IntegrityError:
                 db.rollback()
                 return jsonify({"status": "error", "message": "Workspace not found."}), 400
+            except Exception:
+                db.rollback()
+                raise
+            finally:
+                db_context.close()
+
+        @self.app.route("/api/tasks/<int:task_id>/factory-details", methods=["GET"])
+        def get_task_factory_details(task_id):
+            try:
+                active_workspace_id = get_workspace_id(self.engine.target_dir)
+                db_context = get_db()
+                db = next(db_context)
+                try:
+                    task = db.get(Task, task_id)
+                    if task is None or task.workspace_id != active_workspace_id:
+                        return jsonify({"status": "error", "message": "Task not found."}), 404
+                    runs = (
+                        db.execute(
+                            select(ExecutionRun)
+                            .where(ExecutionRun.task_id == task_id)
+                            .order_by(ExecutionRun.started_at.desc(), ExecutionRun.id.desc())
+                        )
+                        .scalars()
+                        .all()
+                    )
+                    events = (
+                        db.execute(
+                            select(FactoryEvent)
+                            .where(FactoryEvent.task_id == task_id)
+                            .order_by(FactoryEvent.created_at.desc(), FactoryEvent.id.desc())
+                        )
+                        .scalars()
+                        .all()
+                    )
+                    latest_run = runs[0] if runs else None
+                    changed_files = []
+                    if latest_run is not None:
+                        changed_files = (
+                            db.execute(
+                                select(ExecutionChangedFile)
+                                .where(ExecutionChangedFile.execution_run_id == latest_run.id)
+                                .order_by(ExecutionChangedFile.id.asc())
+                            )
+                            .scalars()
+                            .all()
+                        )
+                finally:
+                    db_context.close()
+            except Exception as exception:
+                return jsonify({"status": "error", "message": "Task details unavailable: {}".format(exception)}), 503
+
+            return jsonify(
+                {
+                    "status": "success",
+                    "task": serialize_task(task),
+                    "latest_runs": [serialize_execution_run(run) for run in runs[:10]],
+                    "latest_events": [serialize_factory_event(event) for event in events[:20]],
+                    "changed_files": [serialize_changed_file(changed_file) for changed_file in changed_files],
+                }
+            )
+
+        @self.app.route("/api/tasks/<int:task_id>/mark-review-required", methods=["POST"])
+        def mark_task_review_required(task_id):
+            payload = request.get_json(silent=True) or {}
+            workspace_id = payload.get("workspace_id")
+            reason = payload.get("reason") or "Marked review required by operator."
+            if not isinstance(workspace_id, int) or isinstance(workspace_id, bool):
+                return jsonify({"status": "error", "message": "Valid workspace_id is required."}), 400
+            if not isinstance(reason, str):
+                return jsonify({"status": "error", "message": "reason must be a string."}), 400
+
+            active_workspace_id = get_workspace_id(self.engine.target_dir)
+            if workspace_id != active_workspace_id:
+                return jsonify({"status": "error", "message": "Workspace is not active."}), 403
+
+            db_context = get_db()
+            db = next(db_context)
+            try:
+                task = db.get(Task, task_id)
+                if task is None or task.workspace_id != workspace_id:
+                    return jsonify({"status": "error", "message": "Task not found."}), 404
+                task.status = "review"
+                _safe_db_commit(db)
+                event = _safe_create_factory_event(
+                    db,
+                    workspace_id,
+                    "task_marked_review_required",
+                    "Task marked review required: {}".format(task.title),
+                    task_id=task.id,
+                    payload={"reason": reason[:1000]},
+                )
+                return jsonify(
+                    {
+                        "status": "success",
+                        "task": serialize_task(task),
+                        "event": serialize_factory_event(event),
+                    }
+                )
+            except Exception:
+                db.rollback()
+                raise
+            finally:
+                db_context.close()
+
+        @self.app.route("/api/tasks/<int:task_id>/retry-one", methods=["POST"])
+        def retry_one_task(task_id):
+            payload = request.get_json(silent=True) or {}
+            workspace_id = payload.get("workspace_id")
+            execution_mode = self.engine.get_execution_mode()
+            if execution_mode != "one_task":
+                return jsonify(
+                    {
+                        "status": "error",
+                        "message": "Retry One Task requires execution mode one_task.",
+                        "execution_mode": execution_mode,
+                    }
+                ), 403
+            if not isinstance(workspace_id, int) or isinstance(workspace_id, bool):
+                return jsonify({"status": "error", "message": "Valid workspace_id is required."}), 400
+            active_workspace_id = get_workspace_id(self.engine.target_dir)
+            if workspace_id != active_workspace_id:
+                return jsonify({"status": "error", "message": "Workspace is not active."}), 403
+
+            db_context = get_db()
+            db = next(db_context)
+            try:
+                workspace = db.get(Workspace, workspace_id)
+                if workspace is None:
+                    return jsonify({"status": "error", "message": "Workspace not found."}), 400
+                task = db.get(Task, task_id)
+                if task is None or task.workspace_id != workspace_id:
+                    return jsonify({"status": "error", "message": "Task not found."}), 404
+                result = _execute_factory_task(db, workspace, task, execution_mode)
+                response = {
+                    "status": result.get("status"),
+                    "task_id": task.id,
+                    "task_status": result.get("task_status"),
+                    "execution_run_id": result.get("execution_run_id"),
+                    "factory_events_created": result.get("factory_events_created", 0),
+                    "git": result.get("git", {}),
+                    "stdout": result.get("stdout", ""),
+                    "stderr": result.get("stderr", ""),
+                    "returncode": result.get("returncode"),
+                    "timeout_seconds": result.get("timeout_seconds"),
+                    "execution_time": result.get("execution_time"),
+                    "token_usage": result.get("token_usage", {}),
+                    "message": result.get("message", "Retry completed."),
+                }
+                return jsonify(response), int(result.get("status_code") or 200)
             except Exception:
                 db.rollback()
                 raise
@@ -2252,6 +2446,271 @@ class NexusDashboard:
                     self.packet_runner_state["current_task_title"] = None
                     if not self.packet_runner_state.get("message"):
                         self.packet_runner_state["message"] = "Packet runner is idle."
+                db_context.close()
+
+        @self.app.route("/api/work-packets/<int:work_packet_id>/continue", methods=["POST"])
+        def continue_work_packet(work_packet_id):
+            payload = request.get_json(silent=True) or {}
+            execution_mode = self.engine.get_execution_mode()
+            if execution_mode != "one_packet":
+                return jsonify(
+                    {
+                        "status": "error",
+                        "message": "Continue Packet requires execution mode one_packet.",
+                        "execution_mode": execution_mode,
+                    }
+                ), 403
+
+            workspace_id = payload.get("workspace_id")
+            if not isinstance(workspace_id, int) or isinstance(workspace_id, bool):
+                return jsonify({"status": "error", "message": "Valid workspace_id is required."}), 400
+            active_workspace_id = get_workspace_id(self.engine.target_dir)
+            if workspace_id != active_workspace_id:
+                return jsonify({"status": "error", "message": "Workspace is not active."}), 403
+
+            with self.packet_runner_lock:
+                if self.packet_runner_state.get("running"):
+                    return jsonify(
+                        {
+                            "status": "error",
+                            "message": "Another packet run is already active.",
+                            "runner": dict(self.packet_runner_state),
+                        }
+                    ), 409
+                self.packet_runner_state = {
+                    "running": True,
+                    "mode": "one_packet_continue",
+                    "work_packet_id": work_packet_id,
+                    "current_task_id": None,
+                    "current_task_title": None,
+                    "completed": 0,
+                    "total": 0,
+                    "message": "Packet continue is loading packet.",
+                    "cancel_requested": False,
+                }
+
+            db_context = get_db()
+            db = next(db_context)
+            completed_count = 0
+            failed_count = 0
+            skipped_count = 0
+            execution_run_ids = []
+            events_created = 0
+            status = "success"
+            status_code = 200
+            message = "Packet continue completed successfully."
+            try:
+                workspace = db.get(Workspace, workspace_id)
+                if workspace is None:
+                    return jsonify({"status": "error", "message": "Workspace not found."}), 400
+
+                work_packet = db.get(WorkPacket, work_packet_id)
+                if work_packet is None or work_packet.workspace_id != workspace_id:
+                    return jsonify({"status": "error", "message": "Work packet not found."}), 404
+
+                packet_links = (
+                    db.execute(
+                        select(WorkPacketTask)
+                        .where(WorkPacketTask.work_packet_id == work_packet_id)
+                        .order_by(WorkPacketTask.position.asc(), WorkPacketTask.id.asc())
+                    )
+                    .scalars()
+                    .all()
+                )
+                packet_tasks = []
+                for link in packet_links:
+                    task = db.get(Task, link.task_id)
+                    if task is not None and task.workspace_id == workspace_id:
+                        packet_tasks.append((link, task))
+                if not packet_tasks:
+                    return jsonify({"status": "error", "message": "Work packet has no runnable tasks."}), 400
+
+                unfinished_statuses = {"failed", "skipped", "pending", "todo", "review", "review_required", "staged"}
+                run_tasks = [
+                    (link, task)
+                    for link, task in packet_tasks
+                    if (link.status or "").lower() in unfinished_statuses
+                    or (task.status or "").lower() in unfinished_statuses
+                ]
+                if not run_tasks:
+                    return jsonify(
+                        {
+                            "status": "success",
+                            "work_packet_id": work_packet_id,
+                            "packet_status": work_packet.status,
+                            "completed_count": 0,
+                            "failed_count": 0,
+                            "skipped_count": 0,
+                            "execution_run_ids": [],
+                            "events_created": 0,
+                            "message": "No unfinished packet tasks found.",
+                        }
+                    )
+
+                work_packet.status = "running"
+                work_packet.started_at = work_packet.started_at or datetime.now(timezone.utc)
+                _safe_db_commit(db)
+                with self.packet_runner_lock:
+                    self.packet_runner_state["total"] = len(run_tasks)
+                    self.packet_runner_state["message"] = "Continuing packet from first unfinished task."
+
+                event = _safe_create_factory_event(
+                    db,
+                    workspace_id,
+                    "packet_run_continued",
+                    "Packet run continued: {}".format(work_packet.title),
+                    work_packet_id=work_packet_id,
+                    payload={"remaining_task_count": len(run_tasks), "execution_mode": execution_mode},
+                )
+                events_created += 1 if event is not None else 0
+
+                for link, task in run_tasks:
+                    with self.packet_runner_lock:
+                        cancel_requested = bool(self.packet_runner_state.get("cancel_requested"))
+                    if cancel_requested:
+                        link.status = "skipped"
+                        skipped_count += 1
+                        _safe_db_commit(db)
+                        continue
+
+                    link.status = "running"
+                    link.started_at = datetime.now(timezone.utc)
+                    _safe_db_commit(db)
+                    with self.packet_runner_lock:
+                        self.packet_runner_state["current_task_id"] = task.id
+                        self.packet_runner_state["current_task_title"] = task.title
+                        self.packet_runner_state["message"] = "Continuing packet task: {}".format(task.title)
+
+                    event = _safe_create_factory_event(
+                        db,
+                        workspace_id,
+                        "packet_task_started",
+                        "Packet task continued: {}".format(task.title),
+                        work_packet_id=work_packet_id,
+                        task_id=task.id,
+                    )
+                    events_created += 1 if event is not None else 0
+
+                    result = _execute_factory_task(
+                        db,
+                        workspace,
+                        task,
+                        execution_mode,
+                        work_packet_id=work_packet_id,
+                        create_requested_event=False,
+                    )
+                    if result.get("execution_run_id"):
+                        execution_run_ids.append(result.get("execution_run_id"))
+                    events_created += int(result.get("factory_events_created") or 0)
+
+                    if result.get("status") == "success":
+                        completed_count += 1
+                        link.status = "completed"
+                        link.completed_at = datetime.now(timezone.utc)
+                        event = _safe_create_factory_event(
+                            db,
+                            workspace_id,
+                            "packet_task_completed",
+                            "Packet task completed after continue: {}".format(task.title),
+                            work_packet_id=work_packet_id,
+                            task_id=task.id,
+                            execution_run_id=result.get("execution_run_id"),
+                        )
+                        events_created += 1 if event is not None else 0
+                        _safe_db_commit(db)
+                        with self.packet_runner_lock:
+                            self.packet_runner_state["completed"] = completed_count
+                        continue
+
+                    failed_count += 1
+                    status = "failed"
+                    status_code = 500 if result.get("status") != "timeout" else 504
+                    message = "Packet continue stopped after task {} ended with status {}.".format(
+                        task.id,
+                        result.get("status") or "failed",
+                    )
+                    link.status = "failed"
+                    link.failed_at = datetime.now(timezone.utc)
+                    work_packet.status = "failed"
+                    work_packet.failed_at = datetime.now(timezone.utc)
+                    event = _safe_create_factory_event(
+                        db,
+                        workspace_id,
+                        "packet_task_failed",
+                        "Packet task failed during continue: {}".format(task.title),
+                        work_packet_id=work_packet_id,
+                        task_id=task.id,
+                        execution_run_id=result.get("execution_run_id"),
+                    )
+                    events_created += 1 if event is not None else 0
+
+                    remaining_started = False
+                    for remaining_link, remaining_task in run_tasks:
+                        if remaining_started:
+                            remaining_link.status = "skipped"
+                            skipped_count += 1
+                            event = _safe_create_factory_event(
+                                db,
+                                workspace_id,
+                                "packet_task_skipped",
+                                "Packet task skipped after continue failure: {}".format(remaining_task.title),
+                                work_packet_id=work_packet_id,
+                                task_id=remaining_task.id,
+                            )
+                            events_created += 1 if event is not None else 0
+                        if remaining_link is link:
+                            remaining_started = True
+                    _safe_db_commit(db)
+                    break
+
+                if status == "success":
+                    all_completed = True
+                    for link, task in packet_tasks:
+                        if (link.status or "").lower() != "completed":
+                            all_completed = False
+                            break
+                    if all_completed:
+                        work_packet.status = "completed"
+                        work_packet.completed_at = datetime.now(timezone.utc)
+                    event = _safe_create_factory_event(
+                        db,
+                        workspace_id,
+                        "packet_run_completed",
+                        "Packet continue completed: {}".format(work_packet.title),
+                        work_packet_id=work_packet_id,
+                        payload={
+                            "completed_count": completed_count,
+                            "failed_count": failed_count,
+                            "skipped_count": skipped_count,
+                        },
+                    )
+                    events_created += 1 if event is not None else 0
+                    _safe_db_commit(db)
+
+                with self.packet_runner_lock:
+                    self.packet_runner_state["message"] = message
+
+                return jsonify(
+                    {
+                        "status": status,
+                        "work_packet_id": work_packet_id,
+                        "packet_status": work_packet.status,
+                        "completed_count": completed_count,
+                        "failed_count": failed_count,
+                        "skipped_count": skipped_count,
+                        "execution_run_ids": execution_run_ids,
+                        "events_created": events_created,
+                        "message": message,
+                    }
+                ), status_code
+            except Exception:
+                db.rollback()
+                raise
+            finally:
+                with self.packet_runner_lock:
+                    self.packet_runner_state["running"] = False
+                    self.packet_runner_state["current_task_id"] = None
+                    self.packet_runner_state["current_task_title"] = None
                 db_context.close()
 
         @self.app.route("/api/work-packets/<int:work_packet_id>/status", methods=["GET"])

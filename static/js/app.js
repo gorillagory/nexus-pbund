@@ -301,6 +301,7 @@ window.NexusApp = {
         this.renderFactorySummaryCards(factory, git);
         this.renderFactoryCurrentState(factory, runner);
         this.renderFactorySafeActions(factory, git);
+        this.renderFactoryFailureRecovery(factory, runner, runs);
         this.renderFactoryGitStatus(git);
         this.renderFactoryEvents(events);
         this.renderFactoryRuns(runs);
@@ -377,6 +378,154 @@ window.NexusApp = {
             <div class="factory-guidance-title">${this.escapeHtml(guidance.title)}</div>
             <p class="factory-guidance-copy mb-0">${this.escapeHtml(guidance.body)}</p>
         `;
+    },
+
+    latestFailedRun(runs) {
+        return (Array.isArray(runs) ? runs : []).find((run) => {
+            const status = String(run?.status || "").toLowerCase();
+            return ["failed", "timeout", "error"].includes(status) || Number(run?.returncode || 0) !== 0;
+        }) || null;
+    },
+
+    renderFactoryFailureRecovery(factory, runner, runs) {
+        const target = document.getElementById("factory-failure-recovery-panel");
+        if (!target) return;
+
+        const failedRun = this.latestFailedRun(runs);
+        if (!failedRun) {
+            target.innerHTML = `
+                <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-2">
+                    <h4 class="h6 fw-semibold mb-0">Latest Failed Run</h4>
+                    <span class="factory-status-badge factory-status-pass">clear</span>
+                </div>
+                <div class="text-secondary small">No failed execution run in the recent factory window.</div>
+            `;
+            return;
+        }
+
+        const mode = String(factory?.execution_mode || "manual");
+        const packetId = failedRun.work_packet_id || runner?.work_packet_id || "";
+        const canRetry = mode === "one_task" && failedRun.task_id;
+        const canContinue = mode === "one_packet" && packetId;
+        const preview = (failedRun.stderr || failedRun.stdout || failedRun.error_message || "").slice(0, 220);
+        target.innerHTML = `
+            <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-3">
+                <h4 class="h6 fw-semibold mb-0">Latest Failed Run</h4>
+                <span class="factory-status-badge ${this.factoryStatusClass(failedRun.status)}">${this.escapeHtml(failedRun.status || "failed")}</span>
+            </div>
+            <div class="factory-recovery-grid">
+                <div>
+                    <div class="factory-summary-label">Run</div>
+                    <div class="factory-summary-value">#${this.escapeHtml(failedRun.id || "-")}</div>
+                </div>
+                <div>
+                    <div class="factory-summary-label">Task</div>
+                    <div class="factory-summary-value">#${this.escapeHtml(failedRun.task_id || "-")}</div>
+                </div>
+                <div>
+                    <div class="factory-summary-label">Packet</div>
+                    <div class="factory-summary-value">#${this.escapeHtml(packetId || "-")}</div>
+                </div>
+                <div>
+                    <div class="factory-summary-label">Return</div>
+                    <div class="factory-summary-value">${this.escapeHtml(failedRun.returncode ?? "-")}</div>
+                </div>
+            </div>
+            <pre class="factory-recovery-preview">${this.escapeHtml(preview || "No stderr/stdout preview.")}</pre>
+            <div class="d-flex gap-2 flex-wrap">
+                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="NexusApp.viewFactoryRunDetails(${Number(failedRun.id) || 0})">View Run Details</button>
+                ${failedRun.task_id ? `<button type="button" class="btn btn-outline-warning btn-sm" onclick="NexusApp.markTaskReviewRequired(${Number(failedRun.task_id) || 0})">Mark Review Required</button>` : ""}
+                ${failedRun.task_id ? `<button type="button" class="btn btn-primary btn-sm" ${canRetry ? "" : "disabled"} onclick="NexusApp.retryOneTask(${Number(failedRun.task_id) || 0})">Retry One Task</button>` : ""}
+                ${packetId ? `<button type="button" class="btn btn-outline-primary btn-sm" ${canContinue ? "" : "disabled"} onclick="NexusApp.continueWorkPacket(${Number(packetId) || 0})">Continue Packet</button>` : ""}
+            </div>
+            <div class="factory-recovery-warning mt-2">
+                Retry runs only this task. Continue runs only this packet from the first unfinished task.
+            </div>
+        `;
+    },
+
+    async viewFactoryRunDetails(runId) {
+        if (!runId) return;
+        try {
+            const response = await fetch(`/api/factory/runs/${runId}`);
+            const data = await response.json();
+            if (!response.ok || data.status !== "success") {
+                throw new Error(data.message || "Unable to load run details.");
+            }
+            const stderr = data?.run?.stderr || data?.run?.error_message || data?.run?.stdout || "No output captured.";
+            NexusCore.showToast(`Run ${runId}: ${String(stderr).slice(0, 180)}`, data?.run?.status === "success" ? "success" : "primary");
+        } catch (error) {
+            NexusCore.showToast(`Run details error: ${error.message}`, "error");
+        }
+    },
+
+    async markTaskReviewRequired(taskId) {
+        if (!taskId) return;
+        try {
+            const response = await fetch(`/api/tasks/${taskId}/mark-review-required`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    workspace_id: NexusState.currentWorkspaceId,
+                    reason: "Marked review required from Factory Console recovery panel.",
+                }),
+            });
+            const data = await response.json();
+            if (!response.ok || data.status !== "success") {
+                throw new Error(data.message || "Unable to mark review required.");
+            }
+            NexusCore.showToast("Task marked review required.", "success");
+            await this.loadFactoryConsole();
+            this.renderBoard();
+        } catch (error) {
+            NexusCore.showToast(`Review marker error: ${error.message}`, "error");
+        }
+    },
+
+    async retryOneTask(taskId) {
+        if (!taskId) return;
+        try {
+            const response = await fetch(`/api/tasks/${taskId}/retry-one`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ workspace_id: NexusState.currentWorkspaceId }),
+            });
+            const data = await response.json();
+            if (!response.ok || !["success", "failed", "timeout"].includes(data.status)) {
+                throw new Error(data.message || "Unable to retry task.");
+            }
+            NexusCore.showToast(
+                data.status === "success" ? "Retry completed successfully." : "Retry finished with failure.",
+                data.status === "success" ? "success" : "error",
+            );
+            await this.loadFactoryConsole();
+            this.renderBoard();
+        } catch (error) {
+            NexusCore.showToast(`Retry error: ${error.message}`, "error");
+        }
+    },
+
+    async continueWorkPacket(workPacketId) {
+        if (!workPacketId) return;
+        try {
+            const response = await fetch(`/api/work-packets/${workPacketId}/continue`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ workspace_id: NexusState.currentWorkspaceId }),
+            });
+            const data = await response.json();
+            if (!response.ok || !["success", "failed"].includes(data.status)) {
+                throw new Error(data.message || "Unable to continue packet.");
+            }
+            NexusCore.showToast(
+                data.status === "success" ? "Packet continue completed." : "Packet continue stopped after failure.",
+                data.status === "success" ? "success" : "error",
+            );
+            await this.loadFactoryConsole();
+            this.renderBoard();
+        } catch (error) {
+            NexusCore.showToast(`Packet continue error: ${error.message}`, "error");
+        }
     },
 
     async loadFactoryPreflightStatus() {
