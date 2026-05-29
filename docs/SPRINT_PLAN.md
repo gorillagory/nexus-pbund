@@ -16,6 +16,7 @@ Completed capabilities:
 - Operator UX polish.
 - Packet 022 Orchestration Inbox foundation for supervised idea capture and triage.
 - Packet 023 Discord Event Router foundation for authenticated Discord capture into the inbox.
+- Packet 024 Git Explorer foundation for read-only repository visibility.
 
 ## Sprint 2 Goal
 
@@ -26,7 +27,7 @@ Remote-operable supervised factory. The operator should be able to capture inten
 1. Prompt Vault. Complete.
 2. Orchestration Inbox. Complete as Packet 022 foundation.
 3. Discord Event Router. Complete as Packet 023 foundation.
-4. Git Explorer.
+4. Git Explorer. Complete as Packet 024 foundation.
 5. Branch Per Packet.
 6. Operator Intervention Queue.
 7. Trusted Packet Mode.
@@ -34,6 +35,8 @@ Remote-operable supervised factory. The operator should be able to capture inten
 Inbox capture rule: raw ideas are captured first, then triaged into a scoped task, work packet, document update, or explicit discard. The inbox must not execute work.
 
 Discord router rule: Discord-originated intent is accepted only through the capture router, stored as source `discord`, and then triaged in the Orchestration Inbox. Discord must not directly start Codex, tasks, packets, or Auto-Pilot.
+
+Git Explorer rule: dashboard Git inspection is read-only. It may show branch, status, commits, baseline tags, changed files, diff stat, and bounded redacted diff previews. It must not expose git write actions. Branch Per Packet remains Packet 025.
 
 Local configuration:
 

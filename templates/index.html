@@ -332,6 +332,9 @@
                 <button type="button" id="tab-board-btn" class="nav-link text-start" onclick="NexusApp.showView('board')">
                     <i class="bi bi-kanban me-3"></i>Orchestration Board
                 </button>
+                <button type="button" id="tab-git-btn" class="nav-link text-start" onclick="NexusApp.showView('git-explorer')">
+                    <i class="bi bi-git me-3"></i>Git Explorer
+                </button>
                 <button type="button" id="tab-inbox-btn" class="nav-link text-start" onclick="NexusApp.showView('orchestration-inbox')">
                     <i class="bi bi-inbox me-3"></i>Orchestration Inbox
                 </button>
@@ -635,6 +638,55 @@
                             <div id="cost-ledger-summary" class="small text-secondary mt-3">Open Board to load cost tracking.</div>
                         </div>
                         <span class="d-none">/api/work-packets/preview /api/work-packets/stage /api/work-packets/run Copy All Codex Commands Run Packet Supervised Packet Runner</span>
+                    </div>
+                </div>
+
+                <div id="view-git-explorer" class="spa-view d-none">
+                    <div class="card bg-white border-0 shadow-sm">
+                        <div class="card-header bg-white border-bottom p-4 d-flex justify-content-between align-items-start gap-3 flex-wrap">
+                            <div>
+                                <h3 class="h5 mb-1 text-dark">Git Explorer</h3>
+                                <p class="text-secondary mb-0">Read-only repository visibility. No commit, merge, branch, tag, push, reset, clean, fetch, or pull actions are available here.</p>
+                            </div>
+                            <button type="button" class="btn btn-outline-primary btn-sm" onclick="NexusApp.loadGitExplorer()">
+                                <i class="bi bi-arrow-repeat me-2"></i>Refresh Git Explorer
+                            </button>
+                        </div>
+                        <div class="card-body p-4">
+                            <div class="row g-4 mb-4">
+                                <div class="col-xl-4">
+                                    <section id="git-explorer-status" class="factory-console-panel small text-secondary">Git Explorer not loaded.</section>
+                                </div>
+                                <div class="col-xl-8">
+                                    <h4 class="h6 fw-semibold mb-2">Changed Files</h4>
+                                    <section id="git-explorer-files" class="factory-console-panel small text-secondary">No changed files loaded.</section>
+                                </div>
+                            </div>
+                            <div class="row g-4 mb-4">
+                                <div class="col-xl-6">
+                                    <h4 class="h6 fw-semibold mb-2">Recent Commits</h4>
+                                    <section id="git-explorer-commits" class="git-explorer-list">No commit log loaded.</section>
+                                </div>
+                                <div class="col-xl-6">
+                                    <h4 class="h6 fw-semibold mb-2">Recent Baseline Tags</h4>
+                                    <section id="git-explorer-tags" class="git-explorer-list">No baseline tags loaded.</section>
+                                </div>
+                            </div>
+                            <div class="row g-4">
+                                <div class="col-xl-5">
+                                    <h4 class="h6 fw-semibold mb-2">Diff Stat</h4>
+                                    <pre id="git-explorer-diff-stat" class="factory-diff-stat mb-0">No diff stat loaded.</pre>
+                                </div>
+                                <div class="col-xl-7">
+                                    <div class="d-flex justify-content-between align-items-center gap-2 mb-2">
+                                        <h4 class="h6 fw-semibold mb-0">Redacted Diff Preview</h4>
+                                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="NexusApp.loadGitExplorerDiff()">Load Preview</button>
+                                    </div>
+                                    <pre id="git-explorer-diff-preview" class="git-explorer-diff-preview mb-0">Diff preview is optional and capped.</pre>
+                                </div>
+                            </div>
+                            <span class="d-none">/api/git-explorer/summary /api/git-explorer/log /api/git-explorer/tags /api/git-explorer/changes /api/git-explorer/diff read-only Git Explorer</span>
+                        </div>
                     </div>
                 </div>
 

@@ -4,7 +4,7 @@
 - Current branch: `main`
 - Current commit at prior chat handoff: `208dbdbaecd646b013a590fae2db32d06daff408`
 - Prior chat handoff summary: `208dbdb add chat handoff for next session`
-- Latest Packet 022 baseline tag: `nexus-orchestration-inbox-baseline-2026-05-30`
+- Latest Packet 023 baseline tag: `nexus-discord-event-router-baseline-2026-05-30`
 - Recent visible baseline tags:
   - `nexus-workflow-lock-prompt-vault-baseline-2026-05-29`
   - `nexus-recovery-audit-baseline-2026-05-29`
@@ -24,6 +24,7 @@
 - Prompt Vault
 - Orchestration Inbox
 - Discord Event Router
+- Git Explorer
 - Workflow Lock docs
 - Orchestration-ready workflow foundation
 - Supervised packet runner
@@ -81,7 +82,7 @@
 ## Current Roadmap
 - Packet 022 — Orchestration Inbox foundation complete
 - Packet 023 — Discord Event Router complete
-- Packet 024 — Git Explorer
+- Packet 024 — Git Explorer complete
 - Packet 025 — Branch Per Packet
 - Packet 026 — Operator Intervention Queue
 - Packet 027 — Trusted Packet Mode
@@ -111,4 +112,4 @@ Prefer one pasteable Codex operator prompt for local execution. Reduce manual co
 
 Keep the safety rails in this document. Do not force push, reset, clean, run destructive database operations, expose API keys, or start Auto-Pilot unless the user explicitly asks for that exact work.
 
-Packet 023 adds the Discord Event Router foundation. After it is merged and tagged, continue with Packet 024 — Git Explorer unless repo docs say otherwise.
+Packet 024 adds the read-only Git Explorer foundation. After it is merged and tagged, continue with Packet 025 — Branch Per Packet unless repo docs say otherwise.

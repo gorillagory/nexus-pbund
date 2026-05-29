@@ -61,6 +61,8 @@ Automatic analysis is enabled only for Auto-Pilot.
 
 The Factory Console is the operator surface for mode, automatic analysis state, Git state, preflight, CI metadata, recent events, execution runs, changed files, and recovery actions.
 
+Packet 024 added Git Explorer as a read-only dashboard surface for branch, clean/dirty status, recent commits, baseline tags, changed files, diff stat, and bounded redacted diff previews. Git Explorer must not perform git writes. Branch Per Packet remains Packet 025.
+
 ## Recovery Flow
 
 When a run fails:
@@ -84,6 +86,8 @@ GitHub Actions runs quick strict preflight on push and pull request to `main`.
 ## Git And Tag Baseline Practice
 
 Use a packet branch, verify locally, commit, fast-forward merge to `main`, verify again, tag a baseline, and push `main` plus the tag.
+
+The dashboard Git Explorer is read-only. Operator/Codex may still perform routine git operations outside the app according to the packet workflow, but the app must not expose commit, merge, branch, tag, push, pull, fetch, reset, clean, rebase, stash, or checkout actions.
 
 ## Safety Rules
 

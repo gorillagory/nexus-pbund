@@ -54,6 +54,13 @@ from src.services.factory_events import (
     summarize_factory_state,
 )
 from src.services.git_changes import summarize_git_changes
+from src.services.git_explorer import (
+    get_changes,
+    get_diff_preview,
+    get_git_explorer_summary,
+    get_recent_baseline_tags,
+    get_recent_commits,
+)
 from src.services.orchestration_inbox import (
     create_inbox_item,
     discard_inbox_item,
@@ -1780,6 +1787,54 @@ class NexusDashboard:
                 {
                     "status": "success",
                     "git": summarize_git_changes(self.engine.target_dir),
+                }
+            )
+
+        @self.app.route("/api/git-explorer/summary", methods=["GET"])
+        def get_git_explorer_summary_route():
+            return jsonify(
+                {
+                    "status": "success",
+                    "git": get_git_explorer_summary(self.engine.target_dir),
+                }
+            )
+
+        @self.app.route("/api/git-explorer/log", methods=["GET"])
+        def get_git_explorer_log_route():
+            limit = request.args.get("limit", default=20, type=int)
+            return jsonify(
+                {
+                    "status": "success",
+                    "log": get_recent_commits(self.engine.target_dir, limit=limit),
+                }
+            )
+
+        @self.app.route("/api/git-explorer/tags", methods=["GET"])
+        def get_git_explorer_tags_route():
+            limit = request.args.get("limit", default=40, type=int)
+            return jsonify(
+                {
+                    "status": "success",
+                    "tags": get_recent_baseline_tags(self.engine.target_dir, limit=limit),
+                }
+            )
+
+        @self.app.route("/api/git-explorer/changes", methods=["GET"])
+        def get_git_explorer_changes_route():
+            return jsonify(
+                {
+                    "status": "success",
+                    "changes": get_changes(self.engine.target_dir),
+                }
+            )
+
+        @self.app.route("/api/git-explorer/diff", methods=["GET"])
+        def get_git_explorer_diff_route():
+            limit = request.args.get("limit", default=12000, type=int)
+            return jsonify(
+                {
+                    "status": "success",
+                    "diff": get_diff_preview(self.engine.target_dir, limit=limit),
                 }
             )
 

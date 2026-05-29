@@ -28,6 +28,7 @@ PY_COMPILE_FILES = [
     "src/services/work_packet_parser.py",
     "src/services/factory_events.py",
     "src/services/git_changes.py",
+    "src/services/git_explorer.py",
     "src/services/orchestration_inbox.py",
     "src/services/prompt_vault.py",
 ]

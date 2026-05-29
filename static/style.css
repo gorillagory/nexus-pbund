@@ -669,7 +669,9 @@ pre {
 }
 
 .factory-diff-stat,
-.factory-preflight-output {
+.factory-preflight-output,
+.git-explorer-diff-preview,
+.git-explorer-list {
     background: #fff;
     border: 1px solid #e6edf5;
     border-radius: 8px;
@@ -680,6 +682,19 @@ pre {
     overflow: auto;
     padding: 0.75rem;
     white-space: pre-wrap;
+}
+
+.git-explorer-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.git-explorer-line {
+    border-bottom: 1px solid #f0f3f6;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    overflow-wrap: anywhere;
+    padding: 0.25rem 0;
 }
 
 .factory-preflight-details summary {

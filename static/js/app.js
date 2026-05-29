@@ -38,6 +38,7 @@ window.NexusApp = {
     latestFactoryConsole: null,
     latestPreflightStatus: null,
     latestCiStatus: null,
+    latestGitExplorer: null,
     orchestrationInboxItems: [],
     selectedOrchestrationInboxItem: null,
     promptVaultTemplates: [],
@@ -48,6 +49,7 @@ window.NexusApp = {
             arch: "explorer",
             chat: "chat",
             board: "board",
+            git: "git-explorer",
             inbox: "orchestration-inbox",
             prompts: "prompt-vault",
             history: "history",
@@ -64,6 +66,7 @@ window.NexusApp = {
             explorer: "arch",
             chat: "chat",
             board: "board",
+            "git-explorer": "git",
             "orchestration-inbox": "inbox",
             "prompt-vault": "prompts",
             history: "history",
@@ -76,6 +79,7 @@ window.NexusApp = {
             explorer: "File Explorer",
             chat: "CTO Copilot",
             board: "Orchestration Board",
+            "git-explorer": "Git Explorer",
             "orchestration-inbox": "Orchestration Inbox",
             "prompt-vault": "Prompt Vault",
             history: "Project History",
@@ -113,6 +117,11 @@ window.NexusApp = {
         if (tab === "board") {
             this.renderBoard();
             this.loadAutoPilotStatus();
+            return;
+        }
+
+        if (tab === "git") {
+            this.loadGitExplorer();
             return;
         }
 
@@ -955,6 +964,118 @@ window.NexusApp = {
         if (diffTarget) {
             diffTarget.textContent = git?.diff_stat || git?.diff_stat_error || "No diff stat.";
             diffTarget.className = "factory-diff-stat mb-0";
+        }
+    },
+
+    async loadGitExplorer() {
+        const statusTarget = document.getElementById("git-explorer-status");
+        if (statusTarget) {
+            statusTarget.textContent = "Loading Git Explorer...";
+        }
+        try {
+            const response = await fetch("/api/git-explorer/summary");
+            const data = await response.json();
+            if (!response.ok || data.status !== "success") {
+                throw new Error(data.message || "Unable to load Git Explorer.");
+            }
+            this.latestGitExplorer = data.git || {};
+            this.renderGitExplorer(this.latestGitExplorer);
+        } catch (error) {
+            if (statusTarget) {
+                statusTarget.textContent = `Unable to load Git Explorer: ${error.message}`;
+                statusTarget.className = "factory-console-panel small text-danger";
+            }
+            NexusCore.showToast(`Git Explorer error: ${error.message}`, "error");
+        }
+    },
+
+    renderGitExplorer(git) {
+        const statusTarget = document.getElementById("git-explorer-status");
+        const filesTarget = document.getElementById("git-explorer-files");
+        const commitsTarget = document.getElementById("git-explorer-commits");
+        const tagsTarget = document.getElementById("git-explorer-tags");
+        const statTarget = document.getElementById("git-explorer-diff-stat");
+        const changedFiles = Array.isArray(git?.changed_files) ? git.changed_files : [];
+
+        if (statusTarget) {
+            statusTarget.className = "factory-console-panel small text-secondary";
+            statusTarget.innerHTML = `
+                <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
+                    <div>
+                        <div class="factory-summary-label">Current Branch</div>
+                        <div class="factory-summary-value">${this.escapeHtml(git?.branch || "unknown")}</div>
+                    </div>
+                    <span class="factory-status-badge ${this.factoryStatusClass(git?.is_dirty ? "dirty" : "clean")}">${git?.is_dirty ? "dirty" : "clean"}</span>
+                </div>
+                <div class="factory-run-event mt-3">
+                    <strong>Changed Files</strong>
+                    <span>${this.escapeHtml(git?.changed_file_count ?? changedFiles.length)}</span>
+                </div>
+            `;
+        }
+
+        if (filesTarget) {
+            filesTarget.innerHTML = "";
+            if (!changedFiles.length) {
+                filesTarget.textContent = "No changed files.";
+            } else {
+                const list = document.createElement("ul");
+                list.className = "factory-changed-files";
+                changedFiles.slice(0, 80).forEach((file) => {
+                    const item = document.createElement("li");
+                    item.className = "factory-changed-file";
+                    const status = document.createElement("span");
+                    status.className = "factory-file-status";
+                    status.textContent = file.status || "?";
+                    const path = document.createElement("span");
+                    path.textContent = file.path || "";
+                    item.appendChild(status);
+                    item.appendChild(path);
+                    list.appendChild(item);
+                });
+                filesTarget.appendChild(list);
+            }
+        }
+
+        if (commitsTarget) {
+            const commits = Array.isArray(git?.recent_commits) ? git.recent_commits : [];
+            commitsTarget.innerHTML = commits.length
+                ? commits.map((line) => `<div class="git-explorer-line">${this.escapeHtml(line)}</div>`).join("")
+                : '<div class="text-secondary small">No recent commits found.</div>';
+        }
+
+        if (tagsTarget) {
+            const tags = Array.isArray(git?.recent_baseline_tags) ? git.recent_baseline_tags : [];
+            tagsTarget.innerHTML = tags.length
+                ? tags.map((line) => `<div class="git-explorer-line">${this.escapeHtml(line)}</div>`).join("")
+                : '<div class="text-secondary small">No baseline tags found.</div>';
+        }
+
+        if (statTarget) {
+            statTarget.textContent = git?.diff_stat || git?.diff_stat_error || "No diff stat.";
+        }
+    },
+
+    async loadGitExplorerDiff() {
+        const target = document.getElementById("git-explorer-diff-preview");
+        if (target) {
+            target.textContent = "Loading redacted diff preview...";
+        }
+        try {
+            const response = await fetch("/api/git-explorer/diff?limit=12000");
+            const data = await response.json();
+            if (!response.ok || data.status !== "success") {
+                throw new Error(data.message || "Unable to load diff preview.");
+            }
+            const diff = data.diff || {};
+            if (target) {
+                target.textContent = diff.diff || diff.stderr || "No diff preview.";
+            }
+        } catch (error) {
+            if (target) {
+                target.textContent = `Unable to load diff preview: ${error.message}`;
+            }
+            NexusCore.showToast(`Diff preview error: ${error.message}`, "error");
         }
     },
 
