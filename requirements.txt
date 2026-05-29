@@ -1,2 +1,8 @@
 requests
 tenacity
+flask
+sqlalchemy
+watchdog
+psutil
+python-dotenv
+psycopg2-binary
