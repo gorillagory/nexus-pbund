@@ -407,12 +407,22 @@ class NexusEngine:
         self.save_settings({"execution_mode": normalized_mode})
         return normalized_mode
 
+    def is_automatic_analysis_enabled(self):
+        return self.get_execution_mode() == "autopilot"
+
+    def automatic_analysis_status(self):
+        return {
+            "execution_mode": self.get_execution_mode(),
+            "automatic_analysis_enabled": self.is_automatic_analysis_enabled(),
+        }
+
     def public_settings(self):
         public = dict(self.settings)
         public.pop("gemini_api_key", None)
         public.pop("openai_api_key", None)
         public.pop("api_key", None)
         public["execution_mode"] = self.get_execution_mode()
+        public["automatic_analysis_enabled"] = self.is_automatic_analysis_enabled()
 
         gemini_key = (self.settings.get("gemini_api_key") or "").strip()
         openai_key = (self.settings.get("openai_api_key") or "").strip()
@@ -1441,6 +1451,16 @@ class NexusWatcher(FileSystemEventHandler):
             for pattern in self._get_ignore_patterns()
         )
 
+    def _should_suppress_automatic_analysis(self, event_path):
+        if self.engine.is_automatic_analysis_enabled():
+            return False
+
+        print(
+            f">>> [WATCHDOG] Automatic analysis suppressed in Manual Mode: "
+            f"{os.path.abspath(event_path)}"
+        )
+        return True
+
     def _handle_change(self, event, event_type):
         file_path = os.path.abspath(event.src_path)
         print(f">>> [WATCHDOG EVENT] File {event_type}: {file_path}")
@@ -1459,6 +1479,9 @@ class NexusWatcher(FileSystemEventHandler):
         }
         if file_path in generated_paths:
             print(f">>> [WATCHDOG] Ignoring generated artifact update: {file_path}")
+            return
+
+        if self._should_suppress_automatic_analysis(file_path):
             return
 
         with self._debounce_lock:
@@ -1501,6 +1524,9 @@ class NexusWatcher(FileSystemEventHandler):
             )
             return
 
+        if self._should_suppress_automatic_analysis(destination_path):
+            return
+
         with self._debounce_lock:
             self._debounce_generation += 1
             generation = self._debounce_generation
@@ -1525,6 +1551,9 @@ class NexusWatcher(FileSystemEventHandler):
 
         if self._should_ignore(source_path):
             print(f">>> [WATCHDOG] Ignored (Cost Control): {source_path}")
+            return
+
+        if self._should_suppress_automatic_analysis(source_path):
             return
 
         print(f">>> [WATCHDOG] Processing change: {source_path}")

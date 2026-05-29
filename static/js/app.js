@@ -30,6 +30,7 @@ window.NexusApp = {
         state: "idle",
     },
     executionMode: "manual",
+    automaticAnalysisEnabled: false,
 
     setTab(tab) {
         const tabViews = {
@@ -872,7 +873,7 @@ window.NexusApp = {
                                 <div>
                                     <h6 class="text-primary fw-bold text-uppercase mb-2">To-Do</h6>
                                     <div class="d-flex align-items-center gap-2 flex-wrap">
-                                        <span id="execution-mode-indicator" class="badge text-bg-warning border">Manual Mode</span>
+                                        <span id="execution-mode-indicator" class="badge text-bg-warning border">Manual Mode - Auto-Pilot and automatic analysis disabled</span>
                                         <div class="btn-group btn-group-sm" role="group" aria-label="Execution mode">
                                             <button id="execution-mode-manual-btn" type="button" class="btn btn-outline-secondary" onclick="NexusApp.setExecutionMode('manual')">Manual</button>
                                             <button id="execution-mode-autopilot-btn" type="button" class="btn btn-outline-secondary" onclick="NexusApp.setExecutionMode('autopilot')">Auto-Pilot</button>
@@ -1144,6 +1145,7 @@ window.NexusApp = {
             }
 
             this.executionMode = data.execution_mode || "manual";
+            this.automaticAnalysisEnabled = Boolean(data.automatic_analysis_enabled);
             this.renderExecutionMode();
             this.updateAutoPilotUI();
         } catch (error) {
@@ -1164,6 +1166,7 @@ window.NexusApp = {
             }
 
             this.executionMode = data.execution_mode || "manual";
+            this.automaticAnalysisEnabled = Boolean(data.automatic_analysis_enabled);
             this.renderExecutionMode();
             this.updateAutoPilotUI();
             NexusCore.showToast(
@@ -1179,7 +1182,9 @@ window.NexusApp = {
 
     renderExecutionMode() {
         const isAutoPilot = this.executionMode === "autopilot";
-        const label = isAutoPilot ? "Auto-Pilot Mode" : "Manual Mode";
+        const label = isAutoPilot
+            ? "Auto-Pilot Mode - automatic analysis enabled"
+            : "Manual Mode - Auto-Pilot and automatic analysis disabled";
         const indicatorClass = isAutoPilot
             ? "badge text-bg-primary border"
             : "badge text-bg-warning border";

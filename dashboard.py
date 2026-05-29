@@ -1092,6 +1092,7 @@ class NexusDashboard:
                     "execution_mode": current_mode,
                     "allowed_modes": ["manual", "autopilot"],
                     "autopilot_allowed": current_mode == "autopilot",
+                    "automatic_analysis_enabled": self.engine.is_automatic_analysis_enabled(),
                 }
             )
 
@@ -1105,6 +1106,7 @@ class NexusDashboard:
                     "execution_mode": current_mode,
                     "allowed_modes": ["manual", "autopilot"],
                     "autopilot_allowed": current_mode == "autopilot",
+                    "automatic_analysis_enabled": self.engine.is_automatic_analysis_enabled(),
                 }
             )
 
