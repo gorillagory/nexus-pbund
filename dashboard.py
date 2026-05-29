@@ -24,10 +24,13 @@ from models import (
     ChatSession,
     ExecutionChangedFile,
     ExecutionRun,
+    FactoryEvent,
     Footprint,
     Message,
     Task,
     UserProfile,
+    WorkPacket,
+    WorkPacketTask,
     Workspace,
 )
 from src.api.project_routes import projects_blueprint
@@ -655,6 +658,320 @@ def _send_factory_discord_notification(message):
     return False
 
 
+def _execute_factory_task(
+    db,
+    workspace,
+    task,
+    execution_mode,
+    work_packet_id=None,
+    create_requested_event=True,
+):
+    workspace_id = workspace.id
+    task_id = task.id
+    workspace_path = os.path.abspath(workspace.local_path)
+    task_title = getattr(task, "title", None) or "Task #{}".format(task_id)
+    task_description = task.description or ""
+    factory_events_created = 0
+
+    if not os.path.isdir(workspace_path):
+        return {
+            "status": "failed",
+            "message": "Workspace directory not found.",
+            "status_code": 400,
+            "task_status": getattr(task, "status", None),
+            "execution_run_id": None,
+            "factory_events_created": 0,
+            "git": {},
+            "stdout": "",
+            "stderr": "Workspace directory not found.",
+            "returncode": -1,
+            "timeout_seconds": 0,
+            "execution_time": 0,
+            "token_usage": {},
+        }
+
+    commands = extract_codex_commands(task_description)
+    if len(commands) != 1:
+        return {
+            "status": "failed",
+            "message": "Task description must contain exactly one codex command.",
+            "status_code": 400,
+            "task_status": getattr(task, "status", None),
+            "execution_run_id": None,
+            "factory_events_created": 0,
+            "git": {},
+            "stdout": "",
+            "stderr": "Task description must contain exactly one codex command.",
+            "returncode": -1,
+            "timeout_seconds": 0,
+            "execution_time": 0,
+            "token_usage": {},
+        }
+
+    command_prompt = _prompt_from_codex_command(commands[0])
+    if command_prompt is None or not command_prompt.strip():
+        return {
+            "status": "failed",
+            "message": "Task codex command is invalid.",
+            "status_code": 400,
+            "task_status": getattr(task, "status", None),
+            "execution_run_id": None,
+            "factory_events_created": 0,
+            "git": {},
+            "stdout": "",
+            "stderr": "Task codex command is invalid.",
+            "returncode": -1,
+            "timeout_seconds": 0,
+            "execution_time": 0,
+            "token_usage": {},
+        }
+
+    if create_requested_event:
+        event = _safe_create_factory_event(
+            db,
+            workspace_id,
+            "task_run_requested",
+            "Run requested for task: {}".format(task_title),
+            work_packet_id=work_packet_id,
+            task_id=task_id,
+            payload={"execution_mode": execution_mode, "command_excerpt": commands[0][:240]},
+        )
+        factory_events_created += 1 if event is not None else 0
+
+    started_at = datetime.now(timezone.utc)
+    execution_run = ExecutionRun(
+        workspace_id=workspace_id,
+        work_packet_id=work_packet_id,
+        task_id=task_id,
+        command=commands[0],
+        prompt=command_prompt,
+        status="running",
+        started_at=started_at,
+        provider="codex",
+        model="codex-cli",
+    )
+    if hasattr(db, "add"):
+        db.add(execution_run)
+        _safe_db_commit(db)
+        _safe_db_refresh(db, execution_run)
+
+    event = _safe_create_factory_event(
+        db,
+        workspace_id,
+        "task_run_started",
+        "Codex run started for task: {}".format(task_title),
+        work_packet_id=work_packet_id,
+        task_id=task_id,
+        execution_run_id=execution_run.id,
+        payload={"execution_mode": execution_mode, "command_excerpt": commands[0][:240]},
+    )
+    factory_events_created += 1 if event is not None else 0
+    _send_factory_discord_notification("Run One Task started: {}".format(task_title))
+
+    try:
+        codex_result = CodexRunner(timeout_factory=calculate_prompt_timeout).run(
+            command_prompt,
+            workspace_path,
+            task_id=task_id,
+        )
+    except OSError as exception:
+        finished_at = datetime.now(timezone.utc)
+        execution_run.status = "failed"
+        execution_run.returncode = -1
+        execution_run.stdout = ""
+        execution_run.stderr = str(exception)
+        execution_run.finished_at = finished_at
+        execution_run.duration_seconds = (finished_at - started_at).total_seconds()
+        execution_run.timeout_seconds = 0
+        execution_run.error_message = str(exception)
+        task.status = "review"
+        _safe_db_commit(db)
+        event = _safe_create_factory_event(
+            db,
+            workspace_id,
+            "codex_run_failed",
+            "Codex runner failed before execution for task: {}".format(task_title),
+            work_packet_id=work_packet_id,
+            task_id=task_id,
+            execution_run_id=execution_run.id,
+            payload={"error": str(exception)},
+        )
+        factory_events_created += 1 if event is not None else 0
+        event = _safe_create_factory_event(
+            db,
+            workspace_id,
+            "task_marked_review_required",
+            "Task moved to review after failure: {}".format(task_title),
+            work_packet_id=work_packet_id,
+            task_id=task_id,
+            execution_run_id=execution_run.id,
+        )
+        factory_events_created += 1 if event is not None else 0
+        _send_factory_discord_notification("Run One Task failed: {}".format(task_title))
+        return {
+            "status": "failed",
+            "message": str(exception),
+            "status_code": 500,
+            "task_status": task.status,
+            "execution_run_id": execution_run.id,
+            "factory_events_created": factory_events_created,
+            "git": summarize_git_changes(workspace_path),
+            "stdout": "",
+            "stderr": str(exception),
+            "returncode": -1,
+            "timeout_seconds": 0,
+            "execution_time": execution_run.duration_seconds,
+            "token_usage": {},
+        }
+
+    status = "success"
+    status_code = 200
+    event_type = "codex_run_completed"
+    if codex_result.status == "timeout":
+        status = "timeout"
+        status_code = 504
+        event_type = "codex_run_timeout"
+    elif codex_result.status != "success" or codex_result.returncode != 0:
+        status = "failed"
+        status_code = 500
+        event_type = "codex_run_failed"
+
+    token_usage = codex_result.token_usage or {}
+    finished_at = datetime.now(timezone.utc)
+    execution_run.status = status
+    execution_run.returncode = codex_result.returncode
+    execution_run.stdout = codex_result.stdout
+    execution_run.stderr = codex_result.stderr
+    execution_run.finished_at = finished_at
+    execution_run.duration_seconds = codex_result.execution_time
+    execution_run.timeout_seconds = codex_result.timeout_seconds
+    execution_run.input_tokens = token_usage.get("input_tokens")
+    execution_run.output_tokens = token_usage.get("output_tokens")
+    execution_run.total_tokens = token_usage.get("total_tokens")
+    execution_run.estimated_cost_usd = token_usage.get("estimated_cost_usd")
+    if status == "timeout":
+        execution_run.error_message = "Codex execution timed out after {} seconds.".format(
+            codex_result.timeout_seconds
+        )
+        task.status = "review"
+    elif status == "failed":
+        execution_run.error_message = (
+            (codex_result.stderr or "").strip()
+            or (codex_result.stdout or "").strip()
+            or "Codex execution failed."
+        )
+        task.status = "review"
+    else:
+        task.status = "done"
+    _safe_db_commit(db)
+
+    event = _safe_create_factory_event(
+        db,
+        workspace_id,
+        event_type,
+        "Codex run {} for task: {}".format(status, task_title),
+        work_packet_id=work_packet_id,
+        task_id=task_id,
+        execution_run_id=execution_run.id,
+        payload={
+            "returncode": codex_result.returncode,
+            "duration_seconds": codex_result.execution_time,
+            "token_usage": token_usage,
+        },
+    )
+    factory_events_created += 1 if event is not None else 0
+
+    git_summary = summarize_git_changes(workspace_path)
+    changed_files = git_summary.get("changed_files", [])
+    changed_file_rows = []
+    for changed_file in changed_files:
+        changed_file_rows.append(
+            ExecutionChangedFile(
+                execution_run_id=execution_run.id,
+                file_path=changed_file.get("path") or "",
+                change_type=changed_file.get("status") or "",
+                insertions=0,
+                deletions=0,
+                diff_summary=git_summary.get("diff_stat") or git_summary.get("status_output") or "",
+            )
+        )
+    if changed_file_rows and hasattr(db, "add_all"):
+        db.add_all(changed_file_rows)
+        _safe_db_commit(db)
+
+    event = _safe_create_factory_event(
+        db,
+        workspace_id,
+        "git_changes_captured",
+        "Captured {} changed file{} after task run.".format(
+            len(changed_files),
+            "" if len(changed_files) == 1 else "s",
+        ),
+        work_packet_id=work_packet_id,
+        task_id=task_id,
+        execution_run_id=execution_run.id,
+        payload={
+            "changed_files": changed_files,
+            "is_dirty": git_summary.get("is_dirty", False),
+        },
+    )
+    factory_events_created += 1 if event is not None else 0
+
+    final_task_event_type = "task_marked_done" if task.status == "done" else "task_marked_review_required"
+    event = _safe_create_factory_event(
+        db,
+        workspace_id,
+        final_task_event_type,
+        "Task moved to {}: {}".format(task.status, task_title),
+        work_packet_id=work_packet_id,
+        task_id=task_id,
+        execution_run_id=execution_run.id,
+        payload={"task_status": task.status},
+    )
+    factory_events_created += 1 if event is not None else 0
+
+    if token_usage:
+        cost_event = {
+            "source": "run_one" if work_packet_id is None else "packet_runner",
+            "provider": "codex",
+            "model": "codex-cli",
+            "task_id": task_id,
+            "notes": "One-task Codex execution." if work_packet_id is None else "Supervised packet task execution.",
+        }
+        for key in ("total_tokens", "input_tokens", "output_tokens", "estimated_cost_usd"):
+            if key in token_usage:
+                cost_event[key] = token_usage.get(key)
+        try:
+            append_cost_event(workspace_path, cost_event)
+        except OSError:
+            pass
+
+    _send_factory_discord_notification(
+        "Run One Task {}: {} | {:.2f}s | {} tokens | {} changed files".format(
+            status,
+            task_title,
+            codex_result.execution_time or 0,
+            token_usage.get("total_tokens", 0),
+            len(changed_files),
+        )
+    )
+
+    return {
+        "status": status,
+        "status_code": status_code,
+        "task_status": task.status,
+        "execution_run_id": execution_run.id,
+        "factory_events_created": factory_events_created,
+        "git": git_summary,
+        "stdout": codex_result.stdout,
+        "stderr": codex_result.stderr,
+        "returncode": codex_result.returncode,
+        "timeout_seconds": codex_result.timeout_seconds,
+        "execution_time": codex_result.execution_time,
+        "token_usage": token_usage,
+    }
+
+
 class AutonomousQueue:
     POLL_INTERVAL_SECONDS = 2
     COMPLETION_TIMEOUT_SECONDS = 120
@@ -925,6 +1242,18 @@ class NexusDashboard:
         self.engine = engine
         self.engine.telemetry_logger = append_codex_telemetry
         self.autonomous_queue = AutonomousQueue()
+        self.packet_runner_lock = Lock()
+        self.packet_runner_state = {
+            "running": False,
+            "mode": "one_packet",
+            "work_packet_id": None,
+            "current_task_id": None,
+            "current_task_title": None,
+            "completed": 0,
+            "total": 0,
+            "message": "Packet runner is idle.",
+            "cancel_requested": False,
+        }
 
         @self.app.route("/")
         def index():
@@ -1055,6 +1384,8 @@ class NexusDashboard:
                 ), 503
 
             state = summarize_factory_state(events, runs)
+            with self.packet_runner_lock:
+                runner_state = dict(self.packet_runner_state)
             return jsonify(
                 {
                     "status": "success",
@@ -1064,6 +1395,7 @@ class NexusDashboard:
                         "current_state": state.get("current_state", "idle"),
                         "recent_event_count": state.get("recent_event_count", 0),
                         "recent_run_count": state.get("recent_run_count", 0),
+                        "runner": runner_state,
                     },
                     "git": git_summary,
                     "recent_events": [serialize_factory_event(event) for event in events],
@@ -1396,6 +1728,17 @@ class NexusDashboard:
                 if db.get(Workspace, workspace_id) is None:
                     return jsonify({"status": "error", "message": "Workspace not found."}), 400
 
+                work_packet = WorkPacket(
+                    workspace_id=workspace_id,
+                    title=(parsed_packet.get("title") or "Untitled Work Packet")[:255],
+                    risk_level=(parsed_packet.get("risk_level") or "unspecified")[:64],
+                    stop_condition=parsed_packet.get("stop_condition") or "",
+                    estimated_minutes=(parsed_packet.get("estimated_minutes") or "")[:64],
+                    status="staged",
+                )
+                db.add(work_packet)
+                db.flush()
+
                 tasks = [
                     Task(
                         workspace_id=workspace_id,
@@ -1406,13 +1749,26 @@ class NexusDashboard:
                     for index, task in enumerate(parsed_tasks, start=1)
                 ]
                 db.add_all(tasks)
+                db.flush()
+                packet_tasks = [
+                    WorkPacketTask(
+                        work_packet_id=work_packet.id,
+                        task_id=task.id,
+                        position=index,
+                        status="staged",
+                    )
+                    for index, task in enumerate(tasks, start=1)
+                ]
+                db.add_all(packet_tasks)
                 db.commit()
+                db.refresh(work_packet)
                 for task in tasks:
                     db.refresh(task)
 
                 return jsonify(
                     {
                         "status": "success",
+                        "work_packet_id": work_packet.id,
                         "packet_title": parsed_packet.get("title"),
                         "created_count": len(tasks),
                         "task_ids": [task.id for task in tasks],
@@ -1427,6 +1783,397 @@ class NexusDashboard:
                 raise
             finally:
                 db_context.close()
+
+        @self.app.route("/api/work-packets/run", methods=["POST"])
+        def run_work_packet():
+            payload = request.get_json(silent=True)
+            if not isinstance(payload, dict):
+                return jsonify({"status": "error", "message": "JSON object is required."}), 400
+
+            execution_mode = self.engine.get_execution_mode()
+            if execution_mode != "one_packet":
+                return jsonify(
+                    {
+                        "status": "error",
+                        "message": "Run Packet requires execution mode one_packet.",
+                        "execution_mode": execution_mode,
+                    }
+                ), 403
+
+            workspace_id = payload.get("workspace_id")
+            work_packet_id = payload.get("work_packet_id")
+            if not isinstance(workspace_id, int) or isinstance(workspace_id, bool):
+                return jsonify({"status": "error", "message": "Valid workspace_id is required."}), 400
+            if not isinstance(work_packet_id, int) or isinstance(work_packet_id, bool):
+                return jsonify({"status": "error", "message": "Valid work_packet_id is required."}), 400
+
+            active_workspace_id = get_workspace_id(self.engine.target_dir)
+            if workspace_id != active_workspace_id:
+                return jsonify({"status": "error", "message": "Workspace is not active."}), 403
+
+            with self.packet_runner_lock:
+                if self.packet_runner_state.get("running"):
+                    return jsonify(
+                        {
+                            "status": "error",
+                            "message": "Another packet run is already active.",
+                            "runner": dict(self.packet_runner_state),
+                        }
+                    ), 409
+                self.packet_runner_state = {
+                    "running": True,
+                    "mode": "one_packet",
+                    "work_packet_id": work_packet_id,
+                    "current_task_id": None,
+                    "current_task_title": None,
+                    "completed": 0,
+                    "total": 0,
+                    "message": "Packet runner is loading packet.",
+                    "cancel_requested": False,
+                }
+
+            db_context = get_db()
+            db = next(db_context)
+            completed_count = 0
+            failed_count = 0
+            skipped_count = 0
+            execution_run_ids = []
+            events_created = 0
+            status = "success"
+            status_code = 200
+            message = "Packet completed successfully."
+            try:
+                workspace = db.get(Workspace, workspace_id)
+                if workspace is None:
+                    return jsonify({"status": "error", "message": "Workspace not found."}), 400
+
+                work_packet = db.get(WorkPacket, work_packet_id)
+                if work_packet is None or work_packet.workspace_id != workspace_id:
+                    return jsonify({"status": "error", "message": "Work packet not found."}), 404
+
+                packet_links = (
+                    db.execute(
+                        select(WorkPacketTask)
+                        .where(WorkPacketTask.work_packet_id == work_packet_id)
+                        .order_by(WorkPacketTask.position.asc(), WorkPacketTask.id.asc())
+                    )
+                    .scalars()
+                    .all()
+                )
+                if not packet_links:
+                    return jsonify({"status": "error", "message": "Work packet has no linked tasks."}), 400
+
+                packet_tasks = []
+                for link in packet_links:
+                    task = db.get(Task, link.task_id)
+                    if task is not None and task.workspace_id == workspace_id:
+                        packet_tasks.append((link, task))
+
+                if not packet_tasks:
+                    return jsonify({"status": "error", "message": "Work packet has no runnable tasks."}), 400
+
+                now = datetime.now(timezone.utc)
+                work_packet.status = "running"
+                work_packet.started_at = work_packet.started_at or now
+                _safe_db_commit(db)
+
+                with self.packet_runner_lock:
+                    self.packet_runner_state["total"] = len(packet_tasks)
+                    self.packet_runner_state["message"] = "Packet runner started."
+
+                event = _safe_create_factory_event(
+                    db,
+                    workspace_id,
+                    "packet_run_started",
+                    "Packet run started: {}".format(work_packet.title),
+                    work_packet_id=work_packet_id,
+                    payload={"task_count": len(packet_tasks), "execution_mode": execution_mode},
+                )
+                events_created += 1 if event is not None else 0
+
+                for link, task in packet_tasks:
+                    with self.packet_runner_lock:
+                        cancel_requested = bool(self.packet_runner_state.get("cancel_requested"))
+                    if cancel_requested:
+                        link.status = "skipped"
+                        skipped_count += 1
+                        event = _safe_create_factory_event(
+                            db,
+                            workspace_id,
+                            "packet_task_skipped",
+                            "Packet task skipped after cancel request: {}".format(task.title),
+                            work_packet_id=work_packet_id,
+                            task_id=task.id,
+                        )
+                        events_created += 1 if event is not None else 0
+                        _safe_db_commit(db)
+                        continue
+
+                    link.status = "running"
+                    link.started_at = datetime.now(timezone.utc)
+                    _safe_db_commit(db)
+                    with self.packet_runner_lock:
+                        self.packet_runner_state["current_task_id"] = task.id
+                        self.packet_runner_state["current_task_title"] = task.title
+                        self.packet_runner_state["message"] = "Running packet task: {}".format(task.title)
+
+                    event = _safe_create_factory_event(
+                        db,
+                        workspace_id,
+                        "packet_task_started",
+                        "Packet task started: {}".format(task.title),
+                        work_packet_id=work_packet_id,
+                        task_id=task.id,
+                    )
+                    events_created += 1 if event is not None else 0
+
+                    result = _execute_factory_task(
+                        db,
+                        workspace,
+                        task,
+                        execution_mode,
+                        work_packet_id=work_packet_id,
+                        create_requested_event=False,
+                    )
+                    if result.get("execution_run_id"):
+                        execution_run_ids.append(result.get("execution_run_id"))
+                    events_created += int(result.get("factory_events_created") or 0)
+
+                    if result.get("status") == "success":
+                        completed_count += 1
+                        link.status = "completed"
+                        link.completed_at = datetime.now(timezone.utc)
+                        event = _safe_create_factory_event(
+                            db,
+                            workspace_id,
+                            "packet_task_completed",
+                            "Packet task completed: {}".format(task.title),
+                            work_packet_id=work_packet_id,
+                            task_id=task.id,
+                            execution_run_id=result.get("execution_run_id"),
+                            payload={"task_status": getattr(task, "status", None)},
+                        )
+                        events_created += 1 if event is not None else 0
+                        _safe_db_commit(db)
+                        with self.packet_runner_lock:
+                            self.packet_runner_state["completed"] = completed_count
+                        continue
+
+                    failed_count += 1
+                    status = "failed"
+                    status_code = 500 if result.get("status") != "timeout" else 504
+                    message = "Packet stopped after task {} ended with status {}.".format(
+                        task.id,
+                        result.get("status") or "failed",
+                    )
+                    link.status = "failed"
+                    link.failed_at = datetime.now(timezone.utc)
+                    work_packet.status = "failed"
+                    work_packet.failed_at = datetime.now(timezone.utc)
+                    event = _safe_create_factory_event(
+                        db,
+                        workspace_id,
+                        "packet_task_failed",
+                        "Packet task failed: {}".format(task.title),
+                        work_packet_id=work_packet_id,
+                        task_id=task.id,
+                        execution_run_id=result.get("execution_run_id"),
+                        payload={"status": result.get("status"), "returncode": result.get("returncode")},
+                    )
+                    events_created += 1 if event is not None else 0
+
+                    remaining_started = False
+                    for remaining_link, remaining_task in packet_tasks:
+                        if remaining_started:
+                            remaining_link.status = "skipped"
+                            skipped_count += 1
+                            event = _safe_create_factory_event(
+                                db,
+                                workspace_id,
+                                "packet_task_skipped",
+                                "Packet task skipped after failure: {}".format(remaining_task.title),
+                                work_packet_id=work_packet_id,
+                                task_id=remaining_task.id,
+                            )
+                            events_created += 1 if event is not None else 0
+                        if remaining_link is link:
+                            remaining_started = True
+
+                    event = _safe_create_factory_event(
+                        db,
+                        workspace_id,
+                        "packet_run_failed",
+                        "Packet run failed: {}".format(work_packet.title),
+                        work_packet_id=work_packet_id,
+                        payload={
+                            "completed_count": completed_count,
+                            "failed_count": failed_count,
+                            "skipped_count": skipped_count,
+                        },
+                    )
+                    events_created += 1 if event is not None else 0
+                    _safe_db_commit(db)
+                    break
+
+                if status == "success":
+                    work_packet.status = "completed"
+                    work_packet.completed_at = datetime.now(timezone.utc)
+                    event = _safe_create_factory_event(
+                        db,
+                        workspace_id,
+                        "packet_run_completed",
+                        "Packet run completed: {}".format(work_packet.title),
+                        work_packet_id=work_packet_id,
+                        payload={
+                            "completed_count": completed_count,
+                            "failed_count": failed_count,
+                            "skipped_count": skipped_count,
+                        },
+                    )
+                    events_created += 1 if event is not None else 0
+                    _safe_db_commit(db)
+
+                with self.packet_runner_lock:
+                    self.packet_runner_state["message"] = message
+
+                return jsonify(
+                    {
+                        "status": status,
+                        "work_packet_id": work_packet_id,
+                        "packet_status": work_packet.status,
+                        "completed_count": completed_count,
+                        "failed_count": failed_count,
+                        "skipped_count": skipped_count,
+                        "execution_run_ids": execution_run_ids,
+                        "events_created": events_created,
+                        "message": message,
+                    }
+                ), status_code
+            except Exception:
+                db.rollback()
+                raise
+            finally:
+                with self.packet_runner_lock:
+                    self.packet_runner_state["running"] = False
+                    self.packet_runner_state["current_task_id"] = None
+                    self.packet_runner_state["current_task_title"] = None
+                    if not self.packet_runner_state.get("message"):
+                        self.packet_runner_state["message"] = "Packet runner is idle."
+                db_context.close()
+
+        @self.app.route("/api/work-packets/<int:work_packet_id>/status", methods=["GET"])
+        def get_work_packet_status(work_packet_id):
+            db_context = get_db()
+            db = next(db_context)
+            try:
+                work_packet = db.get(WorkPacket, work_packet_id)
+                if work_packet is None:
+                    return jsonify({"status": "error", "message": "Work packet not found."}), 404
+
+                links = (
+                    db.execute(
+                        select(WorkPacketTask)
+                        .where(WorkPacketTask.work_packet_id == work_packet_id)
+                        .order_by(WorkPacketTask.position.asc(), WorkPacketTask.id.asc())
+                    )
+                    .scalars()
+                    .all()
+                )
+                tasks = []
+                for link in links:
+                    task = db.get(Task, link.task_id)
+                    if task is None:
+                        continue
+                    item = serialize_task(task)
+                    item["packet_task_status"] = link.status
+                    item["packet_task_position"] = link.position
+                    tasks.append(item)
+
+                runs = (
+                    db.execute(
+                        select(ExecutionRun)
+                        .where(ExecutionRun.work_packet_id == work_packet_id)
+                        .order_by(ExecutionRun.started_at.desc(), ExecutionRun.id.desc())
+                    )
+                    .scalars()
+                    .all()
+                )
+                events = (
+                    db.execute(
+                        select(FactoryEvent)
+                        .where(FactoryEvent.work_packet_id == work_packet_id)
+                        .order_by(FactoryEvent.created_at.desc(), FactoryEvent.id.desc())
+                    )
+                    .scalars()
+                    .all()
+                )
+                with self.packet_runner_lock:
+                    runner_state = dict(self.packet_runner_state)
+
+                return jsonify(
+                    {
+                        "status": "success",
+                        "work_packet": {
+                            "id": work_packet.id,
+                            "workspace_id": work_packet.workspace_id,
+                            "title": work_packet.title,
+                            "risk_level": work_packet.risk_level,
+                            "stop_condition": work_packet.stop_condition,
+                            "estimated_minutes": work_packet.estimated_minutes,
+                            "status": work_packet.status,
+                            "created_at": work_packet.created_at.isoformat() if work_packet.created_at else None,
+                            "started_at": work_packet.started_at.isoformat() if work_packet.started_at else None,
+                            "completed_at": work_packet.completed_at.isoformat() if work_packet.completed_at else None,
+                            "failed_at": work_packet.failed_at.isoformat() if work_packet.failed_at else None,
+                        },
+                        "tasks": tasks,
+                        "runs": [serialize_execution_run(run) for run in runs],
+                        "events": [serialize_factory_event(event) for event in events],
+                        "runner": runner_state,
+                    }
+                )
+            finally:
+                db_context.close()
+
+        @self.app.route("/api/work-packets/cancel-run", methods=["POST"])
+        def cancel_work_packet_run():
+            with self.packet_runner_lock:
+                if not self.packet_runner_state.get("running"):
+                    return jsonify(
+                        {
+                            "status": "idle",
+                            "message": "No packet run is active.",
+                            "runner": dict(self.packet_runner_state),
+                        }
+                    )
+                self.packet_runner_state["cancel_requested"] = True
+                self.packet_runner_state["message"] = "Cancel requested; current task will finish first."
+                runner_state = dict(self.packet_runner_state)
+
+            workspace_id = get_workspace_id(self.engine.target_dir)
+            if workspace_id is not None:
+                db_context = get_db()
+                db = next(db_context)
+                try:
+                    event = _safe_create_factory_event(
+                        db,
+                        workspace_id,
+                        "packet_cancel_requested",
+                        "Packet cancel requested.",
+                        work_packet_id=runner_state.get("work_packet_id"),
+                        task_id=runner_state.get("current_task_id"),
+                    )
+                    _ = event
+                finally:
+                    db_context.close()
+
+            return jsonify(
+                {
+                    "status": "success",
+                    "message": "Cancel requested; current task will finish first.",
+                    "runner": runner_state,
+                }
+            )
 
         @self.app.route("/api/tasks/<int:task_id>", methods=["PUT", "PATCH"])
         def update_task(task_id):
@@ -1501,8 +2248,6 @@ class NexusDashboard:
 
             db_context = get_db()
             db = next(db_context)
-            execution_run = None
-            factory_events_created = 0
             try:
                 workspace = db.get(Workspace, workspace_id)
                 if workspace is None:
@@ -1512,264 +2257,15 @@ class NexusDashboard:
                 if task is None or task.workspace_id != workspace_id:
                     return jsonify({"status": "error", "message": "Task not found."}), 404
 
-                workspace_path = os.path.abspath(workspace.local_path)
-                task_title = getattr(task, "title", None) or "Task #{}".format(task_id)
-                task_description = task.description or ""
-
-                if not os.path.isdir(workspace_path):
-                    return jsonify({"status": "error", "message": "Workspace directory not found."}), 400
-
-                commands = extract_codex_commands(task_description)
-                if len(commands) != 1:
-                    return jsonify(
-                        {
-                            "status": "error",
-                            "message": "Task description must contain exactly one codex command.",
-                        }
-                    ), 400
-
-                command_prompt = _prompt_from_codex_command(commands[0])
-                if command_prompt is None or not command_prompt.strip():
-                    return jsonify({"status": "error", "message": "Task codex command is invalid."}), 400
-
-                event = _safe_create_factory_event(
+                result = _execute_factory_task(
                     db,
-                    workspace_id,
-                    "task_run_requested",
-                    "Run requested for task: {}".format(task_title),
-                    task_id=task_id,
-                    payload={"execution_mode": execution_mode, "command_excerpt": commands[0][:240]},
+                    workspace,
+                    task,
+                    execution_mode,
+                    create_requested_event=True,
                 )
-                factory_events_created += 1 if event is not None else 0
-
-                started_at = datetime.now(timezone.utc)
-                execution_run = ExecutionRun(
-                    workspace_id=workspace_id,
-                    task_id=task_id,
-                    command=commands[0],
-                    prompt=command_prompt,
-                    status="running",
-                    started_at=started_at,
-                    provider="codex",
-                    model="codex-cli",
-                )
-                if hasattr(db, "add"):
-                    db.add(execution_run)
-                    _safe_db_commit(db)
-                    _safe_db_refresh(db, execution_run)
-
-                event = _safe_create_factory_event(
-                    db,
-                    workspace_id,
-                    "task_run_started",
-                    "Codex run started for task: {}".format(task_title),
-                    task_id=task_id,
-                    execution_run_id=execution_run.id,
-                    payload={"execution_mode": execution_mode, "command_excerpt": commands[0][:240]},
-                )
-                factory_events_created += 1 if event is not None else 0
-                _send_factory_discord_notification("Run One Task started: {}".format(task_title))
-
-                try:
-                    codex_result = CodexRunner(timeout_factory=calculate_prompt_timeout).run(
-                        command_prompt,
-                        workspace_path,
-                        task_id=task_id,
-                    )
-                except OSError as exception:
-                    finished_at = datetime.now(timezone.utc)
-                    execution_run.status = "failed"
-                    execution_run.returncode = -1
-                    execution_run.stdout = ""
-                    execution_run.stderr = str(exception)
-                    execution_run.finished_at = finished_at
-                    execution_run.duration_seconds = (finished_at - started_at).total_seconds()
-                    execution_run.timeout_seconds = 0
-                    execution_run.error_message = str(exception)
-                    task.status = "review"
-                    _safe_db_commit(db)
-                    event = _safe_create_factory_event(
-                        db,
-                        workspace_id,
-                        "codex_run_failed",
-                        "Codex runner failed before execution for task: {}".format(task_title),
-                        task_id=task_id,
-                        execution_run_id=execution_run.id,
-                        payload={"error": str(exception)},
-                    )
-                    factory_events_created += 1 if event is not None else 0
-                    event = _safe_create_factory_event(
-                        db,
-                        workspace_id,
-                        "task_marked_review_required",
-                        "Task moved to review after failure: {}".format(task_title),
-                        task_id=task_id,
-                        execution_run_id=execution_run.id,
-                    )
-                    factory_events_created += 1 if event is not None else 0
-                    _send_factory_discord_notification("Run One Task failed: {}".format(task_title))
-                    return jsonify(
-                        {
-                            "status": "failed",
-                            "task_status": task.status,
-                            "execution_run_id": execution_run.id,
-                            "factory_events_created": factory_events_created,
-                            "git": summarize_git_changes(workspace_path),
-                            "stdout": "",
-                            "stderr": str(exception),
-                            "returncode": -1,
-                            "timeout_seconds": 0,
-                            "execution_time": execution_run.duration_seconds,
-                            "token_usage": {},
-                        }
-                    ), 500
-
-                status = "success"
-                status_code = 200
-                event_type = "codex_run_completed"
-                if codex_result.status == "timeout":
-                    status = "timeout"
-                    status_code = 504
-                    event_type = "codex_run_timeout"
-                elif codex_result.status != "success" or codex_result.returncode != 0:
-                    status = "failed"
-                    status_code = 500
-                    event_type = "codex_run_failed"
-
-                token_usage = codex_result.token_usage or {}
-                finished_at = datetime.now(timezone.utc)
-                execution_run.status = status
-                execution_run.returncode = codex_result.returncode
-                execution_run.stdout = codex_result.stdout
-                execution_run.stderr = codex_result.stderr
-                execution_run.finished_at = finished_at
-                execution_run.duration_seconds = codex_result.execution_time
-                execution_run.timeout_seconds = codex_result.timeout_seconds
-                execution_run.input_tokens = token_usage.get("input_tokens")
-                execution_run.output_tokens = token_usage.get("output_tokens")
-                execution_run.total_tokens = token_usage.get("total_tokens")
-                execution_run.estimated_cost_usd = token_usage.get("estimated_cost_usd")
-                if status == "timeout":
-                    execution_run.error_message = "Codex execution timed out after {} seconds.".format(
-                        codex_result.timeout_seconds
-                    )
-                    task.status = "review"
-                elif status == "failed":
-                    execution_run.error_message = (
-                        (codex_result.stderr or "").strip()
-                        or (codex_result.stdout or "").strip()
-                        or "Codex execution failed."
-                    )
-                    task.status = "review"
-                else:
-                    task.status = "done"
-                _safe_db_commit(db)
-
-                event = _safe_create_factory_event(
-                    db,
-                    workspace_id,
-                    event_type,
-                    "Codex run {} for task: {}".format(status, task_title),
-                    task_id=task_id,
-                    execution_run_id=execution_run.id,
-                    payload={
-                        "returncode": codex_result.returncode,
-                        "duration_seconds": codex_result.execution_time,
-                        "token_usage": token_usage,
-                    },
-                )
-                factory_events_created += 1 if event is not None else 0
-
-                git_summary = summarize_git_changes(workspace_path)
-                changed_files = git_summary.get("changed_files", [])
-                changed_file_rows = []
-                for changed_file in changed_files:
-                    changed_file_rows.append(
-                        ExecutionChangedFile(
-                            execution_run_id=execution_run.id,
-                            file_path=changed_file.get("path") or "",
-                            change_type=changed_file.get("status") or "",
-                            insertions=0,
-                            deletions=0,
-                            diff_summary=git_summary.get("diff_stat") or git_summary.get("status_output") or "",
-                        )
-                    )
-                if changed_file_rows and hasattr(db, "add_all"):
-                    db.add_all(changed_file_rows)
-                    _safe_db_commit(db)
-
-                event = _safe_create_factory_event(
-                    db,
-                    workspace_id,
-                    "git_changes_captured",
-                    "Captured {} changed file{} after task run.".format(
-                        len(changed_files),
-                        "" if len(changed_files) == 1 else "s",
-                    ),
-                    task_id=task_id,
-                    execution_run_id=execution_run.id,
-                    payload={
-                        "changed_files": changed_files,
-                        "is_dirty": git_summary.get("is_dirty", False),
-                    },
-                )
-                factory_events_created += 1 if event is not None else 0
-
-                final_task_event_type = (
-                    "task_marked_done" if task.status == "done" else "task_marked_review_required"
-                )
-                event = _safe_create_factory_event(
-                    db,
-                    workspace_id,
-                    final_task_event_type,
-                    "Task moved to {}: {}".format(task.status, task_title),
-                    task_id=task_id,
-                    execution_run_id=execution_run.id,
-                    payload={"task_status": task.status},
-                )
-                factory_events_created += 1 if event is not None else 0
-
-                if token_usage:
-                    cost_event = {
-                        "source": "run_one",
-                        "provider": "codex",
-                        "model": "codex-cli",
-                        "task_id": task_id,
-                        "notes": "One-task Codex execution.",
-                    }
-                    for key in ("total_tokens", "input_tokens", "output_tokens", "estimated_cost_usd"):
-                        if key in token_usage:
-                            cost_event[key] = token_usage.get(key)
-                    try:
-                        append_cost_event(workspace_path, cost_event)
-                    except OSError:
-                        pass
-
-                _send_factory_discord_notification(
-                    "Run One Task {}: {} | {:.2f}s | {} tokens | {} changed files".format(
-                        status,
-                        task_title,
-                        codex_result.execution_time or 0,
-                        token_usage.get("total_tokens", 0),
-                        len(changed_files),
-                    )
-                )
-
-                return jsonify(
-                    {
-                        "status": status,
-                        "task_status": task.status,
-                        "execution_run_id": execution_run.id,
-                        "factory_events_created": factory_events_created,
-                        "git": git_summary,
-                        "stdout": codex_result.stdout,
-                        "stderr": codex_result.stderr,
-                        "returncode": codex_result.returncode,
-                        "timeout_seconds": codex_result.timeout_seconds,
-                        "execution_time": codex_result.execution_time,
-                        "token_usage": token_usage,
-                    }
-                ), status_code
+                status_code = result.pop("status_code", 200)
+                return jsonify(result), status_code
             finally:
                 db_context.close()
 
@@ -1822,7 +2318,7 @@ class NexusDashboard:
                 {
                     "status": "success",
                     "execution_mode": current_mode,
-                    "allowed_modes": ["manual", "one_task", "autopilot"],
+                    "allowed_modes": ["manual", "one_task", "one_packet", "autopilot"],
                     "autopilot_allowed": current_mode == "autopilot",
                     "automatic_analysis_enabled": self.engine.is_automatic_analysis_enabled(),
                 }
@@ -1836,7 +2332,7 @@ class NexusDashboard:
                 {
                     "status": "success",
                     "execution_mode": current_mode,
-                    "allowed_modes": ["manual", "one_task", "autopilot"],
+                    "allowed_modes": ["manual", "one_task", "one_packet", "autopilot"],
                     "autopilot_allowed": current_mode == "autopilot",
                     "automatic_analysis_enabled": self.engine.is_automatic_analysis_enabled(),
                 }

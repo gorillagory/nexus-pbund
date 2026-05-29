@@ -36,6 +36,8 @@ def main():
         (" Manual ", "manual"),
         ("one_task", "one_task"),
         (" One_Task ", "one_task"),
+        ("one_packet", "one_packet"),
+        (" One_Packet ", "one_packet"),
         ("autopilot", "autopilot"),
         ("bad", "manual"),
     ]
@@ -84,6 +86,22 @@ def main():
     checks.append("openai_api_key" not in public_settings or fail("one_task public_settings exposes openai_api_key"))
     checks.append("api_key" not in public_settings or fail("one_task public_settings exposes api_key"))
     pass_line("engine reports one_task mode without automatic analysis or raw API keys")
+
+    engine.settings["execution_mode"] = "one_packet"
+    public_settings = engine.public_settings()
+    checks.append(engine.get_execution_mode() == "one_packet" or fail("one_packet mode was not returned"))
+    checks.append(
+        public_settings.get("execution_mode") == "one_packet"
+        or fail("public_settings missing one_packet execution_mode")
+    )
+    checks.append(
+        public_settings.get("automatic_analysis_enabled") is False
+        or fail("one_packet public settings enables automatic analysis")
+    )
+    checks.append("gemini_api_key" not in public_settings or fail("one_packet public_settings exposes gemini_api_key"))
+    checks.append("openai_api_key" not in public_settings or fail("one_packet public_settings exposes openai_api_key"))
+    checks.append("api_key" not in public_settings or fail("one_packet public_settings exposes api_key"))
+    pass_line("engine reports one_packet mode without automatic analysis or raw API keys")
 
     engine.settings["execution_mode"] = "autopilot"
     public_settings = engine.public_settings()

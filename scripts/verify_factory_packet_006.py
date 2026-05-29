@@ -72,6 +72,24 @@ def main():
     )
     pass_line("one_task mode disables automatic analysis")
 
+    engine.settings = {"execution_mode": "one_packet"}
+    one_packet_status = engine.automatic_analysis_status()
+    one_packet_public = engine.public_settings()
+    checks.append(engine.get_execution_mode() == "one_packet" or fail("one_packet mode not returned"))
+    checks.append(
+        engine.is_automatic_analysis_enabled() is False
+        or fail("one_packet mode enables automatic analysis")
+    )
+    checks.append(
+        one_packet_status.get("automatic_analysis_enabled") is False
+        or fail("one_packet status enables automatic analysis")
+    )
+    checks.append(
+        one_packet_public.get("automatic_analysis_enabled") is False
+        or fail("one_packet public settings enables automatic analysis")
+    )
+    pass_line("one_packet mode disables automatic analysis")
+
     engine.settings = {"execution_mode": "autopilot"}
     autopilot_status = engine.automatic_analysis_status()
     autopilot_public = engine.public_settings()

@@ -33,6 +33,7 @@ window.NexusApp = {
     executionMode: "manual",
     automaticAnalysisEnabled: false,
     latestWorkPacketPreview: null,
+    latestStagedWorkPacket: null,
     latestCostLedger: null,
     latestFactoryConsole: null,
 
@@ -212,6 +213,7 @@ window.NexusApp = {
 
     renderFactoryConsole(data) {
         const factory = data?.factory || {};
+        const runner = factory.runner || {};
         const git = data?.git || {};
         const summaryTarget = document.getElementById("factory-console-summary");
         if (summaryTarget) {
@@ -220,6 +222,7 @@ window.NexusApp = {
                 ["Execution Mode", factory.execution_mode || "unknown"],
                 ["Automatic Analysis", factory.automatic_analysis_enabled ? "enabled" : "disabled"],
                 ["Factory State", factory.current_state || "idle"],
+                ["Packet Runner", runner.running ? (runner.message || "running") : (runner.message || "idle")],
                 ["Git State", git.is_dirty ? "dirty" : "clean"],
                 ["Recent Events", factory.recent_event_count || 0],
                 ["Recent Runs", factory.recent_run_count || 0],
@@ -1162,8 +1165,14 @@ window.NexusApp = {
                         <div class="d-flex flex-wrap gap-2">
                             <button type="button" class="btn btn-outline-primary btn-sm" onclick="NexusApp.previewWorkPacket()">Preview Packet</button>
                             <button type="button" class="btn btn-primary btn-sm" onclick="NexusApp.stageWorkPacket()">Stage to Kanban</button>
+                            <button id="run-packet-btn" type="button" class="btn btn-outline-success btn-sm" onclick="NexusApp.runWorkPacket()">Run Packet</button>
                             <button type="button" class="btn btn-outline-secondary btn-sm" onclick="NexusApp.copyAllWorkPacketCodexCommands()">Copy All Codex Commands</button>
                         </div>
+                    </div>
+                    <div id="work-packet-runner-status" class="border rounded bg-white p-3 mb-3 small text-secondary">
+                        <div class="fw-semibold text-dark">Supervised Packet Runner</div>
+                        <div>Supervised Packet Runner: runs only this packet and stops after first failure.</div>
+                        <div id="latest-work-packet-status" class="mt-2">No staged packet selected.</div>
                     </div>
                     <textarea id="work-packet-input" class="form-control font-monospace small mb-3" rows="8" placeholder="Paste a work packet containing codex &quot;...&quot; commands"></textarea>
                     <div id="work-packet-preview" class="border rounded bg-white p-3 small text-secondary">
@@ -1227,6 +1236,7 @@ window.NexusApp = {
                                         <div class="btn-group btn-group-sm" role="group" aria-label="Execution mode">
                                             <button id="execution-mode-manual-btn" type="button" class="btn btn-outline-secondary" onclick="NexusApp.setExecutionMode('manual')">Manual</button>
                                             <button id="execution-mode-one-task-btn" type="button" class="btn btn-outline-secondary" onclick="NexusApp.setExecutionMode('one_task')">One Task</button>
+                                            <button id="execution-mode-one-packet-btn" type="button" class="btn btn-outline-secondary" onclick="NexusApp.setExecutionMode('one_packet')">One Packet</button>
                                             <button id="execution-mode-autopilot-btn" type="button" class="btn btn-outline-secondary" onclick="NexusApp.setExecutionMode('autopilot')">Auto-Pilot</button>
                                         </div>
                                     </div>
@@ -1256,6 +1266,7 @@ window.NexusApp = {
 
         this.renderTasks(NexusState.tasks);
         this.renderWorkPacketPreview(this.latestWorkPacketPreview);
+        this.renderWorkPacketRunnerStatus();
         this.renderExecutionMode();
         this.updateAutoPilotUI();
         this.renderCostLedger(this.latestCostLedger);
@@ -1405,10 +1416,81 @@ window.NexusApp = {
                 throw new Error(data.message || "Unable to stage work packet.");
             }
 
+            this.latestStagedWorkPacket = data;
             await this.loadKanban();
+            this.renderWorkPacketRunnerStatus();
             NexusCore.showToast(`Staged ${data.created_count} task${data.created_count === 1 ? "" : "s"} to Kanban.`, "success");
         } catch (error) {
             NexusCore.showToast(`Error: ${error.message}`, "error");
+        }
+    },
+
+    renderWorkPacketRunnerStatus() {
+        const target = document.getElementById("latest-work-packet-status");
+        const button = document.getElementById("run-packet-btn");
+        const packet = this.latestStagedWorkPacket || {};
+        const packetId = packet.work_packet_id;
+        if (target) {
+            target.textContent = packetId
+                ? `Selected packet #${packetId}: ${packet.packet_title || "Untitled Work Packet"}`
+                : "No staged packet selected.";
+        }
+        if (button) {
+            const enabled = this.executionMode === "one_packet" && Boolean(packetId);
+            button.disabled = !enabled;
+            button.className = enabled
+                ? "btn btn-success btn-sm"
+                : "btn btn-outline-success btn-sm";
+            button.title = enabled
+                ? "Run the selected staged packet."
+                : "Switch to One Packet mode and stage a packet first.";
+        }
+    },
+
+    async runWorkPacket(button = null) {
+        const trigger = button || document.getElementById("run-packet-btn");
+        const packet = this.latestStagedWorkPacket || {};
+        if (this.executionMode !== "one_packet") {
+            NexusCore.showToast("Run Packet is available only in One Packet mode.", "error");
+            return;
+        }
+        if (!NexusState.currentWorkspaceId || !packet.work_packet_id) {
+            NexusCore.showToast("Stage a work packet before running it.", "error");
+            return;
+        }
+
+        const originalLabel = trigger ? trigger.textContent : "";
+        if (trigger) {
+            trigger.disabled = true;
+            trigger.textContent = "Running Packet...";
+        }
+
+        try {
+            const response = await fetch("/api/work-packets/run", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    workspace_id: NexusState.currentWorkspaceId,
+                    work_packet_id: packet.work_packet_id,
+                }),
+            });
+            const data = await response.json();
+            if (!response.ok || data.status !== "success") {
+                throw new Error(data.message || `Packet run ended with status ${data.status || "failed"}.`);
+            }
+
+            NexusCore.showToast("Run Packet completed successfully.", "success");
+        } catch (error) {
+            NexusCore.showToast(`Run Packet failed: ${error.message}`, "error");
+        } finally {
+            if (trigger) {
+                trigger.disabled = false;
+                trigger.textContent = originalLabel || "Run Packet";
+            }
+            await this.loadKanban();
+            await this.loadCostLedger();
+            await this.loadFactoryConsole();
+            this.renderWorkPacketRunnerStatus();
         }
     },
 
@@ -1902,6 +1984,7 @@ window.NexusApp = {
             this.automaticAnalysisEnabled = Boolean(data.automatic_analysis_enabled);
             this.renderExecutionMode();
             this.updateAutoPilotUI();
+            this.renderWorkPacketRunnerStatus();
             if (NexusState.currentTab === "board") {
                 this.renderTasks(NexusState.tasks);
             }
@@ -1926,6 +2009,7 @@ window.NexusApp = {
             this.automaticAnalysisEnabled = Boolean(data.automatic_analysis_enabled);
             this.renderExecutionMode();
             this.updateAutoPilotUI();
+            this.renderWorkPacketRunnerStatus();
             if (NexusState.currentTab === "board") {
                 this.renderTasks(NexusState.tasks);
             }
@@ -1934,7 +2018,9 @@ window.NexusApp = {
                     ? "Execution mode set to Auto-Pilot."
                     : (this.executionMode === "one_task"
                         ? "Execution mode set to One Task."
-                        : "Execution mode set to Manual."),
+                        : (this.executionMode === "one_packet"
+                            ? "Execution mode set to One Packet."
+                            : "Execution mode set to Manual.")),
                 "success",
             );
         } catch (error) {
@@ -1945,14 +2031,17 @@ window.NexusApp = {
     renderExecutionMode() {
         const isAutoPilot = this.executionMode === "autopilot";
         const isOneTask = this.executionMode === "one_task";
+        const isOnePacket = this.executionMode === "one_packet";
         const label = isAutoPilot
             ? "Auto-Pilot Mode - automatic analysis enabled"
             : (isOneTask
                 ? "One Task Mode - run a single selected Codex task"
-                : "Manual Mode - Auto-Pilot and automatic analysis disabled");
+                : (isOnePacket
+                    ? "One Packet Mode - supervised packet runner"
+                    : "Manual Mode - Auto-Pilot and automatic analysis disabled"));
         const indicatorClass = isAutoPilot
             ? "badge text-bg-primary border"
-            : (isOneTask ? "badge text-bg-info border" : "badge text-bg-warning border");
+            : ((isOneTask || isOnePacket) ? "badge text-bg-info border" : "badge text-bg-warning border");
 
         ["execution-mode-indicator", "execution-mode-header"].forEach((id) => {
             const indicator = document.getElementById(id);
@@ -1965,6 +2054,7 @@ window.NexusApp = {
 
         const manualButton = document.getElementById("execution-mode-manual-btn");
         const oneTaskButton = document.getElementById("execution-mode-one-task-btn");
+        const onePacketButton = document.getElementById("execution-mode-one-packet-btn");
         const autoPilotButton = document.getElementById("execution-mode-autopilot-btn");
         if (manualButton) {
             manualButton.className = this.executionMode === "manual"
@@ -1973,6 +2063,11 @@ window.NexusApp = {
         }
         if (oneTaskButton) {
             oneTaskButton.className = isOneTask
+                ? "btn btn-info"
+                : "btn btn-outline-secondary";
+        }
+        if (onePacketButton) {
+            onePacketButton.className = isOnePacket
                 ? "btn btn-info"
                 : "btn btn-outline-secondary";
         }
@@ -1994,7 +2089,9 @@ window.NexusApp = {
             button.className = "btn btn-outline-secondary btn-sm";
             button.innerHTML = this.executionMode === "one_task"
                 ? "Auto-Pilot Disabled in One Task Mode"
-                : "Auto-Pilot Disabled in Manual Mode";
+                : (this.executionMode === "one_packet"
+                    ? "Auto-Pilot Disabled in One Packet Mode"
+                    : "Auto-Pilot Disabled in Manual Mode");
             return;
         }
 

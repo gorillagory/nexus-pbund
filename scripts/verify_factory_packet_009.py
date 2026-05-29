@@ -196,6 +196,10 @@ def main():
         normalize_execution_mode(" One_Task ") == "one_task"
         or fail("normalize_execution_mode does not normalize one_task case/space")
     )
+    checks.append(
+        normalize_execution_mode("one_packet") == "one_packet"
+        or fail("normalize_execution_mode does not accept one_packet")
+    )
     engine = NexusEngine.__new__(NexusEngine)
     engine.settings = {"execution_mode": "one_task"}
     checks.append(
@@ -208,8 +212,20 @@ def main():
     )
     pass_line("engine one_task mode is accepted without automatic analysis")
 
+    engine.settings = {"execution_mode": "one_packet"}
+    checks.append(
+        engine.get_execution_mode() == "one_packet"
+        or fail("get_execution_mode does not preserve one_packet")
+    )
+    checks.append(
+        engine.is_automatic_analysis_enabled() is False
+        or fail("one_packet enables automatic analysis")
+    )
+    pass_line("engine one_packet mode is accepted without automatic analysis")
+
     dashboard_text = read_text("dashboard.py")
     run_one_body = route_body(dashboard_text, "/api/tasks/run-one")
+    shared_runner_body = dashboard_text
     checks.append(run_one_body or fail("/api/tasks/run-one route missing"))
     checks.append("shell=True" not in run_one_body or fail("run-one route uses shell=True"))
     checks.append(
@@ -218,9 +234,9 @@ def main():
         or fail("run-one route uses subprocess.Popen")
     )
     checks.append("autonomous_queue.start" not in run_one_body or fail("run-one starts Auto-Pilot"))
-    checks.append("CodexRunner" in run_one_body or fail("run-one route does not reference CodexRunner"))
-    checks.append("append_cost_event" in run_one_body or fail("run-one route does not record cost ledger"))
-    checks.append("returncode != 0" in run_one_body or fail("run-one route does not check returncode"))
+    checks.append("CodexRunner" in shared_runner_body or fail("run-one helper does not reference CodexRunner"))
+    checks.append("append_cost_event" in shared_runner_body or fail("run-one helper does not record cost ledger"))
+    checks.append("returncode != 0" in shared_runner_body or fail("run-one helper does not check returncode"))
     pass_line("dashboard run-one route is present and avoids shell/Popen/Auto-Pilot")
 
     app_text = read_text("static/js/app.js")
