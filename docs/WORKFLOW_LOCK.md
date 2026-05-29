@@ -8,6 +8,8 @@ Capture raw ideas in the Orchestration Inbox before they become work. Do not exe
 
 Packet 022 added the Orchestration Inbox foundation for manual capture and later triage. The inbox is supervised only: it stores raw intent, priority, category, status, and triage notes without calling Codex, task execution, packet execution, or Auto-Pilot routes.
 
+Packet 023 added the Discord Event Router foundation. Discord-originated operator intent is captured into the Orchestration Inbox with source `discord`; Discord messages do not execute tasks, packets, Codex, or Auto-Pilot directly.
+
 ## Triage
 
 Triage asks four questions:
@@ -18,6 +20,8 @@ Triage asks four questions:
 - What verification proves the work?
 
 If the answers are unclear, Codex should inspect local context first and ask the human only when the decision is risky or cannot be inferred.
+
+Discord-captured items follow the same triage rule as manual inbox items. Each captured message must become a scoped task, work packet, document update, or explicit discard before any supervised execution path is considered.
 
 ## Packet Drafting
 

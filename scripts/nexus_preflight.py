@@ -24,6 +24,7 @@ PY_COMPILE_FILES = [
     "chat_session_store.py",
     "src/services/codex_runner.py",
     "src/services/cost_ledger.py",
+    "src/services/discord_router.py",
     "src/services/work_packet_parser.py",
     "src/services/factory_events.py",
     "src/services/git_changes.py",
@@ -136,7 +137,7 @@ def run_safety_scans(summary):
     failed = False
     shell_assignment = "shell" + "=True"
     popen_name = "subprocess." + "Popen"
-    raw_key_pattern = re.compile(r"data\.(gemini_api_key|openai_api_key|api_key)([^_A-Za-z0-9]|$)")
+    raw_key_pattern = re.compile(r"data\.(gemini_api_key|openai_api_key|api_key|discord_ingest_secret)([^_A-Za-z0-9]|$)")
 
     checks = [
         (

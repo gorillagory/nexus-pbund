@@ -39,6 +39,11 @@ from src.api.project_routes import projects_blueprint
 from src.services.codex_runner import CodexRunner
 from src.services.ci_status import summarize_ci_status
 from src.services.cost_ledger import append_cost_event, read_cost_events, summarize_cost_events
+from src.services.discord_router import (
+    discord_router_status,
+    normalize_discord_event,
+    verify_ingest_secret,
+)
 from src.services.factory_events import (
     create_factory_event,
     get_recent_execution_runs,
@@ -1641,6 +1646,7 @@ class NexusDashboard:
                         "recent_run_count": state.get("recent_run_count", 0),
                         "runner": runner_state,
                     },
+                    "discord_router": discord_router_status(self.engine.settings),
                     "git": git_summary,
                     "ci": ci_summary,
                     "recent_events": [serialize_factory_event(event) for event in events],
@@ -1893,6 +1899,38 @@ class NexusDashboard:
                 ), 503
 
             return jsonify({"status": "success", "event": serialize_factory_event(event)}), 201
+
+        @self.app.route("/api/discord-router/status", methods=["GET"])
+        def get_discord_router_status():
+            return jsonify({"status": "success", "discord_router": discord_router_status(self.engine.settings)})
+
+        @self.app.route("/api/discord-router/ingest", methods=["POST"])
+        def ingest_discord_router_event():
+            authorized, auth_error = verify_ingest_secret(self.engine.settings, request.headers)
+            if not authorized:
+                return jsonify({"status": "error", "message": auth_error}), 403
+
+            payload = request.get_json(silent=True)
+            if not isinstance(payload, dict):
+                return jsonify({"status": "error", "message": "JSON object is required."}), 400
+
+            db_context = get_db()
+            db = next(db_context)
+            try:
+                workspace_id = get_workspace_id(self.engine.target_dir)
+                if workspace_id is None:
+                    return jsonify({"status": "error", "message": "Active workspace not found."}), 400
+                inbox_data = normalize_discord_event(payload)
+                item = create_inbox_item(db, workspace_id, inbox_data)
+                return jsonify({"status": "success", "item": serialize_inbox_item(item)}), 201
+            except ValueError as exception:
+                db.rollback()
+                return jsonify({"status": "error", "message": str(exception)}), 400
+            except Exception as exception:
+                db.rollback()
+                return jsonify({"status": "error", "message": "Discord event could not be captured: {}".format(exception)}), 503
+            finally:
+                db_context.close()
 
         @self.app.route("/api/orchestration-inbox/items", methods=["GET"])
         def get_orchestration_inbox_items():

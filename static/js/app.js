@@ -317,10 +317,12 @@ window.NexusApp = {
         const git = data?.git || {};
         const events = Array.isArray(data?.recent_events) ? data.recent_events : [];
         const runs = Array.isArray(data?.recent_runs) ? data.recent_runs : [];
+        const discordRouter = data?.discord_router || {};
 
         this.renderFactorySummaryCards(factory, git);
         this.renderFactoryCurrentState(factory, runner);
         this.renderFactorySafeActions(factory, git);
+        this.renderDiscordRouterStatus(discordRouter);
         this.renderFactoryFailureRecovery(factory, runner, runs);
         this.renderFactoryGitStatus(git);
         this.renderFactoryEvents(events);
@@ -354,6 +356,35 @@ window.NexusApp = {
             `;
             target.appendChild(column);
         });
+    },
+
+    renderDiscordRouterStatus(discordRouter) {
+        const target = document.getElementById("factory-discord-router-panel");
+        if (!target) return;
+        const enabled = Boolean(discordRouter?.enabled);
+        const secretConfigured = Boolean(discordRouter?.secret_configured);
+        const mode = discordRouter?.mode || "capture_only";
+        target.innerHTML = `
+            <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
+                <div>
+                    <h4 class="h6 fw-semibold mb-1">Discord Event Router</h4>
+                    <p class="text-secondary small mb-0">Capture-only ingest to Orchestration Inbox. Triage remains required before any work is staged.</p>
+                </div>
+                <span class="factory-status-badge ${enabled ? "factory-status-pass" : "factory-status-idle"}">${enabled ? "enabled" : "disabled"}</span>
+            </div>
+            <div class="factory-run-event mt-3">
+                <strong>Mode</strong>
+                <span>${this.escapeHtml(mode)}</span>
+            </div>
+            <div class="factory-run-event">
+                <strong>Ingest Secret</strong>
+                <span>${secretConfigured ? "configured" : "not configured"}</span>
+            </div>
+            <div class="factory-run-event">
+                <strong>Endpoint</strong>
+                <span>/api/discord-router/ingest</span>
+            </div>
+        `;
     },
 
     renderFactoryCurrentState(factory, runner) {

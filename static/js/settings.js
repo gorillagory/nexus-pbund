@@ -18,6 +18,12 @@ window.NexusSettings = {
                 ? "Configured — leave blank to keep existing key"
                 : "Enter API key";
             document.getElementById("input-openai-model").value = data.openai_model || "";
+            document.getElementById("input-discord-router-enabled").value = data.discord_router_enabled ? "true" : "false";
+            const discordSecretEl = document.getElementById("input-discord-ingest-secret");
+            discordSecretEl.value = "";
+            discordSecretEl.placeholder = data.discord_ingest_secret_configured
+                ? "Configured — leave blank to keep existing secret"
+                : "Set shared ingest secret";
 
             this.syncProviderSwitch(data.provider || "auto");
             await this.refreshModelPreview();
@@ -36,6 +42,8 @@ window.NexusSettings = {
             gemini_model: document.getElementById("input-gemini-model").value.trim(),
             openai_api_key: document.getElementById("input-openai-api-key").value.trim(),
             openai_model: document.getElementById("input-openai-model").value.trim(),
+            discord_router_enabled: document.getElementById("input-discord-router-enabled").value === "true",
+            discord_ingest_secret: document.getElementById("input-discord-ingest-secret").value.trim(),
         };
 
         try {

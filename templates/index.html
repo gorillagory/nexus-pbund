@@ -57,6 +57,17 @@
                             <input type="text" id="input-openai-model" class="form-control font-monospace" placeholder="optional">
                         </div>
                         <div class="col-md-6">
+                            <label class="form-label text-secondary small fw-bold">DISCORD ROUTER</label>
+                            <select id="input-discord-router-enabled" class="form-select">
+                                <option value="false">Disabled</option>
+                                <option value="true">Enabled</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label text-secondary small fw-bold">DISCORD INGEST SECRET</label>
+                            <input type="password" id="input-discord-ingest-secret" class="form-control font-monospace">
+                        </div>
+                        <div class="col-md-6">
                             <div class="d-flex justify-content-between align-items-center mb-1">
                                 <label class="form-label text-secondary small fw-bold mb-0">CURATED GEMINI MODELS</label>
                                 <small id="gemini-model-summary" class="text-secondary"></small>
@@ -441,6 +452,9 @@
                                     </section>
                                 </div>
                             </div>
+                            <section id="factory-discord-router-panel" class="factory-console-panel mb-4">
+                                <div class="text-secondary small">Discord router status not loaded.</div>
+                            </section>
                             <section id="factory-failure-recovery-panel" class="factory-console-panel mb-4">
                                 <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-3">
                                     <h4 class="h6 fw-semibold mb-0">Latest Failed Run</h4>

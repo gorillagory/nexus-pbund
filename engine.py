@@ -214,6 +214,14 @@ def normalize_execution_mode(value):
     return "manual"
 
 
+def normalize_bool(value):
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return False
+    return str(value).strip().lower() in {"1", "true", "yes", "on", "enabled"}
+
+
 class NexusEngine:
     def __init__(self, target_dir):
         self.target_dir = os.path.abspath(target_dir)
@@ -326,6 +334,8 @@ class NexusEngine:
             "openai_model": "",
             "model_selection_mode": "auto",
             "execution_mode": "manual",
+            "discord_router_enabled": False,
+            "discord_ingest_secret": "",
         }
 
         saved = {}
@@ -355,10 +365,19 @@ class NexusEngine:
         if openai_env_key is not None:
             defaults["openai_api_key"] = openai_env_key.strip()
 
+        discord_env_secret = os.getenv("DISCORD_INGEST_SECRET")
+        if discord_env_secret is not None:
+            defaults["discord_ingest_secret"] = discord_env_secret.strip()
+
+        discord_env_enabled = os.getenv("DISCORD_ROUTER_ENABLED")
+        if discord_env_enabled is not None:
+            defaults["discord_router_enabled"] = normalize_bool(discord_env_enabled)
+
         if defaults["model_selection_mode"] not in {"auto", "manual"}:
             defaults["model_selection_mode"] = "auto"
 
         defaults["execution_mode"] = normalize_execution_mode(defaults.get("execution_mode"))
+        defaults["discord_router_enabled"] = normalize_bool(defaults.get("discord_router_enabled"))
 
         return defaults
 
@@ -372,8 +391,10 @@ class NexusEngine:
             "openai_model",
             "model_selection_mode",
             "execution_mode",
+            "discord_router_enabled",
+            "discord_ingest_secret",
         }
-        secret_keys = {"api_key", "gemini_api_key", "openai_api_key"}
+        secret_keys = {"api_key", "gemini_api_key", "openai_api_key", "discord_ingest_secret"}
 
         for key, value in new_settings.items():
             if key in allowed_keys:
@@ -391,6 +412,7 @@ class NexusEngine:
             self.settings["model_selection_mode"] = "auto"
 
         self.settings["execution_mode"] = normalize_execution_mode(self.settings.get("execution_mode"))
+        self.settings["discord_router_enabled"] = normalize_bool(self.settings.get("discord_router_enabled"))
 
         with open(self.settings_file, "w", encoding="utf-8") as file:
             json.dump(self.settings, file, indent=2)
@@ -421,16 +443,21 @@ class NexusEngine:
         public.pop("gemini_api_key", None)
         public.pop("openai_api_key", None)
         public.pop("api_key", None)
+        public.pop("discord_ingest_secret", None)
         public["execution_mode"] = self.get_execution_mode()
         public["automatic_analysis_enabled"] = self.is_automatic_analysis_enabled()
+        public["discord_router_enabled"] = normalize_bool(self.settings.get("discord_router_enabled"))
 
         gemini_key = (self.settings.get("gemini_api_key") or "").strip()
         openai_key = (self.settings.get("openai_api_key") or "").strip()
+        discord_secret = (self.settings.get("discord_ingest_secret") or "").strip()
         gemini_env_key = (os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY") or "").strip()
         openai_env_key = (os.getenv("OPENAI_API_KEY") or "").strip()
+        discord_env_secret = (os.getenv("DISCORD_INGEST_SECRET") or "").strip()
 
         public["gemini_api_key_configured"] = bool(gemini_key or gemini_env_key)
         public["openai_api_key_configured"] = bool(openai_key or openai_env_key)
+        public["discord_ingest_secret_configured"] = bool(discord_secret or discord_env_secret)
         return public
 
     def list_models(self, provider=None, force=False):
