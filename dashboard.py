@@ -64,6 +64,18 @@ PREFLIGHT_QUICK_COMMAND = ["python3", "scripts/nexus_preflight.py", "--quick"]
 PREFLIGHT_STRICT_CI_COMMAND = ["python3", "scripts/nexus_preflight.py", "--quick", "--strict-clean"]
 PREFLIGHT_TIMEOUT_SECONDS = 300
 PREFLIGHT_OUTPUT_EXCERPT_CHARS = 6000
+RECOVERY_EVENT_TYPES = {
+    "task_marked_review_required",
+    "task_retry_requested",
+    "task_retry_completed",
+    "packet_run_continued",
+}
+FAILURE_EVENT_TYPES = {
+    "codex_run_failed",
+    "codex_run_timeout",
+    "packet_task_failed",
+    "packet_run_failed",
+}
 
 
 def _safe_manual_cost_text(payload, field, max_length, required=False):
@@ -658,6 +670,95 @@ def _safe_db_refresh(db, obj):
         return False
     db.refresh(obj)
     return True
+
+
+def _clean_recovery_text(value, max_length=1000):
+    if value is None:
+        return ""
+    if not isinstance(value, str):
+        value = str(value)
+    value = value.strip()
+    if not value:
+        return ""
+    value = SECRET_TEXT_PATTERN.sub("[redacted]", value)
+    return value[:max_length]
+
+
+def _recovery_payload(action, previous_status=None, operator_note=None, reason=None, **extra):
+    clean_note = _clean_recovery_text(operator_note)
+    clean_reason = _clean_recovery_text(reason)
+    payload = {
+        "action": action,
+        "triggered_by": "operator",
+        "timestamp": _utc_now_iso(),
+    }
+    if previous_status is not None:
+        payload["previous_status"] = str(previous_status)
+    if clean_note:
+        payload["operator_note"] = clean_note
+    if clean_reason:
+        payload["reason"] = clean_reason
+    for key, value in extra.items():
+        if value is not None:
+            payload[key] = value
+    return payload
+
+
+def _factory_event_payload(event):
+    payload_json = getattr(event, "payload_json", None)
+    if not payload_json:
+        return {}
+    try:
+        payload = json.loads(payload_json)
+    except (TypeError, ValueError):
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def _is_recovery_event(event):
+    event_type = getattr(event, "event_type", "") or ""
+    payload = _factory_event_payload(event)
+    return event_type in RECOVERY_EVENT_TYPES or payload.get("triggered_by") == "operator" or bool(payload.get("action"))
+
+
+def _latest_recovery_note(events):
+    for event in events or []:
+        payload = _factory_event_payload(event)
+        note = payload.get("operator_note") or payload.get("reason")
+        if note:
+            return {
+                "event_id": getattr(event, "id", None),
+                "event_type": getattr(event, "event_type", None),
+                "action": payload.get("action"),
+                "note": note,
+                "previous_status": payload.get("previous_status"),
+                "created_at": getattr(event, "created_at", None).isoformat()
+                if getattr(event, "created_at", None)
+                else None,
+            }
+    return None
+
+
+def _latest_failure_event(events):
+    for event in events or []:
+        event_type = getattr(event, "event_type", "") or ""
+        if event_type in FAILURE_EVENT_TYPES or "failed" in event_type or "timeout" in event_type:
+            return event
+    return None
+
+
+def _dedupe_factory_events(events):
+    seen = set()
+    deduped = []
+    for event in events or []:
+        key = getattr(event, "id", None)
+        if key is None:
+            key = (getattr(event, "event_type", None), getattr(event, "created_at", None), id(event))
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(event)
+    return deduped
 
 
 def _send_factory_discord_notification(message):
@@ -1608,18 +1709,42 @@ class NexusDashboard:
                         .scalars()
                         .all()
                     )
+                    task_events = []
+                    if run.task_id:
+                        task_events = (
+                            db.execute(
+                                select(FactoryEvent)
+                                .where(FactoryEvent.task_id == run.task_id)
+                                .order_by(FactoryEvent.created_at.desc(), FactoryEvent.id.desc())
+                            )
+                            .scalars()
+                            .all()
+                        )
+                    related_events = _dedupe_factory_events(list(events) + list(task_events))
+                    recovery_events = [event for event in related_events if _is_recovery_event(event)]
+                    latest_failure = _latest_failure_event(related_events)
+                    latest_recovery_note = _latest_recovery_note(recovery_events)
                 finally:
                     db_context.close()
             except Exception as exception:
                 return jsonify({"status": "error", "message": "Run details unavailable: {}".format(exception)}), 503
 
+            serialized_run = serialize_execution_run(run)
             return jsonify(
                 {
                     "status": "success",
-                    "run": serialize_execution_run(run),
+                    "run": serialized_run,
                     "task": serialize_task(task) if task is not None else None,
                     "changed_files": [serialize_changed_file(changed_file) for changed_file in changed_files],
                     "events": [serialize_factory_event(event) for event in events],
+                    "related_events": [serialize_factory_event(event) for event in related_events[:50]],
+                    "recovery_events": [serialize_factory_event(event) for event in recovery_events[:20]],
+                    "latest_failure_event": serialize_factory_event(latest_failure)
+                    if latest_failure is not None
+                    else None,
+                    "latest_recovery_note": latest_recovery_note,
+                    "stdout_preview": (serialized_run.get("stdout") or "")[:2000],
+                    "stderr_preview": (serialized_run.get("stderr") or serialized_run.get("error_message") or "")[:2000],
                 }
             )
 
@@ -1966,6 +2091,9 @@ class NexusDashboard:
                             .scalars()
                             .all()
                         )
+                    recovery_events = [event for event in events if _is_recovery_event(event)]
+                    latest_failure = _latest_failure_event(events)
+                    latest_recovery_note = _latest_recovery_note(recovery_events)
                 finally:
                     db_context.close()
             except Exception as exception:
@@ -1977,6 +2105,11 @@ class NexusDashboard:
                     "task": serialize_task(task),
                     "latest_runs": [serialize_execution_run(run) for run in runs[:10]],
                     "latest_events": [serialize_factory_event(event) for event in events[:20]],
+                    "recovery_events": [serialize_factory_event(event) for event in recovery_events[:20]],
+                    "latest_failure_event": serialize_factory_event(latest_failure)
+                    if latest_failure is not None
+                    else None,
+                    "latest_recovery_note": latest_recovery_note,
                     "changed_files": [serialize_changed_file(changed_file) for changed_file in changed_files],
                 }
             )
@@ -1986,10 +2119,13 @@ class NexusDashboard:
             payload = request.get_json(silent=True) or {}
             workspace_id = payload.get("workspace_id")
             reason = payload.get("reason") or "Marked review required by operator."
+            operator_note = payload.get("operator_note")
             if not isinstance(workspace_id, int) or isinstance(workspace_id, bool):
                 return jsonify({"status": "error", "message": "Valid workspace_id is required."}), 400
             if not isinstance(reason, str):
                 return jsonify({"status": "error", "message": "reason must be a string."}), 400
+            if operator_note is not None and not isinstance(operator_note, str):
+                return jsonify({"status": "error", "message": "operator_note must be a string."}), 400
 
             active_workspace_id = get_workspace_id(self.engine.target_dir)
             if workspace_id != active_workspace_id:
@@ -2001,21 +2137,31 @@ class NexusDashboard:
                 task = db.get(Task, task_id)
                 if task is None or task.workspace_id != workspace_id:
                     return jsonify({"status": "error", "message": "Task not found."}), 404
+                previous_status = task.status
                 task.status = "review"
                 _safe_db_commit(db)
+                recovery = _recovery_payload(
+                    "mark_review_required",
+                    previous_status=previous_status,
+                    operator_note=operator_note,
+                    reason=reason,
+                    task_id=task.id,
+                    new_status=task.status,
+                )
                 event = _safe_create_factory_event(
                     db,
                     workspace_id,
                     "task_marked_review_required",
                     "Task marked review required: {}".format(task.title),
                     task_id=task.id,
-                    payload={"reason": reason[:1000]},
+                    payload=recovery,
                 )
                 return jsonify(
                     {
                         "status": "success",
                         "task": serialize_task(task),
                         "event": serialize_factory_event(event),
+                        "recovery": recovery,
                     }
                 )
             except Exception:
@@ -2028,6 +2174,8 @@ class NexusDashboard:
         def retry_one_task(task_id):
             payload = request.get_json(silent=True) or {}
             workspace_id = payload.get("workspace_id")
+            reason = payload.get("reason")
+            operator_note = payload.get("operator_note")
             execution_mode = self.engine.get_execution_mode()
             if execution_mode != "one_task":
                 return jsonify(
@@ -2039,6 +2187,10 @@ class NexusDashboard:
                 ), 403
             if not isinstance(workspace_id, int) or isinstance(workspace_id, bool):
                 return jsonify({"status": "error", "message": "Valid workspace_id is required."}), 400
+            if reason is not None and not isinstance(reason, str):
+                return jsonify({"status": "error", "message": "reason must be a string."}), 400
+            if operator_note is not None and not isinstance(operator_note, str):
+                return jsonify({"status": "error", "message": "operator_note must be a string."}), 400
             active_workspace_id = get_workspace_id(self.engine.target_dir)
             if workspace_id != active_workspace_id:
                 return jsonify({"status": "error", "message": "Workspace is not active."}), 403
@@ -2052,7 +2204,52 @@ class NexusDashboard:
                 task = db.get(Task, task_id)
                 if task is None or task.workspace_id != workspace_id:
                     return jsonify({"status": "error", "message": "Task not found."}), 404
+                previous_status = task.status
+                previous_run = (
+                    db.execute(
+                        select(ExecutionRun)
+                        .where(ExecutionRun.task_id == task_id)
+                        .order_by(ExecutionRun.started_at.desc(), ExecutionRun.id.desc())
+                    )
+                    .scalars()
+                    .all()
+                )
+                previous_execution_run_id = previous_run[0].id if previous_run else None
+                recovery = _recovery_payload(
+                    "retry_one_task",
+                    previous_status=previous_status,
+                    operator_note=operator_note,
+                    reason=reason,
+                    task_id=task.id,
+                    execution_mode=execution_mode,
+                    previous_execution_run_id=previous_execution_run_id,
+                )
+                requested_event = _safe_create_factory_event(
+                    db,
+                    workspace_id,
+                    "task_retry_requested",
+                    "Task retry requested: {}".format(task.title),
+                    task_id=task.id,
+                    execution_run_id=previous_execution_run_id,
+                    payload=recovery,
+                )
                 result = _execute_factory_task(db, workspace, task, execution_mode)
+                completed_payload = dict(recovery)
+                completed_payload.update(
+                    {
+                        "result_status": result.get("status"),
+                        "new_status": result.get("task_status"),
+                    }
+                )
+                completed_event = _safe_create_factory_event(
+                    db,
+                    workspace_id,
+                    "task_retry_completed",
+                    "Task retry completed: {}".format(task.title),
+                    task_id=task.id,
+                    execution_run_id=result.get("execution_run_id"),
+                    payload=completed_payload,
+                )
                 response = {
                     "status": result.get("status"),
                     "task_id": task.id,
@@ -2067,6 +2264,12 @@ class NexusDashboard:
                     "execution_time": result.get("execution_time"),
                     "token_usage": result.get("token_usage", {}),
                     "message": result.get("message", "Retry completed."),
+                    "recovery": recovery,
+                    "recovery_events": [
+                        serialize_factory_event(event)
+                        for event in (requested_event, completed_event)
+                        if event is not None
+                    ],
                 }
                 return jsonify(response), int(result.get("status_code") or 200)
             except Exception:
@@ -2462,8 +2665,14 @@ class NexusDashboard:
                 ), 403
 
             workspace_id = payload.get("workspace_id")
+            reason = payload.get("reason")
+            operator_note = payload.get("operator_note")
             if not isinstance(workspace_id, int) or isinstance(workspace_id, bool):
                 return jsonify({"status": "error", "message": "Valid workspace_id is required."}), 400
+            if reason is not None and not isinstance(reason, str):
+                return jsonify({"status": "error", "message": "reason must be a string."}), 400
+            if operator_note is not None and not isinstance(operator_note, str):
+                return jsonify({"status": "error", "message": "operator_note must be a string."}), 400
             active_workspace_id = get_workspace_id(self.engine.target_dir)
             if workspace_id != active_workspace_id:
                 return jsonify({"status": "error", "message": "Workspace is not active."}), 403
@@ -2507,6 +2716,7 @@ class NexusDashboard:
                 work_packet = db.get(WorkPacket, work_packet_id)
                 if work_packet is None or work_packet.workspace_id != workspace_id:
                     return jsonify({"status": "error", "message": "Work packet not found."}), 404
+                previous_packet_status = work_packet.status
 
                 packet_links = (
                     db.execute(
@@ -2533,6 +2743,15 @@ class NexusDashboard:
                     or (task.status or "").lower() in unfinished_statuses
                 ]
                 if not run_tasks:
+                    recovery = _recovery_payload(
+                        "continue_packet",
+                        previous_status=previous_packet_status,
+                        operator_note=operator_note,
+                        reason=reason,
+                        work_packet_id=work_packet_id,
+                        execution_mode=execution_mode,
+                        remaining_task_count=0,
+                    )
                     return jsonify(
                         {
                             "status": "success",
@@ -2544,9 +2763,19 @@ class NexusDashboard:
                             "execution_run_ids": [],
                             "events_created": 0,
                             "message": "No unfinished packet tasks found.",
+                            "recovery": recovery,
                         }
                     )
 
+                recovery = _recovery_payload(
+                    "continue_packet",
+                    previous_status=previous_packet_status,
+                    operator_note=operator_note,
+                    reason=reason,
+                    work_packet_id=work_packet_id,
+                    execution_mode=execution_mode,
+                    remaining_task_count=len(run_tasks),
+                )
                 work_packet.status = "running"
                 work_packet.started_at = work_packet.started_at or datetime.now(timezone.utc)
                 _safe_db_commit(db)
@@ -2560,7 +2789,7 @@ class NexusDashboard:
                     "packet_run_continued",
                     "Packet run continued: {}".format(work_packet.title),
                     work_packet_id=work_packet_id,
-                    payload={"remaining_task_count": len(run_tasks), "execution_mode": execution_mode},
+                    payload=recovery,
                 )
                 events_created += 1 if event is not None else 0
 
@@ -2701,6 +2930,7 @@ class NexusDashboard:
                         "execution_run_ids": execution_run_ids,
                         "events_created": events_created,
                         "message": message,
+                        "recovery": recovery,
                     }
                 ), status_code
             except Exception:

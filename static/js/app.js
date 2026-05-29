@@ -399,6 +399,9 @@ window.NexusApp = {
                     <span class="factory-status-badge factory-status-pass">clear</span>
                 </div>
                 <div class="text-secondary small">No failed execution run in the recent factory window.</div>
+                <div id="factory-run-detail-panel" class="factory-run-detail-panel mt-3">
+                    <div class="text-secondary small">Select a failed run to view recovery audit details.</div>
+                </div>
             `;
             return;
         }
@@ -432,6 +435,8 @@ window.NexusApp = {
                 </div>
             </div>
             <pre class="factory-recovery-preview">${this.escapeHtml(preview || "No stderr/stdout preview.")}</pre>
+            <label class="factory-recovery-note-label" for="factory-recovery-note">Operator note</label>
+            <textarea id="factory-recovery-note" class="form-control form-control-sm factory-recovery-note" rows="2" placeholder="Add context for retry, review, or packet continue."></textarea>
             <div class="d-flex gap-2 flex-wrap">
                 <button type="button" class="btn btn-outline-secondary btn-sm" onclick="NexusApp.viewFactoryRunDetails(${Number(failedRun.id) || 0})">View Run Details</button>
                 ${failedRun.task_id ? `<button type="button" class="btn btn-outline-warning btn-sm" onclick="NexusApp.markTaskReviewRequired(${Number(failedRun.task_id) || 0})">Mark Review Required</button>` : ""}
@@ -440,6 +445,103 @@ window.NexusApp = {
             </div>
             <div class="factory-recovery-warning mt-2">
                 Retry runs only this task. Continue runs only this packet from the first unfinished task.
+            </div>
+            <div id="factory-run-detail-panel" class="factory-run-detail-panel mt-3">
+                <div class="text-secondary small">View Run Details opens stdout, stderr, changed files, and recovery notes here.</div>
+            </div>
+        `;
+    },
+
+    recoveryOperatorNote() {
+        const input = document.getElementById("factory-recovery-note");
+        return input ? input.value.trim() : "";
+    },
+
+    renderFactoryRunDetails(data) {
+        const target = document.getElementById("factory-run-detail-panel");
+        if (!target) return;
+        const run = data?.run || {};
+        const task = data?.task || {};
+        const changedFiles = Array.isArray(data?.changed_files) ? data.changed_files : [];
+        const recoveryEvents = Array.isArray(data?.recovery_events) ? data.recovery_events : [];
+        const relatedEvents = Array.isArray(data?.related_events) ? data.related_events : [];
+        const latestNote = data?.latest_recovery_note || {};
+        const latestFailure = data?.latest_failure_event || {};
+        const stdout = data?.stdout_preview || run.stdout || "";
+        const stderr = data?.stderr_preview || run.stderr || run.error_message || "";
+        const tokenText = run.total_tokens !== null && run.total_tokens !== undefined ? run.total_tokens : "-";
+        const costText = run.estimated_cost_usd !== null && run.estimated_cost_usd !== undefined
+            ? `$${Number(run.estimated_cost_usd).toFixed(6)}`
+            : "-";
+
+        target.innerHTML = `
+            <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-3">
+                <h5 class="h6 fw-semibold mb-0">Run Detail Panel</h5>
+                <span class="factory-status-badge ${this.factoryStatusClass(run.status)}">${this.escapeHtml(run.status || "unknown")}</span>
+            </div>
+            <div class="factory-run-detail-grid">
+                <div><span>Status</span><strong>${this.escapeHtml(run.status || "-")}</strong></div>
+                <div><span>Returncode</span><strong>${this.escapeHtml(run.returncode ?? "-")}</strong></div>
+                <div><span>Tokens</span><strong>${this.escapeHtml(tokenText)}</strong></div>
+                <div><span>Cost</span><strong>${this.escapeHtml(costText)}</strong></div>
+                <div><span>Duration</span><strong>${this.escapeHtml(this.formatFactoryDuration(run.duration_seconds))}</strong></div>
+                <div><span>Task</span><strong>${this.escapeHtml(task.title || (task.id ? `#${task.id}` : "-"))}</strong></div>
+            </div>
+            ${latestFailure?.event_type ? `
+                <div class="factory-recovery-warning mt-3">
+                    Previous failure context: ${this.escapeHtml(latestFailure.event_type)} ${latestFailure.message ? `- ${this.escapeHtml(latestFailure.message)}` : ""}
+                </div>
+            ` : ""}
+            ${latestNote?.note ? `
+                <div class="factory-recovery-note-view mt-3">
+                    <div class="factory-summary-label">Latest recovery note</div>
+                    <div>${this.escapeHtml(latestNote.note)}</div>
+                    <div class="factory-event-meta">
+                        ${this.escapeHtml(latestNote.action || "recovery")} ${latestNote.previous_status ? `from ${this.escapeHtml(latestNote.previous_status)}` : ""}
+                    </div>
+                </div>
+            ` : ""}
+            <div class="mt-3">
+                <div class="factory-summary-label">Changed files</div>
+                ${changedFiles.length ? `
+                    <ul class="factory-changed-files mb-0">
+                        ${changedFiles.map((file) => `
+                            <li class="factory-changed-file">
+                                <span class="factory-file-status">${this.escapeHtml(file.change_type || file.status || "?")}</span>
+                                <span>${this.escapeHtml(file.file_path || file.path || "")}</span>
+                            </li>
+                        `).join("")}
+                    </ul>
+                ` : `<div class="text-secondary small">No changed files recorded for this run.</div>`}
+            </div>
+            <div class="factory-run-output-grid mt-3">
+                <div>
+                    <div class="factory-summary-label">stdout preview</div>
+                    <pre class="factory-run-output">${this.escapeHtml(stdout || "No stdout captured.")}</pre>
+                </div>
+                <div>
+                    <div class="factory-summary-label">stderr preview</div>
+                    <pre class="factory-run-output">${this.escapeHtml(stderr || "No stderr captured.")}</pre>
+                </div>
+            </div>
+            <div class="mt-3">
+                <div class="factory-summary-label">Related recovery events</div>
+                ${recoveryEvents.length ? recoveryEvents.slice(0, 8).map((event) => {
+                    const payload = event.payload || {};
+                    const note = payload.operator_note || payload.reason || "";
+                    const previous = payload.previous_status ? `from ${payload.previous_status}` : "";
+                    return `
+                        <div class="factory-run-event">
+                            <strong>${this.escapeHtml(event.event_type || "event")}</strong>
+                            <span>${this.escapeHtml(payload.action || "")} ${this.escapeHtml(previous)}</span>
+                            ${note ? `<div>${this.escapeHtml(note)}</div>` : ""}
+                        </div>
+                    `;
+                }).join("") : `<div class="text-secondary small">No recovery notes recorded for this run.</div>`}
+            </div>
+            <div class="mt-3">
+                <div class="factory-summary-label">Related events</div>
+                <div class="factory-event-meta">${this.escapeHtml(relatedEvents.length)} event(s) linked to this task/run.</div>
             </div>
         `;
     },
@@ -452,8 +554,8 @@ window.NexusApp = {
             if (!response.ok || data.status !== "success") {
                 throw new Error(data.message || "Unable to load run details.");
             }
-            const stderr = data?.run?.stderr || data?.run?.error_message || data?.run?.stdout || "No output captured.";
-            NexusCore.showToast(`Run ${runId}: ${String(stderr).slice(0, 180)}`, data?.run?.status === "success" ? "success" : "primary");
+            this.renderFactoryRunDetails(data);
+            NexusCore.showToast(`Run ${runId} details loaded.`, data?.run?.status === "success" ? "success" : "primary");
         } catch (error) {
             NexusCore.showToast(`Run details error: ${error.message}`, "error");
         }
@@ -468,6 +570,7 @@ window.NexusApp = {
                 body: JSON.stringify({
                     workspace_id: NexusState.currentWorkspaceId,
                     reason: "Marked review required from Factory Console recovery panel.",
+                    operator_note: this.recoveryOperatorNote(),
                 }),
             });
             const data = await response.json();
@@ -488,7 +591,11 @@ window.NexusApp = {
             const response = await fetch(`/api/tasks/${taskId}/retry-one`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ workspace_id: NexusState.currentWorkspaceId }),
+                body: JSON.stringify({
+                    workspace_id: NexusState.currentWorkspaceId,
+                    operator_note: this.recoveryOperatorNote(),
+                    reason: "Retry requested from Factory Console recovery panel.",
+                }),
             });
             const data = await response.json();
             if (!response.ok || !["success", "failed", "timeout"].includes(data.status)) {
@@ -511,7 +618,11 @@ window.NexusApp = {
             const response = await fetch(`/api/work-packets/${workPacketId}/continue`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ workspace_id: NexusState.currentWorkspaceId }),
+                body: JSON.stringify({
+                    workspace_id: NexusState.currentWorkspaceId,
+                    operator_note: this.recoveryOperatorNote(),
+                    reason: "Continue requested from Factory Console recovery panel.",
+                }),
             });
             const data = await response.json();
             if (!response.ok || !["success", "failed"].includes(data.status)) {
@@ -811,9 +922,16 @@ window.NexusApp = {
         events.slice(0, 10).forEach((event) => {
             const item = document.createElement("div");
             item.className = "factory-event-item";
+            const payload = event.payload || {};
             const linkedIds = [
                 event.task_id ? `task ${event.task_id}` : "",
                 event.execution_run_id ? `run ${event.execution_run_id}` : "",
+            ].filter(Boolean).join(" | ");
+            const recoveryNote = payload.operator_note || payload.reason || "";
+            const actionMeta = [
+                payload.action ? `action ${payload.action}` : "",
+                payload.previous_status ? `previous ${payload.previous_status}` : "",
+                payload.triggered_by ? `by ${payload.triggered_by}` : "",
             ].filter(Boolean).join(" | ");
             item.innerHTML = `
                 <div class="factory-event-icon"><i class="bi ${this.escapeHtml(this.factoryEventIcon(event.event_type))}"></i></div>
@@ -824,6 +942,8 @@ window.NexusApp = {
                     </div>
                     <div class="factory-event-message">${this.escapeHtml(event.message || "")}</div>
                     ${linkedIds ? `<div class="factory-event-meta">${this.escapeHtml(linkedIds)}</div>` : ""}
+                    ${actionMeta ? `<div class="factory-event-meta">${this.escapeHtml(actionMeta)}</div>` : ""}
+                    ${recoveryNote ? `<div class="factory-event-note">Recovery note: ${this.escapeHtml(recoveryNote)}</div>` : ""}
                 </div>
             `;
             list.appendChild(item);
