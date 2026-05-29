@@ -54,6 +54,24 @@ def main():
     )
     pass_line("manual mode disables automatic analysis")
 
+    engine.settings = {"execution_mode": "one_task"}
+    one_task_status = engine.automatic_analysis_status()
+    one_task_public = engine.public_settings()
+    checks.append(engine.get_execution_mode() == "one_task" or fail("one_task mode not returned"))
+    checks.append(
+        engine.is_automatic_analysis_enabled() is False
+        or fail("one_task mode enables automatic analysis")
+    )
+    checks.append(
+        one_task_status.get("automatic_analysis_enabled") is False
+        or fail("one_task status enables automatic analysis")
+    )
+    checks.append(
+        one_task_public.get("automatic_analysis_enabled") is False
+        or fail("one_task public settings enables automatic analysis")
+    )
+    pass_line("one_task mode disables automatic analysis")
+
     engine.settings = {"execution_mode": "autopilot"}
     autopilot_status = engine.automatic_analysis_status()
     autopilot_public = engine.public_settings()

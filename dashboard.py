@@ -577,6 +577,28 @@ def bind_cto_chat_session(workspace_id):
         db_context.close()
 
 
+def extract_first_codex_command_from_text(text):
+    if not isinstance(text, str) or not text:
+        return None
+
+    try:
+        commands = extract_codex_commands(text)
+    except Exception:
+        return None
+
+    return commands[0] if commands else None
+
+
+def _prompt_from_codex_command(command):
+    try:
+        arguments = shlex.split(command or "")
+    except ValueError:
+        return None
+    if len(arguments) != 2 or arguments[0] != "codex":
+        return None
+    return arguments[1]
+
+
 class AutonomousQueue:
     POLL_INTERVAL_SECONDS = 2
     COMPLETION_TIMEOUT_SECONDS = 120
@@ -1247,6 +1269,122 @@ class NexusDashboard:
             finally:
                 db_context.close()
 
+        @self.app.route("/api/tasks/run-one", methods=["POST"])
+        def run_one_task():
+            payload = request.get_json(silent=True)
+            if not isinstance(payload, dict):
+                return jsonify({"status": "error", "message": "JSON object is required."}), 400
+
+            execution_mode = self.engine.get_execution_mode()
+            if execution_mode != "one_task":
+                return jsonify(
+                    {
+                        "status": "error",
+                        "message": "Run One requires execution mode one_task.",
+                        "execution_mode": execution_mode,
+                    }
+                ), 403
+
+            workspace_id = payload.get("workspace_id")
+            task_id = payload.get("task_id")
+            if not isinstance(workspace_id, int) or isinstance(workspace_id, bool):
+                return jsonify({"status": "error", "message": "Valid workspace_id is required."}), 400
+            if not isinstance(task_id, int) or isinstance(task_id, bool):
+                return jsonify({"status": "error", "message": "Valid task_id is required."}), 400
+
+            active_workspace_id = get_workspace_id(self.engine.target_dir)
+            if workspace_id != active_workspace_id:
+                return jsonify({"status": "error", "message": "Workspace is not active."}), 403
+
+            db_context = get_db()
+            db = next(db_context)
+            try:
+                workspace = db.get(Workspace, workspace_id)
+                if workspace is None:
+                    return jsonify({"status": "error", "message": "Workspace not found."}), 400
+
+                task = db.get(Task, task_id)
+                if task is None or task.workspace_id != workspace_id:
+                    return jsonify({"status": "error", "message": "Task not found."}), 404
+
+                workspace_path = os.path.abspath(workspace.local_path)
+                task_description = task.description or ""
+            finally:
+                db_context.close()
+
+            if not os.path.isdir(workspace_path):
+                return jsonify({"status": "error", "message": "Workspace directory not found."}), 400
+
+            commands = extract_codex_commands(task_description)
+            if len(commands) != 1:
+                return jsonify(
+                    {
+                        "status": "error",
+                        "message": "Task description must contain exactly one codex command.",
+                    }
+                ), 400
+
+            command_prompt = _prompt_from_codex_command(commands[0])
+            if command_prompt is None or not command_prompt.strip():
+                return jsonify({"status": "error", "message": "Task codex command is invalid."}), 400
+
+            try:
+                codex_result = CodexRunner(timeout_factory=calculate_prompt_timeout).run(
+                    command_prompt,
+                    workspace_path,
+                    task_id=task_id,
+                )
+            except OSError as exception:
+                return jsonify(
+                    {
+                        "status": "failed",
+                        "stdout": "",
+                        "stderr": str(exception),
+                        "returncode": -1,
+                        "timeout_seconds": 0,
+                        "execution_time": 0,
+                        "token_usage": {},
+                    }
+                ), 500
+
+            status = "success"
+            status_code = 200
+            if codex_result.status == "timeout":
+                status = "timeout"
+                status_code = 504
+            elif codex_result.returncode != 0:
+                status = "failed"
+                status_code = 500
+
+            token_usage = codex_result.token_usage or {}
+            if token_usage:
+                cost_event = {
+                    "source": "run_one",
+                    "provider": "codex",
+                    "model": "codex-cli",
+                    "task_id": task_id,
+                    "notes": "One-task Codex execution.",
+                }
+                for key in ("total_tokens", "input_tokens", "output_tokens"):
+                    if key in token_usage:
+                        cost_event[key] = token_usage.get(key)
+                try:
+                    append_cost_event(workspace_path, cost_event)
+                except OSError:
+                    pass
+
+            return jsonify(
+                {
+                    "status": status,
+                    "stdout": codex_result.stdout,
+                    "stderr": codex_result.stderr,
+                    "returncode": codex_result.returncode,
+                    "timeout_seconds": codex_result.timeout_seconds,
+                    "execution_time": codex_result.execution_time,
+                    "token_usage": token_usage,
+                }
+            ), status_code
+
         @self.app.route("/api/tasks/auto-run", methods=["POST"])
         def auto_run_tasks():
             payload = request.json or {}
@@ -1296,7 +1434,7 @@ class NexusDashboard:
                 {
                     "status": "success",
                     "execution_mode": current_mode,
-                    "allowed_modes": ["manual", "autopilot"],
+                    "allowed_modes": ["manual", "one_task", "autopilot"],
                     "autopilot_allowed": current_mode == "autopilot",
                     "automatic_analysis_enabled": self.engine.is_automatic_analysis_enabled(),
                 }
@@ -1310,7 +1448,7 @@ class NexusDashboard:
                 {
                     "status": "success",
                     "execution_mode": current_mode,
-                    "allowed_modes": ["manual", "autopilot"],
+                    "allowed_modes": ["manual", "one_task", "autopilot"],
                     "autopilot_allowed": current_mode == "autopilot",
                     "automatic_analysis_enabled": self.engine.is_automatic_analysis_enabled(),
                 }

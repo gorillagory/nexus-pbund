@@ -24,7 +24,7 @@ load_dotenv()
 
 LOGGER = logging.getLogger(__name__)
 
-ALLOWED_EXECUTION_MODES = {"manual", "autopilot"}
+ALLOWED_EXECUTION_MODES = {"manual", "one_task", "autopilot"}
 
 
 EXCLUDE_DIRS = {

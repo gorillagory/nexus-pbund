@@ -941,6 +941,7 @@ window.NexusApp = {
                                         <span id="execution-mode-indicator" class="badge text-bg-warning border">Manual Mode - Auto-Pilot and automatic analysis disabled</span>
                                         <div class="btn-group btn-group-sm" role="group" aria-label="Execution mode">
                                             <button id="execution-mode-manual-btn" type="button" class="btn btn-outline-secondary" onclick="NexusApp.setExecutionMode('manual')">Manual</button>
+                                            <button id="execution-mode-one-task-btn" type="button" class="btn btn-outline-secondary" onclick="NexusApp.setExecutionMode('one_task')">One Task</button>
                                             <button id="execution-mode-autopilot-btn" type="button" class="btn btn-outline-secondary" onclick="NexusApp.setExecutionMode('autopilot')">Auto-Pilot</button>
                                         </div>
                                     </div>
@@ -1473,6 +1474,17 @@ window.NexusApp = {
         const codexCommand = this.extractCodexCommand(task.description);
 
         if (codexCommand) {
+            if (this.executionMode === "one_task") {
+                const runOneButton = document.createElement("button");
+                runOneButton.type = "button";
+                runOneButton.className = "btn btn-primary btn-sm";
+                runOneButton.textContent = "Run One Task";
+                runOneButton.addEventListener("click", () => {
+                    this.runOneTask(task.id, runOneButton);
+                });
+                controls.appendChild(runOneButton);
+            }
+
             const copyButton = document.createElement("button");
             copyButton.type = "button";
             copyButton.className = "btn btn-outline-secondary btn-sm";
@@ -1508,6 +1520,49 @@ window.NexusApp = {
         }
 
         return card;
+    },
+
+    async runOneTask(taskId, button = null) {
+        if (this.executionMode !== "one_task") {
+            NexusCore.showToast("Run One Task is available only in One Task mode.", "error");
+            return;
+        }
+
+        if (!NexusState.currentWorkspaceId) {
+            NexusCore.showToast("Select an active workspace before running one task.", "error");
+            return;
+        }
+
+        const originalLabel = button ? button.textContent : "";
+        if (button) {
+            button.disabled = true;
+            button.textContent = "Running...";
+        }
+
+        try {
+            const response = await fetch("/api/tasks/run-one", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    workspace_id: NexusState.currentWorkspaceId,
+                    task_id: taskId,
+                }),
+            });
+            const data = await response.json();
+            if (!response.ok || data.status !== "success") {
+                throw new Error(data.stderr || data.message || `Task run ended with status ${data.status || "failed"}.`);
+            }
+
+            NexusCore.showToast("Run One Task completed successfully.", "success");
+        } catch (error) {
+            NexusCore.showToast(`Run One Task failed: ${error.message}`, "error");
+        } finally {
+            if (button) {
+                button.disabled = false;
+                button.textContent = originalLabel || "Run One Task";
+            }
+            await this.loadCostLedger();
+        }
     },
 
     async advanceTask(taskId, status) {
@@ -1560,6 +1615,9 @@ window.NexusApp = {
             this.automaticAnalysisEnabled = Boolean(data.automatic_analysis_enabled);
             this.renderExecutionMode();
             this.updateAutoPilotUI();
+            if (NexusState.currentTab === "board") {
+                this.renderTasks(NexusState.tasks);
+            }
         } catch (error) {
             NexusCore.showToast(`Error: ${error.message}`, "error");
         }
@@ -1581,10 +1639,15 @@ window.NexusApp = {
             this.automaticAnalysisEnabled = Boolean(data.automatic_analysis_enabled);
             this.renderExecutionMode();
             this.updateAutoPilotUI();
+            if (NexusState.currentTab === "board") {
+                this.renderTasks(NexusState.tasks);
+            }
             NexusCore.showToast(
                 this.executionMode === "autopilot"
                     ? "Execution mode set to Auto-Pilot."
-                    : "Execution mode set to Manual.",
+                    : (this.executionMode === "one_task"
+                        ? "Execution mode set to One Task."
+                        : "Execution mode set to Manual."),
                 "success",
             );
         } catch (error) {
@@ -1594,12 +1657,15 @@ window.NexusApp = {
 
     renderExecutionMode() {
         const isAutoPilot = this.executionMode === "autopilot";
+        const isOneTask = this.executionMode === "one_task";
         const label = isAutoPilot
             ? "Auto-Pilot Mode - automatic analysis enabled"
-            : "Manual Mode - Auto-Pilot and automatic analysis disabled";
+            : (isOneTask
+                ? "One Task Mode - run a single selected Codex task"
+                : "Manual Mode - Auto-Pilot and automatic analysis disabled");
         const indicatorClass = isAutoPilot
             ? "badge text-bg-primary border"
-            : "badge text-bg-warning border";
+            : (isOneTask ? "badge text-bg-info border" : "badge text-bg-warning border");
 
         ["execution-mode-indicator", "execution-mode-header"].forEach((id) => {
             const indicator = document.getElementById(id);
@@ -1611,11 +1677,17 @@ window.NexusApp = {
         });
 
         const manualButton = document.getElementById("execution-mode-manual-btn");
+        const oneTaskButton = document.getElementById("execution-mode-one-task-btn");
         const autoPilotButton = document.getElementById("execution-mode-autopilot-btn");
         if (manualButton) {
-            manualButton.className = isAutoPilot
-                ? "btn btn-outline-secondary"
-                : "btn btn-warning";
+            manualButton.className = this.executionMode === "manual"
+                ? "btn btn-warning"
+                : "btn btn-outline-secondary";
+        }
+        if (oneTaskButton) {
+            oneTaskButton.className = isOneTask
+                ? "btn btn-info"
+                : "btn btn-outline-secondary";
         }
         if (autoPilotButton) {
             autoPilotButton.className = isAutoPilot
@@ -1633,7 +1705,9 @@ window.NexusApp = {
         if (this.executionMode !== "autopilot") {
             button.disabled = true;
             button.className = "btn btn-outline-secondary btn-sm";
-            button.innerHTML = "Auto-Pilot Disabled in Manual Mode";
+            button.innerHTML = this.executionMode === "one_task"
+                ? "Auto-Pilot Disabled in One Task Mode"
+                : "Auto-Pilot Disabled in Manual Mode";
             return;
         }
 
