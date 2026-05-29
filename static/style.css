@@ -831,14 +831,17 @@ pre {
 }
 
 .prompt-vault-panel,
-.prompt-vault-detail {
+.prompt-vault-detail,
+.orchestration-inbox-panel,
+.orchestration-inbox-detail {
     background: #fff;
     border: 1px solid #e6edf5;
     border-radius: 8px;
     padding: 1rem;
 }
 
-.prompt-vault-list {
+.prompt-vault-list,
+.orchestration-inbox-list {
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
@@ -846,7 +849,8 @@ pre {
     overflow: auto;
 }
 
-.prompt-vault-list-item {
+.prompt-vault-list-item,
+.orchestration-inbox-list-item {
     background: #f8fafc;
     border: 1px solid #edf2f7;
     border-radius: 8px;
@@ -859,19 +863,23 @@ pre {
 }
 
 .prompt-vault-list-item:hover,
-.prompt-vault-list-item:focus {
+.prompt-vault-list-item:focus,
+.orchestration-inbox-list-item:hover,
+.orchestration-inbox-list-item:focus {
     border-color: #0d6efd;
     outline: none;
 }
 
-.prompt-vault-list-title {
+.prompt-vault-list-title,
+.orchestration-inbox-list-title {
     font-weight: 700;
     overflow-wrap: anywhere;
 }
 
 .prompt-vault-list-meta,
 .prompt-vault-tags,
-.prompt-vault-template-stats {
+.prompt-vault-template-stats,
+.orchestration-inbox-list-meta {
     display: flex;
     flex-wrap: wrap;
     gap: 0.4rem;
@@ -902,6 +910,30 @@ pre {
 }
 
 .prompt-vault-risk-high {
+    background: #fdecec;
+    border-color: #f6caca;
+    color: #9f1239;
+}
+
+.orchestration-inbox-priority-low {
+    background: #eef7ff;
+    border-color: #cfe8ff;
+    color: #075985;
+}
+
+.orchestration-inbox-priority-normal {
+    background: #eef4ff;
+    border-color: #dbe8ff;
+    color: #1d4ed8;
+}
+
+.orchestration-inbox-priority-high {
+    background: #fff8e1;
+    border-color: #f7df8f;
+    color: #795600;
+}
+
+.orchestration-inbox-priority-urgent {
     background: #fdecec;
     border-color: #f6caca;
     color: #9f1239;

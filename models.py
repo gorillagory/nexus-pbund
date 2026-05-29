@@ -139,6 +139,26 @@ class PromptTemplate(Base):
     updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
+class OrchestrationInboxItem(Base):
+    __tablename__ = "orchestration_inbox_items"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    workspace_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("workspaces.id"), nullable=False
+    )
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    raw_intent: Mapped[str] = mapped_column(Text, nullable=False)
+    source: Mapped[str] = mapped_column(String(64), nullable=False, default="manual", server_default="manual")
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="captured", server_default="captured")
+    priority: Mapped[str] = mapped_column(String(32), nullable=False, default="normal", server_default="normal")
+    category: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    triage_notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
 class WorkPacket(Base):
     __tablename__ = "work_packets"
 

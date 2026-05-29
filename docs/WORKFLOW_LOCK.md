@@ -4,7 +4,9 @@ Nexus is currently operating as a supervised factory. The locked workflow keeps 
 
 ## Idea Capture
 
-Capture raw ideas in the dashboard, chat, prompt vault, or a future inbox. Do not execute from capture. Every idea must become a scoped task, work packet, document update, or explicit discard.
+Capture raw ideas in the Orchestration Inbox before they become work. Do not execute from capture. Every idea must become a scoped task, work packet, document update, or explicit discard.
+
+Packet 022 added the Orchestration Inbox foundation for manual capture and later triage. The inbox is supervised only: it stores raw intent, priority, category, status, and triage notes without calling Codex, task execution, packet execution, or Auto-Pilot routes.
 
 ## Triage
 

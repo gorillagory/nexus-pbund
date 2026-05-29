@@ -87,6 +87,18 @@ FACTORY_COLUMNS = {
         ("created_at", "TIMESTAMP WITH TIME ZONE"),
         ("updated_at", "TIMESTAMP WITH TIME ZONE"),
     ],
+    "orchestration_inbox_items": [
+        ("workspace_id", "INTEGER"),
+        ("title", "VARCHAR(255)"),
+        ("raw_intent", "TEXT"),
+        ("source", "VARCHAR(64)"),
+        ("status", "VARCHAR(32)"),
+        ("priority", "VARCHAR(32)"),
+        ("category", "VARCHAR(64)"),
+        ("triage_notes", "TEXT"),
+        ("created_at", "TIMESTAMP WITH TIME ZONE"),
+        ("updated_at", "TIMESTAMP WITH TIME ZONE"),
+    ],
 }
 
 

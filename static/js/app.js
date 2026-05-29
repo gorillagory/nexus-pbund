@@ -38,6 +38,8 @@ window.NexusApp = {
     latestFactoryConsole: null,
     latestPreflightStatus: null,
     latestCiStatus: null,
+    orchestrationInboxItems: [],
+    selectedOrchestrationInboxItem: null,
     promptVaultTemplates: [],
     selectedPromptTemplate: null,
 
@@ -46,6 +48,7 @@ window.NexusApp = {
             arch: "explorer",
             chat: "chat",
             board: "board",
+            inbox: "orchestration-inbox",
             prompts: "prompt-vault",
             history: "history",
             canvas: "canvas",
@@ -61,6 +64,7 @@ window.NexusApp = {
             explorer: "arch",
             chat: "chat",
             board: "board",
+            "orchestration-inbox": "inbox",
             "prompt-vault": "prompts",
             history: "history",
             canvas: "canvas",
@@ -72,6 +76,7 @@ window.NexusApp = {
             explorer: "File Explorer",
             chat: "CTO Copilot",
             board: "Orchestration Board",
+            "orchestration-inbox": "Orchestration Inbox",
             "prompt-vault": "Prompt Vault",
             history: "Project History",
             canvas: "Architecture Canvas",
@@ -108,6 +113,11 @@ window.NexusApp = {
         if (tab === "board") {
             this.renderBoard();
             this.loadAutoPilotStatus();
+            return;
+        }
+
+        if (tab === "inbox") {
+            this.loadOrchestrationInboxItems();
             return;
         }
 
@@ -2390,6 +2400,195 @@ window.NexusApp = {
             }
         } finally {
             document.body.removeChild(textarea);
+        }
+    },
+
+    async loadOrchestrationInboxItems() {
+        const list = document.getElementById("orchestration-inbox-list");
+        const filter = document.getElementById("orchestration-inbox-status-filter");
+        const status = filter ? filter.value : "";
+        if (list) {
+            list.textContent = "Loading Orchestration Inbox items...";
+        }
+        try {
+            const query = status ? `?status=${encodeURIComponent(status)}` : "";
+            const response = await fetch(`/api/orchestration-inbox/items${query}`);
+            const data = await response.json();
+            if (!response.ok || data.status !== "success") {
+                throw new Error(data.message || "Unable to load inbox items.");
+            }
+            this.orchestrationInboxItems = Array.isArray(data.items) ? data.items : [];
+            this.renderOrchestrationInboxList();
+            const selectedId = this.selectedOrchestrationInboxItem?.id;
+            const selected = this.orchestrationInboxItems.find((item) => Number(item.id) === Number(selectedId))
+                || this.orchestrationInboxItems[0]
+                || null;
+            this.renderOrchestrationInboxDetail(selected);
+        } catch (error) {
+            if (list) {
+                list.textContent = `Orchestration Inbox unavailable: ${error.message}`;
+            }
+            NexusCore.showToast(`Inbox error: ${error.message}`, "error");
+        }
+    },
+
+    renderOrchestrationInboxList() {
+        const list = document.getElementById("orchestration-inbox-list");
+        const count = document.getElementById("orchestration-inbox-count");
+        if (count) {
+            count.textContent = String(this.orchestrationInboxItems.length);
+        }
+        if (!list) return;
+        if (!this.orchestrationInboxItems.length) {
+            list.innerHTML = '<div class="text-secondary small">No inbox items match this filter.</div>';
+            return;
+        }
+        list.innerHTML = this.orchestrationInboxItems.map((item) => `
+            <button type="button" class="orchestration-inbox-list-item" onclick="NexusApp.selectOrchestrationInboxItem(${Number(item.id) || 0})">
+                <span class="orchestration-inbox-list-title">${this.escapeHtml(item.title || "Untitled")}</span>
+                <span class="orchestration-inbox-list-meta">
+                    <span class="prompt-vault-badge">${this.escapeHtml(item.status || "captured")}</span>
+                    <span class="prompt-vault-badge orchestration-inbox-priority-${this.escapeHtml(item.priority || "normal")}">${this.escapeHtml(item.priority || "normal")}</span>
+                    ${item.category ? `<span class="prompt-vault-badge">${this.escapeHtml(item.category)}</span>` : ""}
+                </span>
+                <span class="text-secondary small">${this.escapeHtml(this.formatFactoryTime(item.created_at))}</span>
+            </button>
+        `).join("");
+    },
+
+    selectOrchestrationInboxItem(itemId) {
+        const item = this.orchestrationInboxItems.find((candidate) => Number(candidate.id) === Number(itemId));
+        this.renderOrchestrationInboxDetail(item || null);
+    },
+
+    renderOrchestrationInboxDetail(item) {
+        this.selectedOrchestrationInboxItem = item || null;
+        const emptyState = document.getElementById("orchestration-inbox-empty");
+        const form = document.getElementById("orchestration-inbox-triage-form");
+        const meta = document.getElementById("orchestration-inbox-detail-meta");
+        if (!form || !emptyState) return;
+
+        if (!item) {
+            emptyState.classList.remove("d-none");
+            form.classList.add("d-none");
+            return;
+        }
+
+        emptyState.classList.add("d-none");
+        form.classList.remove("d-none");
+        document.getElementById("orchestration-inbox-item-id").value = item.id || "";
+        document.getElementById("orchestration-inbox-triage-title").value = item.title || "";
+        document.getElementById("orchestration-inbox-triage-raw-intent").value = item.raw_intent || "";
+        document.getElementById("orchestration-inbox-triage-status").value = item.status || "captured";
+        document.getElementById("orchestration-inbox-triage-priority").value = item.priority || "normal";
+        document.getElementById("orchestration-inbox-triage-category").value = item.category || "";
+        document.getElementById("orchestration-inbox-triage-notes").value = item.triage_notes || "";
+        if (meta) {
+            meta.textContent = `Source ${item.source || "manual"} | Created ${this.formatFactoryTime(item.created_at)} | Updated ${this.formatFactoryTime(item.updated_at)}`;
+        }
+    },
+
+    orchestrationInboxCaptureData() {
+        return {
+            title: document.getElementById("orchestration-inbox-title")?.value || "",
+            raw_intent: document.getElementById("orchestration-inbox-raw-intent")?.value || "",
+            source: "manual",
+            status: "captured",
+            priority: document.getElementById("orchestration-inbox-priority")?.value || "normal",
+            category: document.getElementById("orchestration-inbox-category")?.value || "",
+        };
+    },
+
+    async captureOrchestrationInboxItem() {
+        const button = document.getElementById("orchestration-inbox-capture-button");
+        const originalLabel = button?.textContent;
+        if (button) {
+            button.disabled = true;
+            button.textContent = "Capturing...";
+        }
+        try {
+            const response = await fetch("/api/orchestration-inbox/items", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(this.orchestrationInboxCaptureData()),
+            });
+            const payload = await response.json();
+            if (!response.ok || payload.status !== "success") {
+                throw new Error(payload.message || "Unable to capture inbox item.");
+            }
+            document.getElementById("orchestration-inbox-capture-form")?.reset();
+            await this.loadOrchestrationInboxItems();
+            this.renderOrchestrationInboxDetail(payload.item);
+            NexusCore.showToast("Idea captured in Orchestration Inbox.", "success");
+        } catch (error) {
+            NexusCore.showToast(`Capture error: ${error.message}`, "error");
+        } finally {
+            if (button) {
+                button.disabled = false;
+                button.textContent = originalLabel || "Capture Idea";
+            }
+        }
+    },
+
+    orchestrationInboxTriageData() {
+        return {
+            title: document.getElementById("orchestration-inbox-triage-title")?.value || "",
+            raw_intent: document.getElementById("orchestration-inbox-triage-raw-intent")?.value || "",
+            status: document.getElementById("orchestration-inbox-triage-status")?.value || "captured",
+            priority: document.getElementById("orchestration-inbox-triage-priority")?.value || "normal",
+            category: document.getElementById("orchestration-inbox-triage-category")?.value || "",
+            triage_notes: document.getElementById("orchestration-inbox-triage-notes")?.value || "",
+        };
+    },
+
+    async updateSelectedOrchestrationInboxItem() {
+        const itemId = this.selectedOrchestrationInboxItem?.id;
+        if (!itemId) return;
+        try {
+            const response = await fetch(`/api/orchestration-inbox/items/${itemId}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(this.orchestrationInboxTriageData()),
+            });
+            const payload = await response.json();
+            if (!response.ok || payload.status !== "success") {
+                throw new Error(payload.message || "Unable to update inbox item.");
+            }
+            await this.loadOrchestrationInboxItems();
+            this.renderOrchestrationInboxDetail(payload.item);
+            NexusCore.showToast("Inbox item updated.", "success");
+        } catch (error) {
+            NexusCore.showToast(`Triage error: ${error.message}`, "error");
+        }
+    },
+
+    async discardSelectedOrchestrationInboxItem() {
+        const itemId = this.selectedOrchestrationInboxItem?.id;
+        if (!itemId) return;
+        if (!(await NexusCore.confirmAction("Discard this inbox item?", {
+            title: "Discard Inbox Item",
+            confirmLabel: "Discard",
+            variant: "warning",
+        }))) {
+            return;
+        }
+        try {
+            const response = await fetch(`/api/orchestration-inbox/items/${itemId}/discard`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    triage_notes: document.getElementById("orchestration-inbox-triage-notes")?.value || "",
+                }),
+            });
+            const payload = await response.json();
+            if (!response.ok || payload.status !== "success") {
+                throw new Error(payload.message || "Unable to discard inbox item.");
+            }
+            await this.loadOrchestrationInboxItems();
+            this.renderOrchestrationInboxDetail(payload.item);
+            NexusCore.showToast("Inbox item discarded.", "success");
+        } catch (error) {
+            NexusCore.showToast(`Discard error: ${error.message}`, "error");
         }
     },
 

@@ -2,9 +2,9 @@
 
 ## Current Baseline
 - Current branch: `main`
-- Current commit: `ee46a0c74ad278f01f2a5429eb3ce3e483c91b21`
-- Current commit summary: `ee46a0c add workflow lock and prompt vault`
-- Latest visible baseline tag: `nexus-workflow-lock-prompt-vault-baseline-2026-05-29`
+- Current commit at prior chat handoff: `208dbdbaecd646b013a590fae2db32d06daff408`
+- Prior chat handoff summary: `208dbdb add chat handoff for next session`
+- Latest visible baseline tag before Packet 022: `nexus-workflow-lock-prompt-vault-baseline-2026-05-29`
 - Recent visible baseline tags:
   - `nexus-workflow-lock-prompt-vault-baseline-2026-05-29`
   - `nexus-recovery-audit-baseline-2026-05-29`
@@ -22,6 +22,7 @@
 ## What Nexus Can Do Now
 - Work Packet Manager
 - Prompt Vault
+- Orchestration Inbox
 - Workflow Lock docs
 - Orchestration-ready workflow foundation
 - Supervised packet runner
@@ -77,7 +78,7 @@
 10. Baseline tag/push
 
 ## Current Roadmap
-- Packet 022 — Orchestration Inbox foundation
+- Packet 022 — Orchestration Inbox foundation complete
 - Packet 023 — Discord Event Router
 - Packet 024 — Git Explorer
 - Packet 025 — Branch Per Packet
@@ -109,4 +110,4 @@ Prefer one pasteable Codex operator prompt for local execution. Reduce manual co
 
 Keep the safety rails in this document. Do not force push, reset, clean, run destructive database operations, expose API keys, or start Auto-Pilot unless the user explicitly asks for that exact work.
 
-Start with Packet 022 — Orchestration Inbox foundation.
+Packet 022 adds the Orchestration Inbox foundation. After it is merged and tagged, continue with Packet 023 — Discord Event Router unless repo docs say otherwise.

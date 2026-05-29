@@ -27,6 +27,7 @@ from models import (
     FactoryEvent,
     Footprint,
     Message,
+    OrchestrationInboxItem,
     PromptTemplate,
     Task,
     UserProfile,
@@ -48,6 +49,14 @@ from src.services.factory_events import (
     summarize_factory_state,
 )
 from src.services.git_changes import summarize_git_changes
+from src.services.orchestration_inbox import (
+    create_inbox_item,
+    discard_inbox_item,
+    get_inbox_item,
+    list_inbox_items,
+    serialize_inbox_item,
+    update_inbox_item,
+)
 from src.services.prompt_vault import (
     archive_prompt_template,
     create_prompt_template,
@@ -1884,6 +1893,96 @@ class NexusDashboard:
                 ), 503
 
             return jsonify({"status": "success", "event": serialize_factory_event(event)}), 201
+
+        @self.app.route("/api/orchestration-inbox/items", methods=["GET"])
+        def get_orchestration_inbox_items():
+            status = request.args.get("status") or None
+            db_context = get_db()
+            db = next(db_context)
+            try:
+                workspace_id = get_workspace_id(self.engine.target_dir)
+                if workspace_id is None:
+                    return jsonify({"status": "error", "message": "Active workspace not found."}), 400
+                items = list_inbox_items(db, workspace_id, status=status)
+                return jsonify(
+                    {
+                        "status": "success",
+                        "items": [serialize_inbox_item(item) for item in items],
+                    }
+                )
+            except Exception as exception:
+                return jsonify({"status": "error", "message": "Orchestration Inbox unavailable: {}".format(exception)}), 503
+            finally:
+                db_context.close()
+
+        @self.app.route("/api/orchestration-inbox/items", methods=["POST"])
+        def post_orchestration_inbox_item():
+            payload = request.get_json(silent=True) or {}
+            if not isinstance(payload, dict):
+                return jsonify({"status": "error", "message": "JSON object is required."}), 400
+            db_context = get_db()
+            db = next(db_context)
+            try:
+                workspace_id = get_workspace_id(self.engine.target_dir)
+                if workspace_id is None:
+                    return jsonify({"status": "error", "message": "Active workspace not found."}), 400
+                item = create_inbox_item(db, workspace_id, payload)
+                return jsonify({"status": "success", "item": serialize_inbox_item(item)}), 201
+            except ValueError as exception:
+                db.rollback()
+                return jsonify({"status": "error", "message": str(exception)}), 400
+            except Exception as exception:
+                db.rollback()
+                return jsonify({"status": "error", "message": "Inbox item could not be captured: {}".format(exception)}), 503
+            finally:
+                db_context.close()
+
+        @self.app.route("/api/orchestration-inbox/items/<int:item_id>", methods=["PUT"])
+        def put_orchestration_inbox_item(item_id):
+            payload = request.get_json(silent=True) or {}
+            if not isinstance(payload, dict):
+                return jsonify({"status": "error", "message": "JSON object is required."}), 400
+            db_context = get_db()
+            db = next(db_context)
+            try:
+                workspace_id = get_workspace_id(self.engine.target_dir)
+                if workspace_id is None:
+                    return jsonify({"status": "error", "message": "Active workspace not found."}), 400
+                item = get_inbox_item(db, workspace_id, item_id)
+                if item is None:
+                    return jsonify({"status": "error", "message": "Inbox item not found."}), 404
+                item = update_inbox_item(db, item, payload)
+                return jsonify({"status": "success", "item": serialize_inbox_item(item)})
+            except ValueError as exception:
+                db.rollback()
+                return jsonify({"status": "error", "message": str(exception)}), 400
+            except Exception as exception:
+                db.rollback()
+                return jsonify({"status": "error", "message": "Inbox item could not be updated: {}".format(exception)}), 503
+            finally:
+                db_context.close()
+
+        @self.app.route("/api/orchestration-inbox/items/<int:item_id>/discard", methods=["POST"])
+        def discard_orchestration_inbox_item(item_id):
+            payload = request.get_json(silent=True) or {}
+            if not isinstance(payload, dict):
+                return jsonify({"status": "error", "message": "JSON object is required."}), 400
+            db_context = get_db()
+            db = next(db_context)
+            try:
+                workspace_id = get_workspace_id(self.engine.target_dir)
+                if workspace_id is None:
+                    return jsonify({"status": "error", "message": "Active workspace not found."}), 400
+                item = get_inbox_item(db, workspace_id, item_id)
+                if item is None:
+                    return jsonify({"status": "error", "message": "Inbox item not found."}), 404
+                item = discard_inbox_item(db, item, triage_notes=payload.get("triage_notes"))
+                return jsonify({"status": "success", "item": serialize_inbox_item(item)})
+            except Exception as exception:
+                db.rollback()
+                return jsonify({"status": "error", "message": "Inbox item could not be discarded: {}".format(exception)}), 503
+            finally:
+                db_context.close()
 
         @self.app.route("/api/prompt-vault/templates", methods=["GET"])
         def get_prompt_vault_templates():

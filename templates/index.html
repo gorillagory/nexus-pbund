@@ -321,6 +321,9 @@
                 <button type="button" id="tab-board-btn" class="nav-link text-start" onclick="NexusApp.showView('board')">
                     <i class="bi bi-kanban me-3"></i>Orchestration Board
                 </button>
+                <button type="button" id="tab-inbox-btn" class="nav-link text-start" onclick="NexusApp.showView('orchestration-inbox')">
+                    <i class="bi bi-inbox me-3"></i>Orchestration Inbox
+                </button>
                 <button type="button" id="tab-prompts-btn" class="nav-link text-start" onclick="NexusApp.showView('prompt-vault')">
                     <i class="bi bi-journal-text me-3"></i>Prompt Vault
                 </button>
@@ -618,6 +621,124 @@
                             <div id="cost-ledger-summary" class="small text-secondary mt-3">Open Board to load cost tracking.</div>
                         </div>
                         <span class="d-none">/api/work-packets/preview /api/work-packets/stage /api/work-packets/run Copy All Codex Commands Run Packet Supervised Packet Runner</span>
+                    </div>
+                </div>
+
+                <div id="view-orchestration-inbox" class="spa-view d-none">
+                    <div class="card bg-white border-0 shadow-sm">
+                        <div class="card-header bg-white border-bottom p-4 d-flex justify-content-between align-items-start gap-3 flex-wrap">
+                            <div>
+                                <h3 class="h5 mb-1 text-dark">Orchestration Inbox</h3>
+                                <p class="text-secondary mb-0">Capture raw intent for later triage. Capture only; no task, packet, Codex, or Auto-Pilot execution happens here.</p>
+                            </div>
+                            <button type="button" class="btn btn-outline-primary btn-sm" onclick="NexusApp.loadOrchestrationInboxItems()">
+                                <i class="bi bi-arrow-repeat me-2"></i>Refresh Inbox
+                            </button>
+                        </div>
+                        <div class="card-body p-4">
+                            <div class="row g-4">
+                                <div class="col-xl-4">
+                                    <form id="orchestration-inbox-capture-form" class="orchestration-inbox-panel mb-3" onsubmit="NexusApp.captureOrchestrationInboxItem(); return false;">
+                                        <h4 class="h6 fw-semibold mb-3">Capture Idea</h4>
+                                        <div class="mb-2">
+                                            <label for="orchestration-inbox-title" class="form-label small text-secondary mb-1">Title</label>
+                                            <input id="orchestration-inbox-title" class="form-control form-control-sm" maxlength="255" autocomplete="off" required>
+                                        </div>
+                                        <div class="mb-2">
+                                            <label for="orchestration-inbox-raw-intent" class="form-label small text-secondary mb-1">Raw Idea</label>
+                                            <textarea id="orchestration-inbox-raw-intent" class="form-control form-control-sm" rows="5" required></textarea>
+                                        </div>
+                                        <div class="row g-2 mb-3">
+                                            <div class="col-5">
+                                                <label for="orchestration-inbox-priority" class="form-label small text-secondary mb-1">Priority</label>
+                                                <select id="orchestration-inbox-priority" class="form-select form-select-sm">
+                                                    <option value="normal">normal</option>
+                                                    <option value="low">low</option>
+                                                    <option value="high">high</option>
+                                                    <option value="urgent">urgent</option>
+                                                </select>
+                                            </div>
+                                            <div class="col-7">
+                                                <label for="orchestration-inbox-category" class="form-label small text-secondary mb-1">Category</label>
+                                                <input id="orchestration-inbox-category" class="form-control form-control-sm" maxlength="64" placeholder="feature, docs, ci">
+                                            </div>
+                                        </div>
+                                        <button id="orchestration-inbox-capture-button" type="submit" class="btn btn-primary btn-sm">Capture Idea</button>
+                                    </form>
+
+                                    <div class="orchestration-inbox-panel">
+                                        <div class="d-flex justify-content-between align-items-center gap-2 mb-3">
+                                            <h4 class="h6 fw-semibold mb-0">Inbox Items</h4>
+                                            <span id="orchestration-inbox-count" class="badge text-bg-light border text-secondary">0</span>
+                                        </div>
+                                        <label for="orchestration-inbox-status-filter" class="form-label small text-secondary mb-1">Status Filter</label>
+                                        <select id="orchestration-inbox-status-filter" class="form-select form-select-sm mb-3" onchange="NexusApp.loadOrchestrationInboxItems()">
+                                            <option value="">All statuses</option>
+                                            <option value="captured">captured</option>
+                                            <option value="triaged">triaged</option>
+                                            <option value="staged">staged</option>
+                                            <option value="discarded">discarded</option>
+                                        </select>
+                                        <div id="orchestration-inbox-list" class="orchestration-inbox-list text-secondary small">Load inbox items to begin.</div>
+                                    </div>
+                                </div>
+                                <div class="col-xl-8">
+                                    <section class="orchestration-inbox-detail">
+                                        <div id="orchestration-inbox-empty" class="text-secondary small">Select an inbox item to triage it.</div>
+                                        <form id="orchestration-inbox-triage-form" class="d-none" onsubmit="NexusApp.updateSelectedOrchestrationInboxItem(); return false;">
+                                            <input id="orchestration-inbox-item-id" type="hidden">
+                                            <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-3">
+                                                <div>
+                                                    <h4 class="h5 fw-semibold mb-1">Triage Item</h4>
+                                                    <div id="orchestration-inbox-detail-meta" class="text-secondary small"></div>
+                                                </div>
+                                                <div class="d-flex gap-2 flex-wrap">
+                                                    <button type="submit" class="btn btn-primary btn-sm">Save Triage</button>
+                                                    <button type="button" class="btn btn-outline-warning btn-sm" onclick="NexusApp.discardSelectedOrchestrationInboxItem()">Discard</button>
+                                                </div>
+                                            </div>
+                                            <div class="mb-2">
+                                                <label for="orchestration-inbox-triage-title" class="form-label small text-secondary mb-1">Title</label>
+                                                <input id="orchestration-inbox-triage-title" class="form-control form-control-sm" maxlength="255" autocomplete="off">
+                                            </div>
+                                            <div class="mb-2">
+                                                <label for="orchestration-inbox-triage-raw-intent" class="form-label small text-secondary mb-1">Raw Intent</label>
+                                                <textarea id="orchestration-inbox-triage-raw-intent" class="form-control form-control-sm" rows="7"></textarea>
+                                            </div>
+                                            <div class="row g-2 mb-2">
+                                                <div class="col-md-4">
+                                                    <label for="orchestration-inbox-triage-status" class="form-label small text-secondary mb-1">Status</label>
+                                                    <select id="orchestration-inbox-triage-status" class="form-select form-select-sm">
+                                                        <option value="captured">captured</option>
+                                                        <option value="triaged">triaged</option>
+                                                        <option value="staged">staged</option>
+                                                        <option value="discarded">discarded</option>
+                                                    </select>
+                                                </div>
+                                                <div class="col-md-4">
+                                                    <label for="orchestration-inbox-triage-priority" class="form-label small text-secondary mb-1">Priority</label>
+                                                    <select id="orchestration-inbox-triage-priority" class="form-select form-select-sm">
+                                                        <option value="normal">normal</option>
+                                                        <option value="low">low</option>
+                                                        <option value="high">high</option>
+                                                        <option value="urgent">urgent</option>
+                                                    </select>
+                                                </div>
+                                                <div class="col-md-4">
+                                                    <label for="orchestration-inbox-triage-category" class="form-label small text-secondary mb-1">Category</label>
+                                                    <input id="orchestration-inbox-triage-category" class="form-control form-control-sm" maxlength="64">
+                                                </div>
+                                            </div>
+                                            <div class="mb-0">
+                                                <label for="orchestration-inbox-triage-notes" class="form-label small text-secondary mb-1">Triage Notes</label>
+                                                <textarea id="orchestration-inbox-triage-notes" class="form-control form-control-sm" rows="5"></textarea>
+                                            </div>
+                                        </form>
+                                    </section>
+                                    <span class="d-none">/api/orchestration-inbox/items Orchestration Inbox captured triaged staged discarded</span>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
