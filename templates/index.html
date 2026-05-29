@@ -403,6 +403,61 @@
                             </div>
                         </div>
                     </div>
+                    <div class="card bg-white border-0 shadow-sm mt-4" id="factory-run-console">
+                        <div class="card-header bg-white border-bottom p-4 d-flex justify-content-between align-items-start gap-3 flex-wrap">
+                            <div>
+                                <h3 class="h5 mb-1 text-dark">Factory Run Console</h3>
+                                <p class="text-secondary mb-0">Observe factory state, Git changes, recent events, and execution runs without starting automation.</p>
+                            </div>
+                            <button type="button" class="btn btn-outline-primary btn-sm" onclick="NexusApp.loadFactoryConsole()">
+                                <i class="bi bi-arrow-repeat me-2"></i>Refresh Factory Console
+                            </button>
+                        </div>
+                        <div class="card-body p-4">
+                            <div id="factory-console-summary" class="row g-3 mb-4">
+                                <div class="col-12 text-secondary small">Factory console not loaded.</div>
+                            </div>
+                            <div class="row g-4">
+                                <div class="col-lg-5">
+                                    <h4 class="h6 fw-semibold mb-2">Changed Files</h4>
+                                    <div id="factory-git-status" class="border rounded bg-light p-3 small text-secondary">No Git summary loaded.</div>
+                                </div>
+                                <div class="col-lg-7">
+                                    <h4 class="h6 fw-semibold mb-2">Diff Stat</h4>
+                                    <pre id="factory-diff-stat" class="border rounded bg-light p-3 small text-secondary mb-0" style="min-height: 120px;">No diff stat loaded.</pre>
+                                </div>
+                            </div>
+                            <div class="row g-4 mt-1">
+                                <div class="col-lg-6">
+                                    <div class="d-flex justify-content-between align-items-center gap-2 mb-2">
+                                        <h4 class="h6 fw-semibold mb-0">Recent Factory Events</h4>
+                                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="NexusApp.loadFactoryEvents()">Refresh Events</button>
+                                    </div>
+                                    <div id="factory-events-list" class="border rounded bg-light p-3 small text-secondary">No factory events loaded.</div>
+                                </div>
+                                <div class="col-lg-6">
+                                    <div class="d-flex justify-content-between align-items-center gap-2 mb-2">
+                                        <h4 class="h6 fw-semibold mb-0">Recent Execution Runs</h4>
+                                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="NexusApp.loadFactoryRuns()">Refresh Runs</button>
+                                    </div>
+                                    <div id="factory-runs-list" class="border rounded bg-light p-3 small text-secondary">No execution runs loaded.</div>
+                                </div>
+                            </div>
+                            <form id="factory-manual-event-form" class="row g-2 align-items-end mt-4" onsubmit="NexusApp.submitManualFactoryEvent(); return false;">
+                                <div class="col-md-3">
+                                    <label for="factory-event-type" class="form-label small text-secondary mb-1">Event Type</label>
+                                    <input id="factory-event-type" type="text" class="form-control form-control-sm" maxlength="64" value="manual_note" autocomplete="off">
+                                </div>
+                                <div class="col-md-7">
+                                    <label for="factory-event-message" class="form-label small text-secondary mb-1">Manual Event / Note</label>
+                                    <input id="factory-event-message" type="text" class="form-control form-control-sm" maxlength="2000" autocomplete="off">
+                                </div>
+                                <div class="col-md-2 d-grid">
+                                    <button id="factory-event-submit-btn" type="submit" class="btn btn-primary btn-sm">Add Manual Event</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
                 </div>
 
                 <div id="view-resources" class="spa-view d-none">

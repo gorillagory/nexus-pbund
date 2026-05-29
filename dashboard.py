@@ -24,6 +24,15 @@ from models import ChatSession, Footprint, Message, Task, UserProfile, Workspace
 from src.api.project_routes import projects_blueprint
 from src.services.codex_runner import CodexRunner
 from src.services.cost_ledger import append_cost_event, read_cost_events, summarize_cost_events
+from src.services.factory_events import (
+    create_factory_event,
+    get_recent_execution_runs,
+    get_recent_factory_events,
+    serialize_execution_run,
+    serialize_factory_event,
+    summarize_factory_state,
+)
+from src.services.git_changes import summarize_git_changes
 from src.services.work_packet_parser import extract_codex_commands, parse_work_packet
 
 
@@ -975,6 +984,153 @@ class NexusDashboard:
                     "summary": summarize_cost_events(events),
                 }
             ), 201
+
+        @self.app.route("/api/factory/status", methods=["GET"])
+        def get_factory_status():
+            git_summary = summarize_git_changes(self.engine.target_dir)
+            workspace_id = None
+            try:
+                workspace_id = get_workspace_id(self.engine.target_dir)
+                db_context = get_db()
+                db = next(db_context)
+                try:
+                    events = get_recent_factory_events(db, workspace_id=workspace_id, limit=100)
+                    runs = get_recent_execution_runs(db, workspace_id=workspace_id, limit=50)
+                finally:
+                    db_context.close()
+            except Exception as exception:
+                return jsonify(
+                    {
+                        "status": "error",
+                        "message": "Factory database unavailable: {}".format(exception),
+                        "git": git_summary,
+                    }
+                ), 503
+
+            state = summarize_factory_state(events, runs)
+            return jsonify(
+                {
+                    "status": "success",
+                    "factory": {
+                        "execution_mode": self.engine.get_execution_mode(),
+                        "automatic_analysis_enabled": self.engine.is_automatic_analysis_enabled(),
+                        "current_state": state.get("current_state", "idle"),
+                        "recent_event_count": state.get("recent_event_count", 0),
+                        "recent_run_count": state.get("recent_run_count", 0),
+                    },
+                    "git": git_summary,
+                    "recent_events": [serialize_factory_event(event) for event in events],
+                    "recent_runs": [serialize_execution_run(run) for run in runs],
+                }
+            )
+
+        @self.app.route("/api/factory/events", methods=["GET"])
+        def get_factory_events():
+            limit = request.args.get("limit", default=100, type=int)
+            try:
+                workspace_id = get_workspace_id(self.engine.target_dir)
+                db_context = get_db()
+                db = next(db_context)
+                try:
+                    events = get_recent_factory_events(db, workspace_id=workspace_id, limit=limit)
+                finally:
+                    db_context.close()
+            except Exception as exception:
+                return jsonify(
+                    {
+                        "status": "error",
+                        "message": "Factory events unavailable: {}".format(exception),
+                    }
+                ), 503
+
+            return jsonify(
+                {
+                    "status": "success",
+                    "events": [serialize_factory_event(event) for event in events],
+                }
+            )
+
+        @self.app.route("/api/factory/runs", methods=["GET"])
+        def get_factory_runs():
+            limit = request.args.get("limit", default=50, type=int)
+            try:
+                workspace_id = get_workspace_id(self.engine.target_dir)
+                db_context = get_db()
+                db = next(db_context)
+                try:
+                    runs = get_recent_execution_runs(db, workspace_id=workspace_id, limit=limit)
+                finally:
+                    db_context.close()
+            except Exception as exception:
+                return jsonify(
+                    {
+                        "status": "error",
+                        "message": "Factory runs unavailable: {}".format(exception),
+                    }
+                ), 503
+
+            return jsonify(
+                {
+                    "status": "success",
+                    "runs": [serialize_execution_run(run) for run in runs],
+                }
+            )
+
+        @self.app.route("/api/factory/git-status", methods=["GET"])
+        def get_factory_git_status():
+            return jsonify(
+                {
+                    "status": "success",
+                    "git": summarize_git_changes(self.engine.target_dir),
+                }
+            )
+
+        @self.app.route("/api/factory/events/manual", methods=["POST"])
+        def create_manual_factory_event():
+            payload = request.get_json(silent=True)
+            if not isinstance(payload, dict):
+                return jsonify({"status": "error", "message": "JSON object is required."}), 400
+
+            event_type = payload.get("event_type") or "manual_note"
+            message = payload.get("message")
+            event_payload = payload.get("payload")
+            if not isinstance(event_type, str) or not event_type.strip():
+                return jsonify({"status": "error", "message": "event_type is required."}), 400
+            if len(event_type.strip()) > 64:
+                return jsonify({"status": "error", "message": "event_type is too long."}), 400
+            if not isinstance(message, str) or not message.strip():
+                return jsonify({"status": "error", "message": "message is required."}), 400
+            if len(message.strip()) > 2000:
+                return jsonify({"status": "error", "message": "message is too long."}), 400
+            if event_payload is not None and not isinstance(event_payload, (dict, list)):
+                return jsonify({"status": "error", "message": "payload must be an object or array."}), 400
+
+            try:
+                workspace_id = get_workspace_id(self.engine.target_dir)
+                if workspace_id is None:
+                    return jsonify({"status": "error", "message": "Active workspace not found."}), 400
+
+                db_context = get_db()
+                db = next(db_context)
+                try:
+                    event = create_factory_event(
+                        db,
+                        workspace_id=workspace_id,
+                        event_type=event_type.strip(),
+                        message=message.strip(),
+                        payload=event_payload,
+                    )
+                finally:
+                    db_context.close()
+            except Exception as exception:
+                return jsonify(
+                    {
+                        "status": "error",
+                        "message": "Factory event could not be recorded: {}".format(exception),
+                    }
+                ), 503
+
+            return jsonify({"status": "success", "event": serialize_factory_event(event)}), 201
 
         @self.app.route("/api/kill-process", methods=["POST"])
         def kill_process():

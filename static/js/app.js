@@ -33,6 +33,7 @@ window.NexusApp = {
     automaticAnalysisEnabled: false,
     latestWorkPacketPreview: null,
     latestCostLedger: null,
+    latestFactoryConsole: null,
 
     setTab(tab) {
         const tabViews = {
@@ -118,6 +119,10 @@ window.NexusApp = {
             return;
         }
 
+        if (tab === "dashboard") {
+            this.loadFactoryConsole();
+        }
+
         NexusExplorer.renderList();
     },
 
@@ -153,6 +158,262 @@ window.NexusApp = {
             }
         } catch (error) {
             console.error(error);
+        }
+    },
+
+    async loadFactoryConsole() {
+        const target = document.getElementById("factory-console-summary");
+        if (target) {
+            target.innerHTML = '<div class="col-12 text-secondary small">Loading factory console...</div>';
+        }
+
+        try {
+            const response = await fetch("/api/factory/status");
+            const data = await response.json();
+            if (!response.ok || data.status !== "success") {
+                throw new Error(data.message || "Unable to load factory console.");
+            }
+
+            this.latestFactoryConsole = data;
+            this.renderFactoryConsole(data);
+        } catch (error) {
+            if (target) {
+                target.innerHTML = "";
+                const message = document.createElement("div");
+                message.className = "col-12 text-danger small";
+                message.textContent = `Unable to load factory console: ${error.message}`;
+                target.appendChild(message);
+            }
+        }
+    },
+
+    renderFactoryConsole(data) {
+        const factory = data?.factory || {};
+        const git = data?.git || {};
+        const summaryTarget = document.getElementById("factory-console-summary");
+        if (summaryTarget) {
+            summaryTarget.innerHTML = "";
+            [
+                ["Execution Mode", factory.execution_mode || "unknown"],
+                ["Automatic Analysis", factory.automatic_analysis_enabled ? "enabled" : "disabled"],
+                ["Factory State", factory.current_state || "idle"],
+                ["Git State", git.is_dirty ? "dirty" : "clean"],
+                ["Recent Events", factory.recent_event_count || 0],
+                ["Recent Runs", factory.recent_run_count || 0],
+            ].forEach(([label, value]) => {
+                const column = document.createElement("div");
+                column.className = "col-sm-6 col-lg-4";
+                const metric = document.createElement("div");
+                metric.className = "border rounded bg-light p-3 h-100";
+                const labelEl = document.createElement("div");
+                labelEl.className = "text-secondary small";
+                labelEl.textContent = label;
+                const valueEl = document.createElement("div");
+                valueEl.className = "fw-semibold text-dark";
+                valueEl.textContent = String(value);
+                metric.appendChild(labelEl);
+                metric.appendChild(valueEl);
+                column.appendChild(metric);
+                summaryTarget.appendChild(column);
+            });
+        }
+
+        this.renderFactoryGitStatus(git);
+        this.renderFactoryEvents(data?.recent_events || []);
+        this.renderFactoryRuns(data?.recent_runs || []);
+    },
+
+    async loadFactoryEvents() {
+        try {
+            const response = await fetch("/api/factory/events");
+            const data = await response.json();
+            if (!response.ok || data.status !== "success") {
+                throw new Error(data.message || "Unable to load factory events.");
+            }
+            this.renderFactoryEvents(data.events || []);
+        } catch (error) {
+            const target = document.getElementById("factory-events-list");
+            if (target) {
+                target.textContent = `Unable to load factory events: ${error.message}`;
+                target.className = "border rounded bg-light p-3 small text-danger";
+            }
+        }
+    },
+
+    async loadFactoryRuns() {
+        try {
+            const response = await fetch("/api/factory/runs");
+            const data = await response.json();
+            if (!response.ok || data.status !== "success") {
+                throw new Error(data.message || "Unable to load factory runs.");
+            }
+            this.renderFactoryRuns(data.runs || []);
+        } catch (error) {
+            const target = document.getElementById("factory-runs-list");
+            if (target) {
+                target.textContent = `Unable to load factory runs: ${error.message}`;
+                target.className = "border rounded bg-light p-3 small text-danger";
+            }
+        }
+    },
+
+    async loadFactoryGitStatus() {
+        try {
+            const response = await fetch("/api/factory/git-status");
+            const data = await response.json();
+            if (!response.ok || data.status !== "success") {
+                throw new Error(data.message || "Unable to load factory Git status.");
+            }
+            this.renderFactoryGitStatus(data.git || {});
+        } catch (error) {
+            const target = document.getElementById("factory-git-status");
+            if (target) {
+                target.textContent = `Unable to load Git status: ${error.message}`;
+                target.className = "border rounded bg-light p-3 small text-danger";
+            }
+        }
+    },
+
+    renderFactoryGitStatus(git) {
+        const filesTarget = document.getElementById("factory-git-status");
+        const diffTarget = document.getElementById("factory-diff-stat");
+        const changedFiles = Array.isArray(git?.changed_files) ? git.changed_files : [];
+
+        if (filesTarget) {
+            filesTarget.innerHTML = "";
+            filesTarget.className = "border rounded bg-light p-3 small text-secondary";
+            if (!changedFiles.length) {
+                filesTarget.textContent = git?.is_dirty ? "Git changes detected." : "Git is clean.";
+            } else {
+                const list = document.createElement("ul");
+                list.className = "list-unstyled mb-0";
+                changedFiles.slice(0, 20).forEach((file) => {
+                    const item = document.createElement("li");
+                    item.className = "d-flex gap-2";
+                    const status = document.createElement("span");
+                    status.className = "font-monospace text-dark";
+                    status.textContent = file.status || "?";
+                    const path = document.createElement("span");
+                    path.textContent = file.path || "";
+                    item.appendChild(status);
+                    item.appendChild(path);
+                    list.appendChild(item);
+                });
+                filesTarget.appendChild(list);
+            }
+        }
+
+        if (diffTarget) {
+            diffTarget.textContent = git?.diff_stat || git?.diff_stat_error || "No diff stat.";
+        }
+    },
+
+    renderFactoryEvents(events) {
+        const target = document.getElementById("factory-events-list");
+        if (!target) return;
+        target.innerHTML = "";
+        target.className = "border rounded bg-light p-3 small text-secondary";
+        if (!events.length) {
+            target.textContent = "No factory events recorded yet.";
+            return;
+        }
+
+        const list = document.createElement("div");
+        list.className = "d-flex flex-column gap-2";
+        events.slice(0, 10).forEach((event) => {
+            const item = document.createElement("div");
+            item.className = "border rounded bg-white p-2";
+            const title = document.createElement("div");
+            title.className = "fw-semibold text-dark";
+            title.textContent = event.event_type || "event";
+            const message = document.createElement("div");
+            message.textContent = event.message || "";
+            const meta = document.createElement("div");
+            meta.className = "text-secondary";
+            meta.textContent = event.created_at ? new Date(event.created_at).toLocaleString() : "";
+            item.appendChild(title);
+            item.appendChild(message);
+            item.appendChild(meta);
+            list.appendChild(item);
+        });
+        target.appendChild(list);
+    },
+
+    renderFactoryRuns(runs) {
+        const target = document.getElementById("factory-runs-list");
+        if (!target) return;
+        target.innerHTML = "";
+        target.className = "border rounded bg-light p-3 small text-secondary";
+        if (!runs.length) {
+            target.textContent = "No execution runs recorded yet.";
+            return;
+        }
+
+        const list = document.createElement("div");
+        list.className = "d-flex flex-column gap-2";
+        runs.slice(0, 10).forEach((run) => {
+            const item = document.createElement("div");
+            item.className = "border rounded bg-white p-2";
+            const title = document.createElement("div");
+            title.className = "fw-semibold text-dark";
+            title.textContent = `${run.status || "unknown"} | task ${run.task_id || "-"}`;
+            const meta = document.createElement("div");
+            meta.className = "text-secondary";
+            meta.textContent = [
+                run.returncode !== null && run.returncode !== undefined ? `return ${run.returncode}` : "",
+                run.total_tokens ? `${run.total_tokens} tokens` : "",
+                run.started_at ? new Date(run.started_at).toLocaleString() : "",
+            ].filter(Boolean).join(" | ");
+            item.appendChild(title);
+            item.appendChild(meta);
+            list.appendChild(item);
+        });
+        target.appendChild(list);
+    },
+
+    async submitManualFactoryEvent() {
+        const messageInput = document.getElementById("factory-event-message");
+        const typeInput = document.getElementById("factory-event-type");
+        const button = document.getElementById("factory-event-submit-btn");
+        const message = (messageInput?.value || "").trim();
+        const eventType = (typeInput?.value || "manual_note").trim() || "manual_note";
+        if (!message) {
+            NexusCore.showToast("Enter a factory event message before adding it.", "error");
+            return;
+        }
+
+        const originalLabel = button ? button.textContent : "";
+        if (button) {
+            button.disabled = true;
+            button.textContent = "Adding...";
+        }
+
+        try {
+            const response = await fetch("/api/factory/events/manual", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    event_type: eventType,
+                    message: message,
+                    payload: { source: "dashboard" },
+                }),
+            });
+            const data = await response.json();
+            if (!response.ok || data.status !== "success") {
+                throw new Error(data.message || "Unable to add factory event.");
+            }
+            if (messageInput) {
+                messageInput.value = "";
+            }
+            await this.loadFactoryConsole();
+            NexusCore.showToast("Factory event added.", "success");
+        } catch (error) {
+            NexusCore.showToast(`Error: ${error.message}`, "error");
+        } finally {
+            if (button) {
+                button.disabled = false;
+                button.textContent = originalLabel || "Add Manual Event";
+            }
         }
     },
 
