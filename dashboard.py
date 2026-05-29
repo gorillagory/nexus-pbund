@@ -35,6 +35,7 @@ from models import (
 )
 from src.api.project_routes import projects_blueprint
 from src.services.codex_runner import CodexRunner
+from src.services.ci_status import summarize_ci_status
 from src.services.cost_ledger import append_cost_event, read_cost_events, summarize_cost_events
 from src.services.factory_events import (
     create_factory_event,
@@ -1483,6 +1484,7 @@ class NexusDashboard:
         @self.app.route("/api/factory/status", methods=["GET"])
         def get_factory_status():
             git_summary = summarize_git_changes(self.engine.target_dir)
+            ci_summary = summarize_ci_status(self.engine.target_dir)
             workspace_id = None
             try:
                 workspace_id = get_workspace_id(self.engine.target_dir)
@@ -1499,6 +1501,7 @@ class NexusDashboard:
                         "status": "error",
                         "message": "Factory database unavailable: {}".format(exception),
                         "git": git_summary,
+                        "ci": ci_summary,
                     }
                 ), 503
 
@@ -1517,6 +1520,7 @@ class NexusDashboard:
                         "runner": runner_state,
                     },
                     "git": git_summary,
+                    "ci": ci_summary,
                     "recent_events": [serialize_factory_event(event) for event in events],
                     "recent_runs": [serialize_execution_run(run) for run in runs],
                 }
@@ -1580,6 +1584,15 @@ class NexusDashboard:
                 {
                     "status": "success",
                     "git": summarize_git_changes(self.engine.target_dir),
+                }
+            )
+
+        @self.app.route("/api/factory/ci-status", methods=["GET"])
+        def get_factory_ci_status():
+            return jsonify(
+                {
+                    "status": "success",
+                    "ci": summarize_ci_status(self.engine.target_dir),
                 }
             )
 

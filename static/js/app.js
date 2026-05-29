@@ -37,6 +37,7 @@ window.NexusApp = {
     latestCostLedger: null,
     latestFactoryConsole: null,
     latestPreflightStatus: null,
+    latestCiStatus: null,
 
     setTab(tab) {
         const tabViews = {
@@ -182,8 +183,10 @@ window.NexusApp = {
             }
 
             this.latestFactoryConsole = data;
+            this.latestCiStatus = data.ci || this.latestCiStatus;
             this.renderFactoryConsole(data);
             this.loadFactoryPreflightStatus();
+            this.loadFactoryCiStatus();
         } catch (error) {
             if (target) {
                 target.innerHTML = "";
@@ -308,13 +311,14 @@ window.NexusApp = {
         if (!target) return;
 
         const preflight = this.latestPreflightStatus || {};
+        const ci = this.latestCiStatus || {};
         const cards = [
             ["Mode", factory?.execution_mode || "unknown", this.factoryStatusClass(factory?.execution_mode || "manual")],
             ["Automatic Analysis", factory?.automatic_analysis_enabled ? "enabled" : "disabled", factory?.automatic_analysis_enabled ? "factory-status-fail" : "factory-status-pass"],
             ["Git State", git?.is_dirty ? "dirty" : "clean", this.factoryStatusClass(git?.is_dirty ? "dirty" : "clean")],
             ["Recent Runs", factory?.recent_run_count ?? 0, "factory-status-neutral"],
             ["Recent Events", factory?.recent_event_count ?? 0, "factory-status-neutral"],
-            ["Preflight Status", preflight?.local_last_result || "unknown", this.factoryStatusClass(preflight?.local_last_result || "unknown")],
+            ["Preflight Status", preflight?.local_last_result || ci?.local_preflight?.status || "unknown", this.factoryStatusClass(preflight?.local_last_result || ci?.local_preflight?.status || "unknown")],
         ];
 
         target.innerHTML = "";
@@ -397,6 +401,70 @@ window.NexusApp = {
                 target.appendChild(message);
             }
         }
+    },
+
+    async loadFactoryCiStatus() {
+        try {
+            const response = await fetch("/api/factory/ci-status");
+            const data = await response.json();
+            if (!response.ok || data.status !== "success") {
+                throw new Error(data.message || "Unable to load CI status.");
+            }
+            this.latestCiStatus = data.ci || {};
+            this.renderFactoryCiStatus(this.latestCiStatus);
+            if (this.latestFactoryConsole) {
+                this.renderFactorySummaryCards(this.latestFactoryConsole.factory || {}, this.latestFactoryConsole.git || {});
+            }
+        } catch (error) {
+            const target = document.getElementById("factory-ci-status");
+            if (target) {
+                target.innerHTML = "";
+                const message = document.createElement("div");
+                message.className = "text-danger small";
+                message.textContent = `Unable to load CI status: ${error.message}`;
+                target.appendChild(message);
+            }
+        }
+    },
+
+    renderFactoryCiStatus(ci) {
+        const target = document.getElementById("factory-ci-status");
+        if (!target) return;
+
+        const local = ci?.local_preflight || {};
+        const remote = ci?.remote_ci || {};
+        const actionsUrl = ci?.actions_url || "";
+        const rows = [
+            ["Branch", ci?.branch || "-"],
+            ["Commit", ci?.commit_short || (ci?.commit ? String(ci.commit).slice(0, 7) : "-")],
+            ["Workflow", ci?.workflow_present ? "present" : "missing"],
+            ["GitHub Repo", ci?.github_slug || "-"],
+            ["Local Preflight", local?.status || "unknown"],
+            ["Local Duration", this.formatFactoryDuration(local?.duration_seconds)],
+            ["Local Last Run", this.formatFactoryTime(local?.finished_at)],
+            ["Remote CI", remote?.status || "unknown"],
+        ];
+
+        target.innerHTML = `
+            <div class="factory-ci-panel">
+                <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-3">
+                    <div class="factory-guidance-title mb-0">CI / Preflight Status</div>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" onclick="NexusApp.loadFactoryCiStatus()">Refresh CI Status</button>
+                </div>
+                <div class="factory-ci-grid">
+                    ${rows.map(([label, value]) => `
+                        <div class="factory-ci-metric">
+                            <div class="factory-summary-label">${this.escapeHtml(label)}</div>
+                            <div class="factory-summary-value ${this.factoryStatusClass(value)}">${this.escapeHtml(value)}</div>
+                        </div>
+                    `).join("")}
+                </div>
+                <div class="factory-ci-foot mt-3">
+                    ${actionsUrl ? `<a href="${this.escapeHtml(actionsUrl)}" target="_blank" rel="noopener noreferrer">Open GitHub Actions</a>` : `<span>No GitHub Actions URL detected.</span>`}
+                    <span>${this.escapeHtml(remote?.reason || "GitHub API integration not configured")}</span>
+                </div>
+            </div>
+        `;
     },
 
     renderFactoryPreflightStatus(preflight) {
