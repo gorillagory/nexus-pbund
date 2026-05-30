@@ -850,7 +850,8 @@ pre {
 .orchestration-inbox-panel,
 .orchestration-inbox-detail,
 .operator-intervention-panel,
-.operator-intervention-detail {
+.operator-intervention-detail,
+.trusted-packet-panel {
     background: #fff;
     border: 1px solid #e6edf5;
     border-radius: 8px;

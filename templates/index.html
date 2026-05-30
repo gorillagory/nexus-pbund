@@ -68,6 +68,13 @@
                             <input type="password" id="input-discord-ingest-secret" class="form-control font-monospace">
                         </div>
                         <div class="col-md-6">
+                            <label class="form-label text-secondary small fw-bold">TRUSTED PACKET MODE</label>
+                            <select id="input-trusted-packet-mode-enabled" class="form-select">
+                                <option value="false">Disabled</option>
+                                <option value="true">Enabled</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
                             <div class="d-flex justify-content-between align-items-center mb-1">
                                 <label class="form-label text-secondary small fw-bold mb-0">CURATED GEMINI MODELS</label>
                                 <small id="gemini-model-summary" class="text-secondary"></small>

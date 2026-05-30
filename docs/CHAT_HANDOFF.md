@@ -4,7 +4,7 @@
 - Current branch: `main`
 - Current commit at prior chat handoff: `208dbdbaecd646b013a590fae2db32d06daff408`
 - Prior chat handoff summary: `208dbdb add chat handoff for next session`
-- Latest Packet 026 baseline tag: `nexus-operator-intervention-queue-baseline-2026-05-30`
+- Latest Packet 027 baseline tag: `nexus-trusted-packet-mode-baseline-2026-05-30`
 - Recent visible baseline tags:
   - `nexus-workflow-lock-prompt-vault-baseline-2026-05-29`
   - `nexus-recovery-audit-baseline-2026-05-29`
@@ -27,6 +27,7 @@
 - Git Explorer
 - Branch Per Packet
 - Operator Intervention Queue
+- Trusted Packet Mode
 - Workflow Lock docs
 - Orchestration-ready workflow foundation
 - Supervised packet runner
@@ -87,7 +88,7 @@
 - Packet 024 — Git Explorer complete
 - Packet 025 — Branch Per Packet complete
 - Packet 026 — Operator Intervention Queue complete
-- Packet 027 — Trusted Packet Mode
+- Packet 027 — Trusted Packet Mode complete
 
 ## New Chat Startup Instructions
 Ask the user to run this local context capture before planning new implementation work:
@@ -114,4 +115,4 @@ Prefer one pasteable Codex operator prompt for local execution. Reduce manual co
 
 Keep the safety rails in this document. Do not force push, reset, clean, run destructive database operations, expose API keys, or start Auto-Pilot unless the user explicitly asks for that exact work.
 
-Packet 026 adds the Operator Intervention Queue foundation. After it is merged and tagged, continue with Packet 027 — Trusted Packet Mode unless repo docs say otherwise.
+Packet 027 adds the Trusted Packet Mode foundation. After it is merged and tagged, use repo docs and the next sprint direction for follow-up packets.

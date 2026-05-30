@@ -19,6 +19,7 @@ window.NexusSettings = {
                 : "Enter API key";
             document.getElementById("input-openai-model").value = data.openai_model || "";
             document.getElementById("input-discord-router-enabled").value = data.discord_router_enabled ? "true" : "false";
+            document.getElementById("input-trusted-packet-mode-enabled").value = data.trusted_packet_mode_enabled ? "true" : "false";
             const discordSecretEl = document.getElementById("input-discord-ingest-secret");
             discordSecretEl.value = "";
             discordSecretEl.placeholder = data.discord_ingest_secret_configured
@@ -44,6 +45,7 @@ window.NexusSettings = {
             openai_model: document.getElementById("input-openai-model").value.trim(),
             discord_router_enabled: document.getElementById("input-discord-router-enabled").value === "true",
             discord_ingest_secret: document.getElementById("input-discord-ingest-secret").value.trim(),
+            trusted_packet_mode_enabled: document.getElementById("input-trusted-packet-mode-enabled").value === "true",
         };
 
         try {

@@ -90,6 +90,13 @@ from src.services.prompt_vault import (
     serialize_prompt_template,
     update_prompt_template,
 )
+from src.services.trusted_packets import (
+    mark_packet_trusted,
+    packet_trust_eligible,
+    revoke_packet_trust,
+    serialize_trust_metadata,
+    summarize_trust_gate,
+)
 from src.services.work_packet_parser import extract_codex_commands, parse_work_packet
 
 
@@ -2865,6 +2872,7 @@ class NexusDashboard:
                         "status": "success",
                         "work_packet_id": work_packet.id,
                         "packet_title": parsed_packet.get("title"),
+                        "trust": serialize_trust_metadata(work_packet),
                         "created_count": len(tasks),
                         "task_ids": [task.id for task in tasks],
                         "tasks": [serialize_task(task) for task in tasks],
@@ -2876,6 +2884,87 @@ class NexusDashboard:
             except Exception:
                 db.rollback()
                 raise
+            finally:
+                db_context.close()
+
+        @self.app.route("/api/trusted-packets/status", methods=["GET"])
+        def get_trusted_packets_status():
+            work_packet_id = request.args.get("work_packet_id", type=int)
+            db_context = get_db()
+            db = next(db_context)
+            try:
+                work_packet = None
+                if work_packet_id is not None:
+                    active_workspace_id = get_workspace_id(self.engine.target_dir)
+                    work_packet = db.get(WorkPacket, work_packet_id)
+                    if work_packet is None or work_packet.workspace_id != active_workspace_id:
+                        return jsonify({"status": "error", "message": "Work packet not found."}), 404
+                return jsonify(
+                    {
+                        "status": "success",
+                        "trusted_packets": summarize_trust_gate(self.engine.settings, work_packet=work_packet),
+                    }
+                )
+            except Exception as exception:
+                return jsonify({"status": "error", "message": "Trusted Packet Mode unavailable: {}".format(exception)}), 503
+            finally:
+                db_context.close()
+
+        @self.app.route("/api/work-packets/<int:work_packet_id>/trust", methods=["POST"])
+        def trust_work_packet(work_packet_id):
+            payload = request.get_json(silent=True) or {}
+            if not isinstance(payload, dict):
+                return jsonify({"status": "error", "message": "JSON object is required."}), 400
+            db_context = get_db()
+            db = next(db_context)
+            try:
+                active_workspace_id = get_workspace_id(self.engine.target_dir)
+                work_packet = db.get(WorkPacket, work_packet_id)
+                if work_packet is None or work_packet.workspace_id != active_workspace_id:
+                    return jsonify({"status": "error", "message": "Work packet not found."}), 404
+                work_packet = mark_packet_trusted(db, work_packet, payload)
+                return jsonify(
+                    {
+                        "status": "success",
+                        "work_packet_id": work_packet.id,
+                        "trust": serialize_trust_metadata(work_packet),
+                    }
+                )
+            except ValueError as exception:
+                db.rollback()
+                return jsonify({"status": "error", "message": str(exception)}), 400
+            except Exception as exception:
+                db.rollback()
+                return jsonify({"status": "error", "message": "Work packet trust could not be updated: {}".format(exception)}), 503
+            finally:
+                db_context.close()
+
+        @self.app.route("/api/work-packets/<int:work_packet_id>/revoke-trust", methods=["POST"])
+        def revoke_work_packet_trust(work_packet_id):
+            payload = request.get_json(silent=True) or {}
+            if not isinstance(payload, dict):
+                return jsonify({"status": "error", "message": "JSON object is required."}), 400
+            db_context = get_db()
+            db = next(db_context)
+            try:
+                active_workspace_id = get_workspace_id(self.engine.target_dir)
+                work_packet = db.get(WorkPacket, work_packet_id)
+                if work_packet is None or work_packet.workspace_id != active_workspace_id:
+                    return jsonify({"status": "error", "message": "Work packet not found."}), 404
+                work_packet = revoke_packet_trust(db, work_packet, payload)
+                return jsonify(
+                    {
+                        "status": "success",
+                        "work_packet_id": work_packet.id,
+                        "trust": serialize_trust_metadata(work_packet),
+                    }
+                )
+            except ValueError as exception:
+                db.rollback()
+                return jsonify({"status": "error", "message": str(exception)}), 400
+            except Exception as exception:
+                db.rollback()
+                return jsonify({"status": "error", "message": "Work packet trust could not be revoked: {}".format(exception)}), 503
             finally:
                 db_context.close()
 
@@ -2945,6 +3034,20 @@ class NexusDashboard:
                 work_packet = db.get(WorkPacket, work_packet_id)
                 if work_packet is None or work_packet.workspace_id != workspace_id:
                     return jsonify({"status": "error", "message": "Work packet not found."}), 404
+                trust_gate = packet_trust_eligible(
+                    work_packet,
+                    trusted_packet_mode_enabled=self.engine.settings.get("trusted_packet_mode_enabled"),
+                )
+                if not trust_gate.get("eligible"):
+                    with self.packet_runner_lock:
+                        self.packet_runner_state["message"] = "Trusted Packet Mode blocked an untrusted packet."
+                    return jsonify(
+                        {
+                            "status": "error",
+                            "message": "Trusted Packet Mode requires trust_status=trusted before supervised packet execution.",
+                            "trusted_packet_gate": trust_gate,
+                        }
+                    ), 403
 
                 packet_links = (
                     db.execute(
@@ -3136,6 +3239,7 @@ class NexusDashboard:
                         "status": status,
                         "work_packet_id": work_packet_id,
                         "packet_status": work_packet.status,
+                        "trust": serialize_trust_metadata(work_packet),
                         "completed_count": completed_count,
                         "failed_count": failed_count,
                         "skipped_count": skipped_count,
@@ -3512,6 +3616,7 @@ class NexusDashboard:
                             "started_at": work_packet.started_at.isoformat() if work_packet.started_at else None,
                             "completed_at": work_packet.completed_at.isoformat() if work_packet.completed_at else None,
                             "failed_at": work_packet.failed_at.isoformat() if work_packet.failed_at else None,
+                            "trust": serialize_trust_metadata(work_packet),
                         },
                         "tasks": tasks,
                         "runs": [serialize_execution_run(run) for run in runs],

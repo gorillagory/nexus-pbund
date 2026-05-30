@@ -40,6 +40,7 @@ window.NexusApp = {
     latestCiStatus: null,
     latestGitExplorer: null,
     latestPacketBranchStatus: null,
+    latestTrustedPacketMode: null,
     orchestrationInboxItems: [],
     selectedOrchestrationInboxItem: null,
     operatorInterventions: [],
@@ -2065,6 +2066,41 @@ window.NexusApp = {
                         <div>Supervised Packet Runner: runs only this packet and stops after first failure.</div>
                         <div id="latest-work-packet-status" class="mt-2">No staged packet selected.</div>
                     </div>
+                    <div id="trusted-packet-mode-panel" class="trusted-packet-panel mb-3">
+                        <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-3">
+                            <div>
+                                <h6 class="text-dark fw-semibold mb-1">Trusted Packet Mode</h6>
+                                <p class="text-secondary small mb-0">Trust metadata and optional supervised execution gate. This does not execute work or unlock Auto-Pilot.</p>
+                            </div>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="NexusApp.loadTrustedPacketStatus()">Refresh Trust Status</button>
+                        </div>
+                        <div id="trusted-packet-status" class="small text-secondary mb-3">Trusted Packet Mode not loaded.</div>
+                        <div class="row g-2">
+                            <div class="col-md-4">
+                                <label for="trusted-packet-level" class="form-label small text-secondary mb-1">Trust Level</label>
+                                <select id="trusted-packet-level" class="form-select form-select-sm">
+                                    <option value="standard">standard</option>
+                                    <option value="elevated">elevated</option>
+                                </select>
+                            </div>
+                            <div class="col-md-8">
+                                <label for="trusted-packet-reviewer" class="form-label small text-secondary mb-1">Reviewer</label>
+                                <input id="trusted-packet-reviewer" class="form-control form-control-sm" maxlength="128" autocomplete="off">
+                            </div>
+                            <div class="col-12">
+                                <label for="trusted-packet-reason" class="form-label small text-secondary mb-1">Trust / Revoke Reason</label>
+                                <textarea id="trusted-packet-reason" class="form-control form-control-sm" rows="3"></textarea>
+                            </div>
+                            <div class="col-12">
+                                <label for="trusted-packet-notes" class="form-label small text-secondary mb-1">Trust Notes</label>
+                                <textarea id="trusted-packet-notes" class="form-control form-control-sm" rows="3"></textarea>
+                            </div>
+                        </div>
+                        <div class="d-flex gap-2 flex-wrap mt-3">
+                            <button id="trust-packet-btn" type="button" class="btn btn-outline-primary btn-sm" onclick="NexusApp.trustSelectedWorkPacket()" disabled>Mark Packet Trusted</button>
+                            <button id="revoke-trust-packet-btn" type="button" class="btn btn-outline-warning btn-sm" onclick="NexusApp.revokeSelectedWorkPacketTrust()" disabled>Revoke Trust</button>
+                        </div>
+                    </div>
                     <textarea id="work-packet-input" class="form-control font-monospace small mb-3" rows="8" placeholder="Paste a work packet containing codex &quot;...&quot; commands"></textarea>
                     <div id="work-packet-preview" class="border rounded bg-white p-3 small text-secondary">
                         Preview extracted tasks before staging them to To-Do.
@@ -2161,6 +2197,7 @@ window.NexusApp = {
         this.renderExecutionMode();
         this.updateAutoPilotUI();
         this.renderCostLedger(this.latestCostLedger);
+        this.loadTrustedPacketStatus();
         this.loadCostLedger();
     },
 
@@ -2310,6 +2347,7 @@ window.NexusApp = {
             this.latestStagedWorkPacket = data;
             await this.loadKanban();
             this.renderWorkPacketRunnerStatus();
+            await this.loadTrustedPacketStatus();
             NexusCore.showToast(`Staged ${data.created_count} task${data.created_count === 1 ? "" : "s"} to Kanban.`, "success");
         } catch (error) {
             NexusCore.showToast(`Error: ${error.message}`, "error");
@@ -2319,11 +2357,15 @@ window.NexusApp = {
     renderWorkPacketRunnerStatus() {
         const target = document.getElementById("latest-work-packet-status");
         const button = document.getElementById("run-packet-btn");
+        const trustButton = document.getElementById("trust-packet-btn");
+        const revokeButton = document.getElementById("revoke-trust-packet-btn");
         const packet = this.latestStagedWorkPacket || {};
         const packetId = packet.work_packet_id;
+        const trust = packet.trust || this.latestTrustedPacketMode?.packet?.trust || {};
+        const trustLabel = trust.trust_status ? ` | Trust: ${trust.trust_status}/${trust.trust_level || "standard"}` : "";
         if (target) {
             target.textContent = packetId
-                ? `Selected packet #${packetId}: ${packet.packet_title || "Untitled Work Packet"}`
+                ? `Selected packet #${packetId}: ${packet.packet_title || "Untitled Work Packet"}${trustLabel}`
                 : "No staged packet selected.";
         }
         if (button) {
@@ -2335,6 +2377,12 @@ window.NexusApp = {
             button.title = enabled
                 ? "Run the selected staged packet."
                 : "Switch to One Packet mode and stage a packet first.";
+        }
+        if (trustButton) {
+            trustButton.disabled = !packetId;
+        }
+        if (revokeButton) {
+            revokeButton.disabled = !packetId || trust.trust_status !== "trusted";
         }
     },
 
@@ -2382,6 +2430,130 @@ window.NexusApp = {
             await this.loadCostLedger();
             await this.loadFactoryConsole();
             this.renderWorkPacketRunnerStatus();
+        }
+    },
+
+    async loadTrustedPacketStatus() {
+        const panel = document.getElementById("trusted-packet-status");
+        const packet = this.latestStagedWorkPacket || {};
+        const packetId = packet.work_packet_id;
+        if (panel) {
+            panel.textContent = "Loading Trusted Packet Mode...";
+        }
+        try {
+            const query = packetId ? `?work_packet_id=${encodeURIComponent(packetId)}` : "";
+            const response = await fetch(`/api/trusted-packets/status${query}`);
+            const data = await response.json();
+            if (!response.ok || data.status !== "success") {
+                throw new Error(data.message || "Unable to load Trusted Packet Mode.");
+            }
+            this.latestTrustedPacketMode = data.trusted_packets || {};
+            if (packetId && this.latestTrustedPacketMode.packet?.trust) {
+                this.latestStagedWorkPacket = {
+                    ...this.latestStagedWorkPacket,
+                    trust: this.latestTrustedPacketMode.packet.trust,
+                };
+            }
+            this.renderTrustedPacketStatus();
+            this.renderWorkPacketRunnerStatus();
+        } catch (error) {
+            if (panel) {
+                panel.textContent = `Trusted Packet Mode unavailable: ${error.message}`;
+            }
+        }
+    },
+
+    renderTrustedPacketStatus() {
+        const panel = document.getElementById("trusted-packet-status");
+        if (!panel) return;
+        const status = this.latestTrustedPacketMode || {};
+        const packetGate = status.packet || null;
+        const trust = packetGate?.trust || this.latestStagedWorkPacket?.trust || {};
+        const modeText = status.trusted_packet_mode_enabled ? "enabled" : "disabled";
+        const gateText = packetGate
+            ? (packetGate.eligible ? "eligible" : "blocked until trusted")
+            : "no staged packet selected";
+        panel.innerHTML = `
+            <div class="d-flex flex-wrap gap-2 mb-2">
+                <span class="prompt-vault-badge">mode ${this.escapeHtml(modeText)}</span>
+                <span class="prompt-vault-badge">gate ${this.escapeHtml(gateText)}</span>
+                <span class="prompt-vault-badge">status ${this.escapeHtml(trust.trust_status || "unreviewed")}</span>
+                <span class="prompt-vault-badge">level ${this.escapeHtml(trust.trust_level || "standard")}</span>
+            </div>
+            <div>${this.escapeHtml(trust.trust_reason || "No trust reason recorded.")}</div>
+            <div class="text-secondary">${this.escapeHtml(trust.trusted_at ? `Trusted ${this.formatFactoryTime(trust.trusted_at)}` : "")}${this.escapeHtml(trust.revoked_at ? ` Revoked ${this.formatFactoryTime(trust.revoked_at)}` : "")}</div>
+        `;
+    },
+
+    trustedPacketPayload(confirmField) {
+        return {
+            [confirmField]: true,
+            trust_level: document.getElementById("trusted-packet-level")?.value || "standard",
+            trust_reviewer: document.getElementById("trusted-packet-reviewer")?.value || "",
+            trust_reason: document.getElementById("trusted-packet-reason")?.value || "",
+            trust_notes: document.getElementById("trusted-packet-notes")?.value || "",
+        };
+    },
+
+    async trustSelectedWorkPacket() {
+        const packetId = this.latestStagedWorkPacket?.work_packet_id;
+        if (!packetId) {
+            NexusCore.showToast("Stage a work packet before marking trust.", "error");
+            return;
+        }
+        if (!(await NexusCore.confirmAction("Mark this work packet trusted?", {
+            title: "Trust Work Packet",
+            confirmLabel: "Mark Trusted",
+            variant: "primary",
+        }))) {
+            return;
+        }
+        try {
+            const response = await fetch(`/api/work-packets/${packetId}/trust`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(this.trustedPacketPayload("confirm_trust")),
+            });
+            const data = await response.json();
+            if (!response.ok || data.status !== "success") {
+                throw new Error(data.message || "Unable to mark packet trusted.");
+            }
+            this.latestStagedWorkPacket = {...this.latestStagedWorkPacket, trust: data.trust};
+            await this.loadTrustedPacketStatus();
+            NexusCore.showToast("Work packet marked trusted.", "success");
+        } catch (error) {
+            NexusCore.showToast(`Trust update failed: ${error.message}`, "error");
+        }
+    },
+
+    async revokeSelectedWorkPacketTrust() {
+        const packetId = this.latestStagedWorkPacket?.work_packet_id;
+        if (!packetId) {
+            NexusCore.showToast("Stage a work packet before revoking trust.", "error");
+            return;
+        }
+        if (!(await NexusCore.confirmAction("Revoke trust for this work packet?", {
+            title: "Revoke Packet Trust",
+            confirmLabel: "Revoke Trust",
+            variant: "warning",
+        }))) {
+            return;
+        }
+        try {
+            const response = await fetch(`/api/work-packets/${packetId}/revoke-trust`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(this.trustedPacketPayload("confirm_revoke")),
+            });
+            const data = await response.json();
+            if (!response.ok || data.status !== "success") {
+                throw new Error(data.message || "Unable to revoke packet trust.");
+            }
+            this.latestStagedWorkPacket = {...this.latestStagedWorkPacket, trust: data.trust};
+            await this.loadTrustedPacketStatus();
+            NexusCore.showToast("Work packet trust revoked.", "success");
+        } catch (error) {
+            NexusCore.showToast(`Trust revoke failed: ${error.message}`, "error");
         }
     },
 

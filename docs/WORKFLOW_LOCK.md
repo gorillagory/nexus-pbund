@@ -67,6 +67,8 @@ Packet 025 added Branch Per Packet as a supervised branch preparation helper. It
 
 Packet 026 added the Operator Intervention Queue as the human review and decision lane. It records blockers, required review, recommended actions, and operator notes. It does not execute tasks, run packets, run Codex, retry or continue failed runs, recover automatically, perform Git actions, or start Auto-Pilot. Recovery controls remain separate.
 
+Packet 027 added Trusted Packet Mode as a supervised trust gate. Operators may mark reviewed work packets as trusted or revoke trust with explicit confirmation and a recorded reason. Enabling Trusted Packet Mode does not execute anything, does not unlock Auto-Pilot, and does not bypass explicit operator execution. When enabled, supervised packet execution rejects packets unless `trust_status=trusted`.
+
 ## Recovery Flow
 
 When a run fails:
@@ -96,6 +98,8 @@ The dashboard Git Explorer is read-only. Operator/Codex may still perform routin
 Branch Per Packet is the narrow exception for app-level git writes. It may prepare one validated packet branch at a time after clean-worktree checks. Codex operator workflow may still perform verified commit, fast-forward merge, baseline tag, and push outside the app.
 
 The Operator Intervention Queue is record keeping only. It may create, acknowledge, resolve, dismiss, and update intervention records. It must not become a hidden execution, recovery, or Git write path.
+
+Trusted Packet Mode is restrictive only. It may update packet trust metadata and settings, and it may block supervised packet execution for untrusted packets. It must not add autonomous execution, direct Codex execution, retry/continue automation, or Git write controls.
 
 ## Safety Rules
 

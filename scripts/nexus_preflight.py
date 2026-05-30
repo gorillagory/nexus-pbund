@@ -33,6 +33,7 @@ PY_COMPILE_FILES = [
     "src/services/operator_interventions.py",
     "src/services/packet_branch.py",
     "src/services/prompt_vault.py",
+    "src/services/trusted_packets.py",
 ]
 
 VERIFY_SCRIPTS = [

@@ -19,6 +19,7 @@ Completed capabilities:
 - Packet 024 Git Explorer foundation for read-only repository visibility.
 - Packet 025 Branch Per Packet foundation for supervised packet branch preparation.
 - Packet 026 Operator Intervention Queue foundation for human review and decision tracking.
+- Packet 027 Trusted Packet Mode foundation for reviewed packet trust metadata and restrictive execution gating.
 
 ## Sprint 2 Goal
 
@@ -32,7 +33,7 @@ Remote-operable supervised factory. The operator should be able to capture inten
 4. Git Explorer. Complete as Packet 024 foundation.
 5. Branch Per Packet. Complete as Packet 025 foundation.
 6. Operator Intervention Queue. Complete as Packet 026 foundation.
-7. Trusted Packet Mode.
+7. Trusted Packet Mode. Complete as Packet 027 foundation.
 
 Inbox capture rule: raw ideas are captured first, then triaged into a scoped task, work packet, document update, or explicit discard. The inbox must not execute work.
 
@@ -43,6 +44,8 @@ Git Explorer rule: dashboard Git inspection is read-only. It may show branch, st
 Branch Per Packet rule: the app may only prepare a validated `factory/packet-###-safe-slug` branch from clean `main` after explicit operator confirmation. It must not commit, merge, push, pull, fetch, reset, clean, rebase, stash, tag, delete branches, or expose arbitrary checkout.
 
 Operator Intervention Queue rule: the queue records human review items, blockers, recommended actions, and operator notes. It may acknowledge, resolve, dismiss, and update queue records only. It must not execute tasks, run packets, run Codex, retry or continue failed runs, recover automatically, perform Git actions, or start Auto-Pilot.
+
+Trusted Packet Mode rule: operators may mark reviewed packets trusted or revoke trust with explicit confirmation and a recorded reason. Enabling Trusted Packet Mode does not execute automatically and does not unlock Auto-Pilot. When enabled, supervised packet execution is restricted to packets with `trust_status=trusted`.
 
 Local configuration:
 

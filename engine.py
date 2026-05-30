@@ -336,6 +336,7 @@ class NexusEngine:
             "execution_mode": "manual",
             "discord_router_enabled": False,
             "discord_ingest_secret": "",
+            "trusted_packet_mode_enabled": False,
         }
 
         saved = {}
@@ -378,6 +379,7 @@ class NexusEngine:
 
         defaults["execution_mode"] = normalize_execution_mode(defaults.get("execution_mode"))
         defaults["discord_router_enabled"] = normalize_bool(defaults.get("discord_router_enabled"))
+        defaults["trusted_packet_mode_enabled"] = normalize_bool(defaults.get("trusted_packet_mode_enabled"))
 
         return defaults
 
@@ -393,6 +395,7 @@ class NexusEngine:
             "execution_mode",
             "discord_router_enabled",
             "discord_ingest_secret",
+            "trusted_packet_mode_enabled",
         }
         secret_keys = {"api_key", "gemini_api_key", "openai_api_key", "discord_ingest_secret"}
 
@@ -413,6 +416,7 @@ class NexusEngine:
 
         self.settings["execution_mode"] = normalize_execution_mode(self.settings.get("execution_mode"))
         self.settings["discord_router_enabled"] = normalize_bool(self.settings.get("discord_router_enabled"))
+        self.settings["trusted_packet_mode_enabled"] = normalize_bool(self.settings.get("trusted_packet_mode_enabled"))
 
         with open(self.settings_file, "w", encoding="utf-8") as file:
             json.dump(self.settings, file, indent=2)
@@ -447,6 +451,7 @@ class NexusEngine:
         public["execution_mode"] = self.get_execution_mode()
         public["automatic_analysis_enabled"] = self.is_automatic_analysis_enabled()
         public["discord_router_enabled"] = normalize_bool(self.settings.get("discord_router_enabled"))
+        public["trusted_packet_mode_enabled"] = normalize_bool(self.settings.get("trusted_packet_mode_enabled"))
 
         gemini_key = (self.settings.get("gemini_api_key") or "").strip()
         openai_key = (self.settings.get("openai_api_key") or "").strip()

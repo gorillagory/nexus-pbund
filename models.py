@@ -196,12 +196,19 @@ class WorkPacket(Base):
     stop_condition: Mapped[str] = mapped_column(Text, nullable=False, default="", server_default="")
     estimated_minutes: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="staged", server_default="staged")
+    trust_status: Mapped[str] = mapped_column(String(32), nullable=False, default="unreviewed", server_default="unreviewed")
+    trust_level: Mapped[str] = mapped_column(String(32), nullable=False, default="standard", server_default="standard")
+    trust_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    trust_reviewer: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    trust_notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
     started_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     failed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    trusted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    revoked_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class WorkPacketTask(Base):
