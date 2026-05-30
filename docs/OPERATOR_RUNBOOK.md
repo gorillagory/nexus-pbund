@@ -25,6 +25,34 @@ For a packet:
 python3 scripts/nexus_preflight.py --packet 36 --report /tmp/nexus-preflight-packet-036.md
 ```
 
+## Server-Side Codex Job Runner
+
+Use the Server-Side Codex Job Runner, or `tmux`, for long Codex work from a phone or unstable SSH client. Do not run long Codex jobs in raw phone SSH foreground because the client can disconnect while the server-side work is still running without a durable report path.
+
+Create a prompt file outside the repo or under `/tmp`, then start a detached job:
+
+```bash
+python3 scripts/nexus_codex_job.py start --name packet_039 --prompt-file /tmp/packet-039-prompt.txt --expect-report /tmp/nexus-packet-039-server-side-codex-job-runner-report.md
+```
+
+The start command prints the job id, job directory, combined log path, and status path. Job data is stored under `/tmp/nexus-codex-jobs/<job-id>/` with `prompt.txt`, `combined.log`, `runner.log`, `status.json`, `pid`, `started_at`, and `finished_at` when complete. The runner records report expectation only; it does not write reports into the repo by default.
+
+Check status after a disconnect:
+
+```bash
+python3 scripts/nexus_codex_job.py list
+python3 scripts/nexus_codex_job.py status --job-id <job-id>
+python3 scripts/nexus_codex_job.py tail --job-id <job-id>
+```
+
+To stop a job, use only the recorded job id:
+
+```bash
+python3 scripts/nexus_codex_job.py stop --job-id <job-id>
+```
+
+The stop command targets only the PID recorded for that job and verifies the process where possible. Do not use broad `pkill`, `killall`, force push, reset, or clean as recovery shortcuts. If SSH drops, reconnect, run `list`, inspect `status`, tail the log, check the expected report path, then resume normal verification and Git workflow.
+
 ## Factory Console
 
 - Use Command Center for mode, preflight, CI, Git Explorer summary, and Branch Per Packet status.
@@ -127,5 +155,5 @@ cat docs/RECOVERY_RUNBOOK.md
 - No raw Discord webhook URL exposure in docs, reports, UI, API responses, events, notifications, or prompts.
 - Git Explorer is read-only.
 - No force push, reset, clean, branch deletion, or broad Git write controls in the app.
-- No `shell=True` or `subprocess.Popen`.
+- No `shell=True`. No `subprocess.Popen` in dashboard.py or src/services. The narrow exception is `scripts/nexus_codex_job.py`, which uses `subprocess.Popen` only to launch a detached local operator job runner after a human explicitly runs the CLI.
 - No native browser `alert()` or `confirm()`.

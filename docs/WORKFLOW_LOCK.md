@@ -69,6 +69,30 @@ Packet 032 added Operator Review History. It records human review decisions and 
 
 Automatic analysis is enabled only for Auto-Pilot.
 
+## Server-Side Codex Job Runner
+
+Packet 039 adds the Server-Side Codex Job Runner for local operator reliability. It is a terminal-only CLI utility at `scripts/nexus_codex_job.py`; it is not an app route, API route, dashboard control, Discord command surface, packet executor, task executor, Auto-Pilot unlock, or Git write feature.
+
+Use the job runner, or `tmux`, for long Codex jobs from a mobile SSH session. Do not run long Codex jobs in raw phone SSH foreground. A client disconnect must not be allowed to hide live work, logs, status, or report expectations.
+
+Start a detached local Codex job with:
+
+```bash
+python3 scripts/nexus_codex_job.py start --name packet_039 --prompt-file /tmp/packet-039-prompt.txt --expect-report /tmp/nexus-packet-039-server-side-codex-job-runner-report.md
+```
+
+Recover after disconnect with:
+
+```bash
+python3 scripts/nexus_codex_job.py list
+python3 scripts/nexus_codex_job.py status --job-id <job-id>
+python3 scripts/nexus_codex_job.py tail --job-id <job-id>
+```
+
+Jobs live under `/tmp/nexus-codex-jobs/<job-id>/` and keep copied prompt text, bounded status metadata, PID tracking, and combined logs outside repo working files. `stop --job-id <job-id>` may stop only the recorded managed process and must not become broad `pkill` or `killall` behavior.
+
+No Auto-Pilot, app/API execution controls, Discord execution, packet auto-execution, task auto-execution, broad Git write controls, raw secret exposure, or report writes into the repo are added by this runner.
+
 ## Factory Console Visibility
 
 The Factory Console is the operator surface for mode, automatic analysis state, Git state, preflight, CI metadata, recent events, execution runs, changed files, and recovery actions.
@@ -155,7 +179,9 @@ Sprint 4 must preserve the same supervised boundaries:
 
 Packet 038 adds the Mobile Operator Notification Bridge. It may send outbound Discord alerts to the operator's phone when Nexus needs attention, but it is notification-only. Discord notifications must never include raw secrets, webhook URLs, full stdout/stderr, or execution controls, and they must not allow Discord to execute Codex, tasks, packets, Git actions, trust changes, retry/continue behavior, or Auto-Pilot.
 
-The recommended next packet is Packet 039 -- Environment Validation And Startup Diagnostics. It should provide diagnostics and health visibility only, without execution routes, Git writes, raw secret exposure, or Auto-Pilot behavior.
+Packet 039 adds the Server-Side Codex Job Runner. It is a local operator CLI reliability utility only. It keeps long Codex work detached from fragile SSH clients and writes status/logs under `/tmp/nexus-codex-jobs`, while preserving the app/API, Discord, Auto-Pilot, packet execution, task execution, and Git-write boundaries.
+
+The recommended next packet is Packet 040 -- Simple Operator Flow. It should resume operator flow work only after using a server-side job runner or `tmux` for long Codex sessions.
 
 ## Safety Rules
 
@@ -165,6 +191,7 @@ The recommended next packet is Packet 039 -- Environment Validation And Startup 
 - No raw secrets in UI, logs, prompts, reports, or events.
 - No Auto-Pilot unless explicitly building or testing it.
 - No execution routes unless the packet explicitly permits them.
+- No raw phone SSH foreground for long Codex jobs; use `scripts/nexus_codex_job.py` or `tmux`.
 
 ## Operator Rule
 
