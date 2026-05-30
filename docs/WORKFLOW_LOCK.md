@@ -135,6 +135,26 @@ Sprint 3 must preserve explicit execution. No Sprint 3 packet should start Auto-
 
 Packet-aware preflight does not replace the locked workflow. Human review, readiness checks, trusted packet decisions, supervised execution, recovery review, baseline tagging, and push remain explicit operator steps.
 
+## Sprint 4 Direction Lock
+
+Sprint 3 is complete at Packet 036. Sprint 4 is locked in `docs/SPRINT_4_PLAN.md` and focuses on production hardening, operator observability, workflow integrity, verification maturity, and onboarding quality.
+
+Packet 037 is planning-only. It does not add runtime behavior, execution behavior, Git write behavior, retry or continue automation, trust automation, direct Discord execution, or Auto-Pilot behavior.
+
+Sprint 4 must preserve the same supervised boundaries:
+
+- Auto-Pilot remains locked.
+- Discord remains capture-only.
+- Git Explorer remains read-only.
+- Branch Per Packet remains narrow.
+- Trusted Packet Mode remains restrictive only.
+- Operator Intervention Queue remains manual decision tracking.
+- Operator Review History remains audit-only.
+- Packet-aware preflight remains checks and reporting only.
+- Execution remains supervised and explicit.
+
+The recommended next packet is Packet 038 -- Environment Validation And Startup Diagnostics. It should provide diagnostics and health visibility only, without execution routes, Git writes, raw secret exposure, or Auto-Pilot behavior.
+
 ## Safety Rules
 
 - no force push.

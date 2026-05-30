@@ -66,13 +66,13 @@ Runbook rule: `docs/OPERATOR_RUNBOOK.md`, `docs/DEPLOYMENT_RUNBOOK.md`, and `doc
 
 ## Sprint 3 Direction
 
-Sprint 3 should prioritize supervised workflow quality, not autonomy. The main goal is to make captured intent flow cleanly into reviewed, ready, trusted work packets while preserving explicit human execution.
+Sprint 3 is complete. It prioritized supervised workflow quality, not autonomy, and made captured intent flow into reviewed, ready, trusted work packets while preserving explicit human execution.
 
 Do not automatically choose Auto-Pilot. Auto-Pilot remains out of scope until explicitly approved.
 
-## Recommended Packet Roadmap
+## Sprint 3 Packet Roadmap
 
-1. Packet 028 — Sprint 3 Direction Lock. Type: docs/planning, safety. Boundary: documents direction only; no runtime behavior.
+1. Packet 028 — Sprint 3 Direction Lock. Type: docs/planning, safety. Boundary: documents direction only; no runtime behavior. Complete.
 2. Packet 029 — Inbox Triage Conversion Flow. Type: workflow, backend, UI. Boundary: converts inbox items into task, staged untrusted work packet, document update note, or discard audit only; no execution. Complete.
 3. Packet 030 — Packet Drafting Assistant. Type: workflow, backend, UI. Boundary: uses Prompt Vault templates and selected context to draft, save, review, and copy packet text; does not run Codex, stage automatically, or trust packets. Complete.
 4. Packet 031 — Work Packet Readiness Checklist. Type: safety, backend, UI. Boundary: validates safety rules, files allowed, verification commands, and trust visibility before readiness; does not execute or trust packets. Complete.
@@ -86,7 +86,25 @@ Do not automatically choose Auto-Pilot. Auto-Pilot remains out of scope until ex
 
 Sprint 3 is complete at Packet 036. The supervised factory now has capture-first intake, triage conversion, packet drafting, readiness checks, review history, console consolidation, packet-aware preflight, hardened Discord capture, and operator/deployment/recovery runbooks.
 
-Next planning should define Sprint 4 before adding new runtime behavior. Auto-Pilot remains locked until explicitly scoped.
+Packet 037 locks the Sprint 4 direction before adding new runtime behavior. Auto-Pilot remains locked until explicitly scoped.
+
+## Sprint 4 Direction
+
+Sprint 4 focuses on production hardening, operator observability, workflow integrity, verification maturity, and onboarding quality for the supervised factory.
+
+The Sprint 4 plan is maintained in `docs/SPRINT_4_PLAN.md`. The recommended next packet is Packet 038 — Environment Validation And Startup Diagnostics.
+
+## Sprint 4 Packet Roadmap
+
+1. Packet 037 — Sprint 4 Direction Lock. Type: docs/planning, safety. Boundary: documents direction only; no runtime behavior. Complete.
+2. Packet 038 — Environment Validation And Startup Diagnostics. Type: infra, safety, observability. Boundary: diagnostics only; no execution routes, no Git writes, no raw secrets, no Auto-Pilot.
+3. Packet 039 — Work Packet Lifecycle State Map. Type: workflow, UI, safety. Boundary: state visibility and metadata guidance only; no execution, no automatic trust, no branch or Git writes.
+4. Packet 040 — Linked Operator Context Timeline. Type: observability, UI. Boundary: read-only timeline and append-only notes only; no retry, continue, execution, trust automation, or Git mutation.
+5. Packet 041 — Preflight Verifier Registry. Type: testing, safety, workflow. Boundary: checks and reporting only; no auto-fix, no execution routes, no workflow packet execution.
+6. Packet 042 — CI Report Artifact Polish. Type: infra, testing, observability. Boundary: CI reporting only; no deployment automation, no execution expansion, no secrets.
+7. Packet 043 — Operator Troubleshooting Matrix. Type: docs, onboarding, recovery. Boundary: documentation only; no runtime behavior.
+8. Packet 044 — Discord Setup And Notification Harness. Type: integration, docs, testing. Boundary: Discord remains capture-only or notification-only; no Discord-triggered Codex, task, packet, Git, trust, recovery, or Auto-Pilot actions.
+9. Packet 045 — Sprint 4 Closure And Next Direction Lock. Type: docs/planning. Boundary: planning only; no runtime behavior.
 
 ## Local Configuration Notes
 

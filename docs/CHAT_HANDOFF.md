@@ -4,7 +4,8 @@
 - Current branch: `main`
 - Current commit at prior chat handoff: `208dbdbaecd646b013a590fae2db32d06daff408`
 - Prior chat handoff summary: `208dbdb add chat handoff for next session`
-- Latest Packet 036 baseline tag: `nexus-deployment-operator-runbooks-baseline-2026-05-30`
+- Latest Packet 037 baseline tag: `nexus-sprint-4-direction-baseline-2026-05-30`
+- Previous Packet 036 baseline tag: `nexus-deployment-operator-runbooks-baseline-2026-05-30`
 - Previous Packet 035 baseline tag: `nexus-discord-capture-hardening-baseline-2026-05-30`
 - Recent visible baseline tags:
   - `nexus-workflow-lock-prompt-vault-baseline-2026-05-29`
@@ -38,6 +39,7 @@
 - Packet-Aware Preflight Expansion
 - Discord Capture Hardening
 - Deployment and Operator Runbooks
+- Sprint 4 Direction Lock
 - Workflow Lock docs
 - Orchestration-ready workflow foundation
 - Supervised packet runner
@@ -108,7 +110,8 @@
 - Packet 034 — Packet-Aware Preflight Expansion complete
 - Packet 035 — Discord Capture Hardening complete
 - Packet 036 — Deployment And Operator Runbooks complete
-- Next — Sprint 4 Direction Lock
+- Packet 037 — Sprint 4 Direction Lock complete
+- Next — Packet 038 — Environment Validation And Startup Diagnostics
 
 ## New Chat Startup Instructions
 Ask the user to run this local context capture before planning new implementation work:
@@ -123,6 +126,7 @@ cat docs/CHAT_HANDOFF.md
 cat docs/WORKFLOW_LOCK.md
 cat docs/SPRINT_PLAN.md
 cat docs/SPRINT_3_PLAN.md
+cat docs/SPRINT_4_PLAN.md
 cat docs/PROMPTING_GUIDE.md
 cat docs/OPERATOR_RUNBOOK.md
 cat docs/DEPLOYMENT_RUNBOOK.md
@@ -140,4 +144,4 @@ Prefer one pasteable Codex operator prompt for local execution. Reduce manual co
 
 Keep the safety rails in this document. Do not force push, reset, clean, run destructive database operations, expose API keys, or start Auto-Pilot unless the user explicitly asks for that exact work.
 
-Packet 036 adds Operator, Deployment, and Recovery runbooks. Sprint 3 is complete. The next recommended step is Sprint 4 Direction Lock before new runtime feature work. Keep the work supervised: no Auto-Pilot, no direct Discord execution, no broad Git writes, no automatic recovery, no automatic trust, and no execution without explicit operator action.
+Packet 037 locks Sprint 4 direction. Sprint 3 is complete. The next recommended packet is Packet 038 — Environment Validation And Startup Diagnostics. Keep the work supervised: no Auto-Pilot, no direct Discord execution, no broad Git writes, no automatic recovery, no automatic trust, and no execution without explicit operator action.
