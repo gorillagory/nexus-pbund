@@ -47,13 +47,15 @@ Use Prompt Vault templates and inbox context to help draft packet text that the 
 
 Safety boundary: drafting and copying only. No automatic staging or execution. Next recommended packet.
 
+Status: complete. Packet 030 adds a draft-only Packet Drafting Assistant with Prompt Vault template selection, inbox/work-packet/manual source context, deterministic structured prompt generation, saved draft records, review marking, and copy-to-clipboard. It does not execute generated drafts, stage automatically, trust packets, or call execution routes.
+
 ### Packet 031 — Work Packet Readiness Checklist
 
 Type: safety, backend, UI.
 
 Track whether a staged packet includes mission, safety rules, files allowed, verification commands, trust metadata, and rollback/stop criteria.
 
-Safety boundary: readiness metadata only. Does not execute or bypass trust.
+Safety boundary: readiness metadata only. Does not execute or bypass trust. Next recommended packet.
 
 ### Packet 032 — Operator Review History
 

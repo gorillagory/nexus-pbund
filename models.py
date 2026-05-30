@@ -182,6 +182,34 @@ class InboxConversion(Base):
     updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
+class PacketPromptDraft(Base):
+    __tablename__ = "packet_prompt_drafts"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    workspace_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("workspaces.id"), nullable=False
+    )
+    work_packet_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("work_packets.id"), nullable=True
+    )
+    inbox_item_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("orchestration_inbox_items.id"), nullable=True
+    )
+    source_type: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    source_id: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    template_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("prompt_templates.id"), nullable=True)
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    draft_body: Mapped[str] = mapped_column(Text, nullable=False)
+    category: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    safety_notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    verification_notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="draft", server_default="draft")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
 class OperatorIntervention(Base):
     __tablename__ = "operator_interventions"
 

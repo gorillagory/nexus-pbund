@@ -40,6 +40,8 @@ Packets use the Codex operator prompt structure:
 - Commit / merge / push instructions
 - Report path under `/tmp`
 
+Packet 030 added the Packet Drafting Assistant. It may collect manual, inbox, or work-packet context, use Prompt Vault templates, generate deterministic structured packet drafts, save draft records, mark drafts reviewed, and copy draft text. It is draft/review/copy/save only: it must not execute generated prompts, stage work automatically, call execution routes, perform Git writes, retry or continue runs, or start Auto-Pilot. It does not trust packets automatically.
+
 ## Prompt Vault Usage
 
 Reusable prompts belong in the Prompt Vault. Use categories such as feature, bugfix, upgrade, refactor, infra, testing, docs, security, recovery, analysis, schema, uiux, discord, git, and ci.

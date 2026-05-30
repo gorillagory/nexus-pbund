@@ -42,6 +42,8 @@ window.NexusApp = {
     latestPacketBranchStatus: null,
     latestTrustedPacketMode: null,
     latestInboxConversionOptions: null,
+    latestPacketDrafting: null,
+    selectedPacketPromptDraft: null,
     orchestrationInboxItems: [],
     selectedOrchestrationInboxItem: null,
     operatorInterventions: [],
@@ -2107,6 +2109,105 @@ window.NexusApp = {
                         Preview extracted tasks before staging them to To-Do.
                     </div>
                 </div>
+                <div id="packet-drafting-panel" class="packet-drafting-panel mb-4">
+                    <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-3">
+                        <div>
+                            <h5 class="text-dark fw-semibold mb-1">Packet Drafting Assistant</h5>
+                            <p class="text-secondary small mb-0">Draft, review, save, and copy packet prompts only. Generated drafts are not executed and do not mark packets trusted.</p>
+                        </div>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="NexusApp.loadPacketDraftingStatus()">Refresh Drafting Context</button>
+                    </div>
+                    <div id="packet-drafting-status" class="small text-secondary mb-3">Packet Drafting Assistant not loaded.</div>
+                    <div class="row g-3">
+                        <div class="col-lg-4">
+                            <label for="packet-drafting-source" class="form-label small text-secondary mb-1">Source Context</label>
+                            <select id="packet-drafting-source" class="form-select form-select-sm">
+                                <option value="manual:">Manual draft</option>
+                            </select>
+                        </div>
+                        <div class="col-lg-4">
+                            <label for="packet-drafting-template" class="form-label small text-secondary mb-1">Prompt Vault Template</label>
+                            <select id="packet-drafting-template" class="form-select form-select-sm">
+                                <option value="">No template</option>
+                            </select>
+                        </div>
+                        <div class="col-lg-2">
+                            <label for="packet-drafting-number" class="form-label small text-secondary mb-1">Packet</label>
+                            <input id="packet-drafting-number" class="form-control form-control-sm" maxlength="16" placeholder="030">
+                        </div>
+                        <div class="col-lg-2">
+                            <label for="packet-drafting-category" class="form-label small text-secondary mb-1">Category</label>
+                            <select id="packet-drafting-category" class="form-select form-select-sm">
+                                <option value="feature">feature</option>
+                                <option value="bugfix">bugfix</option>
+                                <option value="upgrade">upgrade</option>
+                                <option value="refactor">refactor</option>
+                                <option value="infra">infra</option>
+                                <option value="testing">testing</option>
+                                <option value="docs">docs</option>
+                                <option value="security">security</option>
+                                <option value="recovery">recovery</option>
+                                <option value="analysis">analysis</option>
+                                <option value="schema">schema</option>
+                                <option value="uiux">uiux</option>
+                                <option value="discord">discord</option>
+                                <option value="git">git</option>
+                                <option value="ci">ci</option>
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <label for="packet-drafting-title" class="form-label small text-secondary mb-1">Packet Title</label>
+                            <input id="packet-drafting-title" class="form-control form-control-sm" maxlength="255" placeholder="Packet Drafting Assistant">
+                        </div>
+                        <div class="col-12">
+                            <label for="packet-drafting-goal" class="form-label small text-secondary mb-1">Goal</label>
+                            <textarea id="packet-drafting-goal" class="form-control form-control-sm" rows="3"></textarea>
+                        </div>
+                        <div class="col-lg-6">
+                            <label for="packet-drafting-safety" class="form-label small text-secondary mb-1">Safety Notes</label>
+                            <textarea id="packet-drafting-safety" class="form-control form-control-sm" rows="4">Keep changes scoped. Preserve supervised execution. Do not execute generated drafts.</textarea>
+                        </div>
+                        <div class="col-lg-6">
+                            <label for="packet-drafting-verification" class="form-label small text-secondary mb-1">Verification Notes</label>
+                            <textarea id="packet-drafting-verification" class="form-control form-control-sm" rows="4">Run py_compile, relevant packet verifier, quick preflight, regression suite, and git diff --check.</textarea>
+                        </div>
+                        <div class="col-lg-6">
+                            <label for="packet-drafting-files" class="form-label small text-secondary mb-1">Files Allowed</label>
+                            <textarea id="packet-drafting-files" class="form-control form-control-sm" rows="3">Use only files directly needed after repo inspection.</textarea>
+                        </div>
+                        <div class="col-lg-6">
+                            <label for="packet-drafting-report" class="form-label small text-secondary mb-1">Report Path</label>
+                            <input id="packet-drafting-report" class="form-control form-control-sm" maxlength="255" placeholder="/tmp/nexus-packet-030-report.md">
+                            <label for="packet-drafting-branch" class="form-label small text-secondary mb-1 mt-2">Branch Name</label>
+                            <input id="packet-drafting-branch" class="form-control form-control-sm" maxlength="160" placeholder="factory/packet-030-packet-drafting-assistant">
+                        </div>
+                        <div class="col-12">
+                            <label for="packet-drafting-current-state" class="form-label small text-secondary mb-1">Current State Override</label>
+                            <textarea id="packet-drafting-current-state" class="form-control form-control-sm" rows="3" placeholder="Optional. Leave blank to use selected source context."></textarea>
+                        </div>
+                        <div class="col-12">
+                            <label for="packet-drafting-parts" class="form-label small text-secondary mb-1">Implementation Parts</label>
+                            <textarea id="packet-drafting-parts" class="form-control form-control-sm" rows="3" placeholder="Optional phased implementation notes."></textarea>
+                        </div>
+                    </div>
+                    <div class="d-flex gap-2 flex-wrap mt-3">
+                        <button type="button" class="btn btn-primary btn-sm" onclick="NexusApp.generatePacketDraft()">Generate Draft</button>
+                        <button type="button" class="btn btn-outline-primary btn-sm" onclick="NexusApp.savePacketDraft()">Save Draft</button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="NexusApp.copyPacketDraft()">Copy Draft</button>
+                        <button type="button" class="btn btn-outline-success btn-sm" onclick="NexusApp.markSelectedPacketDraftReviewed()">Mark Reviewed</button>
+                    </div>
+                    <textarea id="packet-drafting-output" class="form-control font-monospace small mt-3" rows="14" placeholder="Generated packet prompt draft appears here."></textarea>
+                    <div class="row g-3 mt-1">
+                        <div class="col-lg-5">
+                            <h6 class="text-dark fw-semibold mb-2">Saved Drafts</h6>
+                            <div id="packet-drafting-drafts" class="prompt-vault-list small text-secondary">No packet drafts loaded.</div>
+                        </div>
+                        <div class="col-lg-7">
+                            <h6 class="text-dark fw-semibold mb-2">Draft Validation</h6>
+                            <div id="packet-drafting-validation" class="factory-console-panel small text-secondary">Generate or load a draft to validate sections.</div>
+                        </div>
+                    </div>
+                </div>
                 <div class="bg-light border rounded p-3 mb-4">
                     <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-3">
                         <div>
@@ -2199,6 +2300,7 @@ window.NexusApp = {
         this.updateAutoPilotUI();
         this.renderCostLedger(this.latestCostLedger);
         this.loadTrustedPacketStatus();
+        this.loadPacketDraftingStatus();
         this.loadCostLedger();
     },
 
@@ -2286,6 +2388,267 @@ window.NexusApp = {
     extractCodexCommand(description) {
         const match = String(description || "").match(/codex\s+"(?:\\.|[^"\\])*"/);
         return match ? match[0] : "";
+    },
+
+    packetDraftingSource() {
+        const value = document.getElementById("packet-drafting-source")?.value || "manual:";
+        const [sourceType, sourceId = ""] = value.split(":");
+        return {
+            source_type: sourceType || "manual",
+            source_id: sourceId || "",
+        };
+    },
+
+    packetDraftingPayload(confirmField = null) {
+        const source = this.packetDraftingSource();
+        const payload = {
+            ...source,
+            template_id: document.getElementById("packet-drafting-template")?.value || "",
+            packet_number: document.getElementById("packet-drafting-number")?.value || "",
+            packet_title: document.getElementById("packet-drafting-title")?.value || "",
+            title: document.getElementById("packet-drafting-title")?.value || "",
+            category: document.getElementById("packet-drafting-category")?.value || "feature",
+            goal: document.getElementById("packet-drafting-goal")?.value || "",
+            safety_notes: document.getElementById("packet-drafting-safety")?.value || "",
+            verification_notes: document.getElementById("packet-drafting-verification")?.value || "",
+            files_allowed: document.getElementById("packet-drafting-files")?.value || "",
+            current_state: document.getElementById("packet-drafting-current-state")?.value || "",
+            implementation_parts: document.getElementById("packet-drafting-parts")?.value || "",
+            branch_name: document.getElementById("packet-drafting-branch")?.value || "",
+            report_path: document.getElementById("packet-drafting-report")?.value || "",
+            draft_body: document.getElementById("packet-drafting-output")?.value || "",
+        };
+        if (source.source_type === "inbox_item") {
+            payload.inbox_item_id = source.source_id;
+        }
+        if (source.source_type === "work_packet") {
+            payload.work_packet_id = source.source_id;
+        }
+        if (confirmField) {
+            payload[confirmField] = true;
+        }
+        return payload;
+    },
+
+    async loadPacketDraftingStatus() {
+        const status = document.getElementById("packet-drafting-status");
+        if (status) {
+            status.textContent = "Loading packet drafting context...";
+        }
+        try {
+            const response = await fetch("/api/packet-drafting/status");
+            const payload = await response.json();
+            if (!response.ok || payload.status !== "success") {
+                throw new Error(payload.message || "Unable to load packet drafting context.");
+            }
+            this.latestPacketDrafting = payload.packet_drafting || {};
+            this.renderPacketDraftingStatus();
+        } catch (error) {
+            if (status) {
+                status.textContent = `Packet Drafting Assistant unavailable: ${error.message}`;
+            }
+            NexusCore.showToast(`Packet drafting error: ${error.message}`, "error");
+        }
+    },
+
+    renderPacketDraftingStatus() {
+        const data = this.latestPacketDrafting || {};
+        const status = document.getElementById("packet-drafting-status");
+        const sourceSelect = document.getElementById("packet-drafting-source");
+        const templateSelect = document.getElementById("packet-drafting-template");
+        const drafts = document.getElementById("packet-drafting-drafts");
+        if (status) {
+            const draftCount = Array.isArray(data.drafts) ? data.drafts.length : 0;
+            const templateCount = Array.isArray(data.templates) ? data.templates.length : 0;
+            status.textContent = `Draft-only mode. ${templateCount} templates available. ${draftCount} saved drafts loaded.`;
+        }
+        if (sourceSelect) {
+            const current = sourceSelect.value;
+            const sources = data.sources || {};
+            const inboxItems = Array.isArray(sources.inbox_items) ? sources.inbox_items : [];
+            const workPackets = Array.isArray(sources.work_packets) ? sources.work_packets : [];
+            sourceSelect.innerHTML = '<option value="manual:">Manual draft</option>';
+            inboxItems.forEach((item) => {
+                const option = document.createElement("option");
+                option.value = `inbox_item:${item.id}`;
+                option.textContent = `Inbox #${item.id}: ${item.title || "Untitled"}`;
+                sourceSelect.appendChild(option);
+            });
+            workPackets.forEach((packet) => {
+                const option = document.createElement("option");
+                option.value = `work_packet:${packet.id}`;
+                option.textContent = `Packet #${packet.id}: ${packet.title || "Untitled"}`;
+                sourceSelect.appendChild(option);
+            });
+            if ([...sourceSelect.options].some((option) => option.value === current)) {
+                sourceSelect.value = current;
+            }
+        }
+        if (templateSelect) {
+            const current = templateSelect.value;
+            const templates = Array.isArray(data.templates) ? data.templates : [];
+            templateSelect.innerHTML = '<option value="">No template</option>';
+            templates.forEach((template) => {
+                const option = document.createElement("option");
+                option.value = String(template.id || "");
+                option.textContent = `${template.category || "feature"} / ${template.title || "Untitled"}`;
+                templateSelect.appendChild(option);
+            });
+            if ([...templateSelect.options].some((option) => option.value === current)) {
+                templateSelect.value = current;
+            }
+        }
+        if (drafts) {
+            const draftItems = Array.isArray(data.drafts) ? data.drafts : [];
+            if (!draftItems.length) {
+                drafts.textContent = "No saved packet drafts.";
+            } else {
+                drafts.innerHTML = draftItems.map((draft) => `
+                    <button type="button" class="prompt-vault-list-item" onclick="NexusApp.selectPacketPromptDraft(${Number(draft.id) || 0})">
+                        <span class="prompt-vault-list-title">${this.escapeHtml(draft.title || "Untitled Draft")}</span>
+                        <span class="prompt-vault-list-meta">
+                            <span class="prompt-vault-badge">${this.escapeHtml(draft.status || "draft")}</span>
+                            <span class="prompt-vault-badge">${this.escapeHtml(draft.category || "feature")}</span>
+                            ${draft.source_type ? `<span class="prompt-vault-badge">${this.escapeHtml(draft.source_type)}</span>` : ""}
+                        </span>
+                        <span class="text-secondary small">${this.escapeHtml(this.formatFactoryTime(draft.updated_at || draft.created_at))}</span>
+                    </button>
+                `).join("");
+            }
+        }
+    },
+
+    selectPacketPromptDraft(draftId) {
+        const drafts = this.latestPacketDrafting?.drafts || [];
+        const draft = drafts.find((item) => Number(item.id) === Number(draftId));
+        if (!draft) return;
+        this.selectedPacketPromptDraft = draft;
+        document.getElementById("packet-drafting-title").value = draft.title || "";
+        document.getElementById("packet-drafting-category").value = draft.category || "feature";
+        document.getElementById("packet-drafting-safety").value = draft.safety_notes || "";
+        document.getElementById("packet-drafting-verification").value = draft.verification_notes || "";
+        document.getElementById("packet-drafting-output").value = draft.draft_body || "";
+        this.renderPacketDraftValidation({valid: true, missing: []}, `Loaded draft #${draft.id} (${draft.status || "draft"}).`);
+    },
+
+    renderPacketDraftValidation(validation, prefix = "") {
+        const panel = document.getElementById("packet-drafting-validation");
+        if (!panel) return;
+        if (!validation) {
+            panel.textContent = prefix || "Draft validation unavailable.";
+            return;
+        }
+        const missing = Array.isArray(validation.missing) ? validation.missing : [];
+        panel.innerHTML = `
+            <div class="d-flex flex-wrap gap-2 mb-2">
+                <span class="prompt-vault-badge">${validation.valid ? "valid" : "missing sections"}</span>
+                ${missing.map((item) => `<span class="prompt-vault-badge prompt-vault-risk-high">${this.escapeHtml(item)}</span>`).join("")}
+            </div>
+            <div>${this.escapeHtml(prefix || "Draft includes required operator prompt sections.")}</div>
+        `;
+    },
+
+    async generatePacketDraft() {
+        if (!(await NexusCore.confirmAction("Generate a packet prompt draft from the selected context?", {
+            title: "Generate Packet Draft",
+            confirmLabel: "Generate",
+            variant: "primary",
+        }))) {
+            return;
+        }
+        try {
+            const response = await fetch("/api/packet-drafting/draft", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(this.packetDraftingPayload("confirm_generate")),
+            });
+            const payload = await response.json();
+            if (!response.ok || payload.status !== "success") {
+                throw new Error(payload.message || "Unable to generate packet draft.");
+            }
+            const draft = payload.draft || {};
+            document.getElementById("packet-drafting-title").value = draft.title || document.getElementById("packet-drafting-title")?.value || "";
+            document.getElementById("packet-drafting-output").value = draft.draft_body || "";
+            this.selectedPacketPromptDraft = null;
+            this.renderPacketDraftValidation(draft.validation, "Generated draft. Review before saving or copying.");
+            NexusCore.showToast("Packet draft generated for review.", "success");
+        } catch (error) {
+            NexusCore.showToast(`Packet draft error: ${error.message}`, "error");
+        }
+    },
+
+    async savePacketDraft() {
+        if (!(await NexusCore.confirmAction("Save this packet prompt draft for later review?", {
+            title: "Save Packet Draft",
+            confirmLabel: "Save Draft",
+            variant: "primary",
+        }))) {
+            return;
+        }
+        const draftId = this.selectedPacketPromptDraft?.id;
+        try {
+            const response = await fetch(draftId ? `/api/packet-drafting/drafts/${draftId}` : "/api/packet-drafting/drafts", {
+                method: draftId ? "PATCH" : "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(this.packetDraftingPayload("confirm_save")),
+            });
+            const payload = await response.json();
+            if (!response.ok || payload.status !== "success") {
+                throw new Error(payload.message || "Unable to save packet draft.");
+            }
+            this.selectedPacketPromptDraft = payload.draft;
+            await this.loadPacketDraftingStatus();
+            this.renderPacketDraftValidation({valid: true, missing: []}, "Draft saved. It remains review/copy only.");
+            NexusCore.showToast("Packet draft saved.", "success");
+        } catch (error) {
+            NexusCore.showToast(`Save draft error: ${error.message}`, "error");
+        }
+    },
+
+    async copyPacketDraft() {
+        const draftText = document.getElementById("packet-drafting-output")?.value || "";
+        if (!draftText.trim()) {
+            NexusCore.showToast("Generate or load a draft before copying.", "error");
+            return;
+        }
+        try {
+            await this.copyTextToClipboard(draftText);
+            NexusCore.showToast("Packet draft copied.", "success");
+        } catch (error) {
+            NexusCore.showToast(`Copy failed: ${error.message}`, "error");
+        }
+    },
+
+    async markSelectedPacketDraftReviewed() {
+        const draftId = this.selectedPacketPromptDraft?.id;
+        if (!draftId) {
+            NexusCore.showToast("Save or select a draft before marking reviewed.", "error");
+            return;
+        }
+        if (!(await NexusCore.confirmAction("Mark this packet draft reviewed?", {
+            title: "Mark Draft Reviewed",
+            confirmLabel: "Mark Reviewed",
+            variant: "primary",
+        }))) {
+            return;
+        }
+        try {
+            const response = await fetch(`/api/packet-drafting/drafts/${draftId}/mark-reviewed`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({confirm_review: true}),
+            });
+            const payload = await response.json();
+            if (!response.ok || payload.status !== "success") {
+                throw new Error(payload.message || "Unable to mark draft reviewed.");
+            }
+            this.selectedPacketPromptDraft = payload.draft;
+            await this.loadPacketDraftingStatus();
+            this.renderPacketDraftValidation({valid: true, missing: []}, "Draft marked reviewed. No packet was trusted or executed.");
+            NexusCore.showToast("Packet draft marked reviewed.", "success");
+        } catch (error) {
+            NexusCore.showToast(`Review update failed: ${error.message}`, "error");
+        }
     },
 
     getWorkPacketText() {

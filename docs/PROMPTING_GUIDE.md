@@ -45,6 +45,7 @@ Codex should inspect local context, make routine implementation decisions, run v
 - Let Codex run git, verification, and report writing itself.
 - Write final reports to `/tmp`.
 - Keep reusable successful prompts in the Prompt Vault.
+- Use Packet Drafting Assistant to generate, edit, save, review, and copy packet prompts from Prompt Vault templates and selected context. It is draft-only and does not execute the prompt.
 
 ## Safety Rails
 
@@ -53,3 +54,4 @@ Codex should inspect local context, make routine implementation decisions, run v
 - Do not call execution routes unless explicitly allowed.
 - Do not start Auto-Pilot unless explicitly building or testing it.
 - Do not force push, reset, clean, or delete data without explicit instruction.
+- Do not treat a generated packet draft as trusted or executable until the operator explicitly reviews and chooses the supervised execution path.

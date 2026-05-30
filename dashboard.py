@@ -88,6 +88,18 @@ from src.services.operator_interventions import (
     update_intervention,
 )
 from src.services.packet_branch import packet_branch_status, prepare_packet_branch
+from src.services.packet_drafting import (
+    build_structured_packet_prompt,
+    get_packet_prompt_draft,
+    list_drafting_sources,
+    list_packet_prompt_drafts,
+    list_usable_templates,
+    mark_packet_prompt_draft_reviewed,
+    save_packet_prompt_draft,
+    serialize_packet_prompt_draft,
+    update_packet_prompt_draft,
+    validate_required_sections,
+)
 from src.services.prompt_vault import (
     archive_prompt_template,
     create_prompt_template,
@@ -2544,6 +2556,165 @@ class NexusDashboard:
                 return jsonify({"status": "error", "message": "Template usage could not be recorded: {}".format(exception)}), 503
             finally:
                 db_context.close()
+
+        @self.app.route("/api/packet-drafting/status", methods=["GET"])
+        def get_packet_drafting_status():
+            db_context = get_db()
+            db = next(db_context)
+            try:
+                workspace_id = get_workspace_id(self.engine.target_dir)
+                if workspace_id is None:
+                    return jsonify({"status": "error", "message": "Active workspace not found."}), 400
+                ensure_default_prompt_templates(db)
+                return jsonify(
+                    {
+                        "status": "success",
+                        "packet_drafting": {
+                            "mode": "draft_only",
+                            "execution_allowed": False,
+                            "templates": [
+                                serialize_prompt_template(template)
+                                for template in list_usable_templates(db)
+                            ],
+                            "sources": list_drafting_sources(db, workspace_id),
+                            "drafts": [
+                                serialize_packet_prompt_draft(draft)
+                                for draft in list_packet_prompt_drafts(db, workspace_id)
+                            ],
+                        },
+                    }
+                )
+            except Exception as exception:
+                return jsonify({"status": "error", "message": "Packet Drafting Assistant unavailable: {}".format(exception)}), 503
+            finally:
+                db_context.close()
+
+        @self.app.route("/api/packet-drafting/templates", methods=["GET"])
+        def get_packet_drafting_templates():
+            category = request.args.get("category") or None
+            db_context = get_db()
+            db = next(db_context)
+            try:
+                ensure_default_prompt_templates(db)
+                return jsonify(
+                    {
+                        "status": "success",
+                        "templates": [
+                            serialize_prompt_template(template)
+                            for template in list_usable_templates(db, category=category)
+                        ],
+                    }
+                )
+            except Exception as exception:
+                return jsonify({"status": "error", "message": "Packet drafting templates unavailable: {}".format(exception)}), 503
+            finally:
+                db_context.close()
+
+        @self.app.route("/api/packet-drafting/draft", methods=["POST"])
+        def generate_packet_prompt_draft_route():
+            payload = request.get_json(silent=True) or {}
+            if not isinstance(payload, dict):
+                return jsonify({"status": "error", "message": "JSON object is required."}), 400
+            db_context = get_db()
+            db = next(db_context)
+            try:
+                workspace_id = get_workspace_id(self.engine.target_dir)
+                if workspace_id is None:
+                    return jsonify({"status": "error", "message": "Active workspace not found."}), 400
+                result = build_structured_packet_prompt(db, workspace_id, payload)
+                return jsonify({"status": "success", "draft": result})
+            except ValueError as exception:
+                db.rollback()
+                return jsonify({"status": "error", "message": str(exception)}), 400
+            except Exception as exception:
+                db.rollback()
+                return jsonify({"status": "error", "message": "Packet draft could not be generated: {}".format(exception)}), 503
+            finally:
+                db_context.close()
+
+        @self.app.route("/api/packet-drafting/drafts", methods=["POST"])
+        def save_packet_prompt_draft_route():
+            payload = request.get_json(silent=True) or {}
+            if not isinstance(payload, dict):
+                return jsonify({"status": "error", "message": "JSON object is required."}), 400
+            db_context = get_db()
+            db = next(db_context)
+            try:
+                workspace_id = get_workspace_id(self.engine.target_dir)
+                if workspace_id is None:
+                    return jsonify({"status": "error", "message": "Active workspace not found."}), 400
+                draft = save_packet_prompt_draft(db, workspace_id, payload)
+                return jsonify({"status": "success", "draft": serialize_packet_prompt_draft(draft)}), 201
+            except ValueError as exception:
+                db.rollback()
+                return jsonify({"status": "error", "message": str(exception)}), 400
+            except Exception as exception:
+                db.rollback()
+                return jsonify({"status": "error", "message": "Packet draft could not be saved: {}".format(exception)}), 503
+            finally:
+                db_context.close()
+
+        @self.app.route("/api/packet-drafting/drafts/<int:draft_id>", methods=["PATCH"])
+        def update_packet_prompt_draft_route(draft_id):
+            payload = request.get_json(silent=True) or {}
+            if not isinstance(payload, dict):
+                return jsonify({"status": "error", "message": "JSON object is required."}), 400
+            db_context = get_db()
+            db = next(db_context)
+            try:
+                workspace_id = get_workspace_id(self.engine.target_dir)
+                if workspace_id is None:
+                    return jsonify({"status": "error", "message": "Active workspace not found."}), 400
+                draft = get_packet_prompt_draft(db, workspace_id, draft_id)
+                if draft is None:
+                    return jsonify({"status": "error", "message": "Packet draft not found."}), 404
+                draft = update_packet_prompt_draft(db, draft, payload)
+                return jsonify({"status": "success", "draft": serialize_packet_prompt_draft(draft)})
+            except ValueError as exception:
+                db.rollback()
+                return jsonify({"status": "error", "message": str(exception)}), 400
+            except Exception as exception:
+                db.rollback()
+                return jsonify({"status": "error", "message": "Packet draft could not be updated: {}".format(exception)}), 503
+            finally:
+                db_context.close()
+
+        @self.app.route("/api/packet-drafting/drafts/<int:draft_id>/mark-reviewed", methods=["POST"])
+        def mark_packet_prompt_draft_reviewed_route(draft_id):
+            payload = request.get_json(silent=True) or {}
+            if not isinstance(payload, dict):
+                return jsonify({"status": "error", "message": "JSON object is required."}), 400
+            db_context = get_db()
+            db = next(db_context)
+            try:
+                workspace_id = get_workspace_id(self.engine.target_dir)
+                if workspace_id is None:
+                    return jsonify({"status": "error", "message": "Active workspace not found."}), 400
+                draft = get_packet_prompt_draft(db, workspace_id, draft_id)
+                if draft is None:
+                    return jsonify({"status": "error", "message": "Packet draft not found."}), 404
+                draft = mark_packet_prompt_draft_reviewed(db, draft, payload)
+                return jsonify({"status": "success", "draft": serialize_packet_prompt_draft(draft)})
+            except ValueError as exception:
+                db.rollback()
+                return jsonify({"status": "error", "message": str(exception)}), 400
+            except Exception as exception:
+                db.rollback()
+                return jsonify({"status": "error", "message": "Packet draft could not be marked reviewed: {}".format(exception)}), 503
+            finally:
+                db_context.close()
+
+        @self.app.route("/api/packet-drafting/validate", methods=["POST"])
+        def validate_packet_prompt_draft_route():
+            payload = request.get_json(silent=True) or {}
+            if not isinstance(payload, dict):
+                return jsonify({"status": "error", "message": "JSON object is required."}), 400
+            return jsonify(
+                {
+                    "status": "success",
+                    "validation": validate_required_sections(payload.get("draft_body") or ""),
+                }
+            )
 
         @self.app.route("/api/kill-process", methods=["POST"])
         def kill_process():
