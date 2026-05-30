@@ -70,7 +70,10 @@ def verify_routes_and_ui():
         check(route in dashboard and route in template, "{} route exists and is surfaced".format(route))
 
     check("confirm_send=payload.get(\"confirm_send\") is True" in dashboard, "test route requires confirm_send=true")
+    check("_json_operator_notification_error" in dashboard, "notification routes have JSON-safe error helper")
     check("sendOperatorTestNotification" in app_js, "dashboard has test notification action")
+    check("fetchOperatorNotificationJson" in app_js, "frontend has mobile alert JSON fetch helper")
+    check("content-type" in app_js and "non-JSON response" in app_js, "frontend checks content type before JSON parsing")
     check("NexusCore.confirmAction" in app_js, "test notification uses async confirmation pattern")
     check("Mobile Operator Alerts" in template, "dashboard contains Mobile Operator Alerts panel")
     check("operator_notify_discord_webhook_url" in engine, "settings support webhook key")
@@ -214,6 +217,56 @@ def verify_service_behavior():
         check(True, "send_test_notification rejects missing confirmation")
 
 
+def verify_route_json_behavior():
+    import dashboard as dashboard_module
+
+    class FakeEngine:
+        target_dir = PROJECT_ROOT
+        state = {"last_update": "test", "recent_changes": []}
+        settings = {
+            "operator_notify_discord_enabled": False,
+            "operator_notify_discord_webhook_url": "",
+            "operator_dashboard_url": "",
+            "operator_notify_min_severity": "info",
+            "operator_notify_cooldown_seconds": 30,
+        }
+
+        def get_execution_mode(self):
+            return "manual"
+
+        def is_automatic_analysis_enabled(self):
+            return False
+
+    app = dashboard_module.NexusDashboard(FakeEngine()).app
+    client = app.test_client()
+
+    response = client.get("/api/operator-notifications/status")
+    check(response.status_code == 200, "status route returns HTTP 200")
+    check("application/json" in response.headers.get("Content-Type", ""), "status route returns JSON content type")
+    check(response.get_json(silent=True, force=False) is not None, "status route body is JSON")
+
+    original_get_workspace_id = dashboard_module.get_workspace_id
+
+    def raise_workspace_error(_path):
+        raise RuntimeError("<!doctype html> database unavailable")
+
+    dashboard_module.get_workspace_id = raise_workspace_error
+    try:
+        for method, path, kwargs in (
+            ("get", "/api/operator-notifications/recent", {}),
+            ("post", "/api/operator-notifications/test", {"json": {"confirm_send": True}}),
+        ):
+            response = getattr(client, method)(path, **kwargs)
+            text = response.get_data(as_text=True)
+            payload = response.get_json(silent=True, force=False)
+            check(response.status_code == 503, "{} returns HTTP 503 on dependency error".format(path))
+            check("application/json" in response.headers.get("Content-Type", ""), "{} returns JSON content type on error".format(path))
+            check(payload is not None and payload.get("status") == "error", "{} returns JSON error payload".format(path))
+            check("<!doctype" not in text.lower(), "{} does not leak HTML in JSON error".format(path))
+    finally:
+        dashboard_module.get_workspace_id = original_get_workspace_id
+
+
 def main():
     verify_service_and_model()
     verify_routes_and_ui()
@@ -221,6 +274,7 @@ def main():
     verify_docs_and_env()
     verify_safety_static()
     verify_service_behavior()
+    verify_route_json_behavior()
     if FAILURES:
         print("FAIL: Packet 038 verification failed")
         return 1

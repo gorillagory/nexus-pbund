@@ -95,6 +95,7 @@ from src.services.operator_interventions import (
 from src.services.operator_notifications import (
     list_recent_notifications,
     notification_status,
+    redact_and_bound_message,
     send_discord_notification,
     send_test_notification,
     serialize_notification,
@@ -764,6 +765,11 @@ def _safe_create_review_event(db, workspace_id, **payload):
             pass
         print("Operator review event creation failed: {}".format(exception))
         return None
+
+
+def _json_operator_notification_error(message, status_code=503):
+    safe_message = redact_and_bound_message(message, 500)
+    return jsonify({"status": "error", "message": safe_message}), status_code
 
 
 def _safe_send_operator_notification(db, workspace_id, settings, **payload):
@@ -2209,22 +2215,26 @@ class NexusDashboard:
 
         @self.app.route("/api/operator-notifications/status", methods=["GET"])
         def get_operator_notifications_status():
-            return jsonify(
-                {
-                    "status": "success",
-                    "operator_notifications": notification_status(self.engine.settings),
-                }
-            )
+            try:
+                return jsonify(
+                    {
+                        "status": "success",
+                        "operator_notifications": notification_status(self.engine.settings),
+                    }
+                )
+            except Exception:
+                return _json_operator_notification_error("Operator notification status unavailable.")
 
         @self.app.route("/api/operator-notifications/recent", methods=["GET"])
         def get_operator_notifications_recent():
             limit = request.args.get("limit", type=int) or 20
-            db_context = get_db()
-            db = next(db_context)
+            db_context = None
             try:
                 workspace_id = get_workspace_id(self.engine.target_dir)
                 if workspace_id is None:
                     return jsonify({"status": "error", "message": "Active workspace not found."}), 400
+                db_context = get_db()
+                db = next(db_context)
                 notifications = list_recent_notifications(db, workspace_id, limit=limit)
                 return jsonify(
                     {
@@ -2233,22 +2243,25 @@ class NexusDashboard:
                         "items": [serialize_notification(item) for item in notifications],
                     }
                 )
-            except Exception as exception:
-                return jsonify({"status": "error", "message": "Operator notifications unavailable: {}".format(exception)}), 503
+            except Exception:
+                return _json_operator_notification_error("Operator notifications unavailable. Check database and schema status.")
             finally:
-                db_context.close()
+                if db_context is not None:
+                    db_context.close()
 
         @self.app.route("/api/operator-notifications/test", methods=["POST"])
         def post_operator_notifications_test():
             payload = request.get_json(silent=True) or {}
             if not isinstance(payload, dict):
                 return jsonify({"status": "error", "message": "JSON object is required."}), 400
-            db_context = get_db()
-            db = next(db_context)
+            db_context = None
+            db = None
             try:
                 workspace_id = get_workspace_id(self.engine.target_dir)
                 if workspace_id is None:
                     return jsonify({"status": "error", "message": "Active workspace not found."}), 400
+                db_context = get_db()
+                db = next(db_context)
                 result = send_test_notification(
                     db,
                     workspace_id,
@@ -2267,13 +2280,16 @@ class NexusDashboard:
                     }
                 ), status_code
             except ValueError as exception:
-                db.rollback()
+                if db is not None:
+                    db.rollback()
                 return jsonify({"status": "error", "message": str(exception)}), 400
-            except Exception as exception:
-                db.rollback()
-                return jsonify({"status": "error", "message": "Test notification could not be sent: {}".format(exception)}), 503
+            except Exception:
+                if db is not None:
+                    db.rollback()
+                return _json_operator_notification_error("Test notification could not be sent. Check notification settings and database status.")
             finally:
-                db_context.close()
+                if db_context is not None:
+                    db_context.close()
 
         @self.app.route("/api/discord-router/ingest", methods=["POST"])
         def ingest_discord_router_event():

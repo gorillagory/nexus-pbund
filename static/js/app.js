@@ -299,6 +299,19 @@ window.NexusApp = {
             .replace(/'/g, "&#39;");
     },
 
+    async fetchOperatorNotificationJson(path, options = {}) {
+        const response = await fetch(path, options);
+        const contentType = response.headers.get("content-type") || "";
+        if (!contentType.toLowerCase().includes("application/json")) {
+            throw new Error(`${path} returned HTTP ${response.status} ${response.statusText || ""} with non-JSON response.`);
+        }
+        const data = await response.json();
+        if (!response.ok) {
+            throw new Error(data.message || `${path} returned HTTP ${response.status} ${response.statusText || ""}.`);
+        }
+        return data;
+    },
+
     formatFactoryTime(value) {
         if (!value) return "-";
         const date = new Date(value);
@@ -477,9 +490,9 @@ window.NexusApp = {
             statusTarget.innerHTML = '<div class="col-12 text-secondary small">Loading mobile alert status...</div>';
         }
         try {
-            const response = await fetch("/api/operator-notifications/recent?limit=10");
-            const data = await response.json();
-            if (!response.ok || data.status !== "success") {
+            const path = "/api/operator-notifications/recent?limit=10";
+            const data = await this.fetchOperatorNotificationJson(path);
+            if (data.status !== "success") {
                 throw new Error(data.message || "Unable to load mobile operator alerts.");
             }
             this.operatorNotificationStatus = data.operator_notifications || {};
@@ -552,13 +565,13 @@ window.NexusApp = {
             button.textContent = "Sending...";
         }
         try {
-            const response = await fetch("/api/operator-notifications/test", {
+            const path = "/api/operator-notifications/test";
+            const data = await this.fetchOperatorNotificationJson(path, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ confirm_send: true }),
             });
-            const data = await response.json();
-            if (!response.ok || data.status !== "success") {
+            if (data.status !== "success") {
                 throw new Error(data.message || "Unable to send test notification.");
             }
             NexusCore.showToast(`Mobile alert test ${data.delivery_status || "recorded"}.`, "success");
