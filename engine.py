@@ -343,6 +343,11 @@ class NexusEngine:
             "discord_timestamp_tolerance_seconds": 0,
             "discord_replay_guard_enabled": True,
             "trusted_packet_mode_enabled": False,
+            "operator_notify_discord_enabled": False,
+            "operator_notify_discord_webhook_url": "",
+            "operator_dashboard_url": "",
+            "operator_notify_min_severity": "info",
+            "operator_notify_cooldown_seconds": 30,
         }
 
         saved = {}
@@ -394,6 +399,18 @@ class NexusEngine:
         discord_replay_guard = os.getenv("DISCORD_REPLAY_GUARD_ENABLED")
         if discord_replay_guard is not None:
             defaults["discord_replay_guard_enabled"] = normalize_bool(discord_replay_guard)
+        operator_notify_enabled = os.getenv("NEXUS_OPERATOR_NOTIFY_DISCORD_ENABLED")
+        if operator_notify_enabled is not None:
+            defaults["operator_notify_discord_enabled"] = normalize_bool(operator_notify_enabled)
+        for setting_key, env_key in (
+            ("operator_notify_discord_webhook_url", "NEXUS_OPERATOR_NOTIFY_DISCORD_WEBHOOK_URL"),
+            ("operator_dashboard_url", "NEXUS_OPERATOR_DASHBOARD_URL"),
+            ("operator_notify_min_severity", "NEXUS_OPERATOR_NOTIFY_MIN_SEVERITY"),
+            ("operator_notify_cooldown_seconds", "NEXUS_OPERATOR_NOTIFY_COOLDOWN_SECONDS"),
+        ):
+            env_value = os.getenv(env_key)
+            if env_value is not None:
+                defaults[setting_key] = env_value.strip()
 
         if defaults["model_selection_mode"] not in {"auto", "manual"}:
             defaults["model_selection_mode"] = "auto"
@@ -403,6 +420,14 @@ class NexusEngine:
         defaults["discord_signature_required"] = normalize_bool(defaults.get("discord_signature_required"))
         defaults["discord_replay_guard_enabled"] = normalize_bool(defaults.get("discord_replay_guard_enabled"))
         defaults["trusted_packet_mode_enabled"] = normalize_bool(defaults.get("trusted_packet_mode_enabled"))
+        defaults["operator_notify_discord_enabled"] = normalize_bool(defaults.get("operator_notify_discord_enabled"))
+        if str(defaults.get("operator_notify_min_severity") or "").strip().lower() not in {"info", "warning", "blocked", "critical"}:
+            defaults["operator_notify_min_severity"] = "info"
+        try:
+            cooldown = int(str(defaults.get("operator_notify_cooldown_seconds") or "30").strip())
+        except ValueError:
+            cooldown = 30
+        defaults["operator_notify_cooldown_seconds"] = max(0, min(cooldown, 3600))
 
         return defaults
 
@@ -425,6 +450,11 @@ class NexusEngine:
             "discord_timestamp_tolerance_seconds",
             "discord_replay_guard_enabled",
             "trusted_packet_mode_enabled",
+            "operator_notify_discord_enabled",
+            "operator_notify_discord_webhook_url",
+            "operator_dashboard_url",
+            "operator_notify_min_severity",
+            "operator_notify_cooldown_seconds",
         }
         secret_keys = {
             "api_key",
@@ -434,6 +464,8 @@ class NexusEngine:
             "discord_allowed_guild_ids",
             "discord_allowed_channel_ids",
             "discord_allowed_author_ids",
+            "operator_notify_discord_webhook_url",
+            "operator_dashboard_url",
         }
 
         for key, value in new_settings.items():
@@ -461,6 +493,14 @@ class NexusEngine:
             tolerance = 0
         self.settings["discord_timestamp_tolerance_seconds"] = max(0, min(tolerance, 86400))
         self.settings["trusted_packet_mode_enabled"] = normalize_bool(self.settings.get("trusted_packet_mode_enabled"))
+        self.settings["operator_notify_discord_enabled"] = normalize_bool(self.settings.get("operator_notify_discord_enabled"))
+        severity = str(self.settings.get("operator_notify_min_severity") or "info").strip().lower()
+        self.settings["operator_notify_min_severity"] = severity if severity in {"info", "warning", "blocked", "critical"} else "info"
+        try:
+            cooldown = int(str(self.settings.get("operator_notify_cooldown_seconds") or "30").strip())
+        except ValueError:
+            cooldown = 30
+        self.settings["operator_notify_cooldown_seconds"] = max(0, min(cooldown, 3600))
 
         with open(self.settings_file, "w", encoding="utf-8") as file:
             json.dump(self.settings, file, indent=2)
@@ -495,23 +535,34 @@ class NexusEngine:
         public.pop("discord_allowed_guild_ids", None)
         public.pop("discord_allowed_channel_ids", None)
         public.pop("discord_allowed_author_ids", None)
+        public.pop("operator_notify_discord_webhook_url", None)
+        public.pop("operator_dashboard_url", None)
         public["execution_mode"] = self.get_execution_mode()
         public["automatic_analysis_enabled"] = self.is_automatic_analysis_enabled()
         public["discord_router_enabled"] = normalize_bool(self.settings.get("discord_router_enabled"))
         public["discord_signature_required"] = normalize_bool(self.settings.get("discord_signature_required"))
         public["discord_replay_guard_enabled"] = normalize_bool(self.settings.get("discord_replay_guard_enabled"))
         public["trusted_packet_mode_enabled"] = normalize_bool(self.settings.get("trusted_packet_mode_enabled"))
+        public["operator_notify_discord_enabled"] = normalize_bool(self.settings.get("operator_notify_discord_enabled"))
 
         gemini_key = (self.settings.get("gemini_api_key") or "").strip()
         openai_key = (self.settings.get("openai_api_key") or "").strip()
         discord_secret = (self.settings.get("discord_ingest_secret") or "").strip()
+        operator_webhook = (self.settings.get("operator_notify_discord_webhook_url") or "").strip()
+        operator_dashboard_url = (self.settings.get("operator_dashboard_url") or "").strip()
         gemini_env_key = (os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY") or "").strip()
         openai_env_key = (os.getenv("OPENAI_API_KEY") or "").strip()
         discord_env_secret = (os.getenv("DISCORD_INGEST_SECRET") or "").strip()
+        operator_webhook_env = (os.getenv("NEXUS_OPERATOR_NOTIFY_DISCORD_WEBHOOK_URL") or "").strip()
+        operator_dashboard_env = (os.getenv("NEXUS_OPERATOR_DASHBOARD_URL") or "").strip()
 
         public["gemini_api_key_configured"] = bool(gemini_key or gemini_env_key)
         public["openai_api_key_configured"] = bool(openai_key or openai_env_key)
         public["discord_ingest_secret_configured"] = bool(discord_secret or discord_env_secret)
+        public["operator_notify_discord_webhook_configured"] = bool(operator_webhook or operator_webhook_env)
+        public["operator_dashboard_url_configured"] = bool(operator_dashboard_url or operator_dashboard_env)
+        public["operator_notify_min_severity"] = self.settings.get("operator_notify_min_severity") or "info"
+        public["operator_notify_cooldown_seconds"] = self.settings.get("operator_notify_cooldown_seconds") or 30
         public["discord_allowed_guild_ids_configured"] = bool((self.settings.get("discord_allowed_guild_ids") or "").strip())
         public["discord_allowed_channel_ids_configured"] = bool((self.settings.get("discord_allowed_channel_ids") or "").strip())
         public["discord_allowed_author_ids_configured"] = bool((self.settings.get("discord_allowed_author_ids") or "").strip())

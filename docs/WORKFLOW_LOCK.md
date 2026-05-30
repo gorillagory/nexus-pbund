@@ -153,7 +153,9 @@ Sprint 4 must preserve the same supervised boundaries:
 - Packet-aware preflight remains checks and reporting only.
 - Execution remains supervised and explicit.
 
-The recommended next packet is Packet 038 -- Environment Validation And Startup Diagnostics. It should provide diagnostics and health visibility only, without execution routes, Git writes, raw secret exposure, or Auto-Pilot behavior.
+Packet 038 adds the Mobile Operator Notification Bridge. It may send outbound Discord alerts to the operator's phone when Nexus needs attention, but it is notification-only. Discord notifications must never include raw secrets, webhook URLs, full stdout/stderr, or execution controls, and they must not allow Discord to execute Codex, tasks, packets, Git actions, trust changes, retry/continue behavior, or Auto-Pilot.
+
+The recommended next packet is Packet 039 -- Environment Validation And Startup Diagnostics. It should provide diagnostics and health visibility only, without execution routes, Git writes, raw secret exposure, or Auto-Pilot behavior.
 
 ## Safety Rules
 

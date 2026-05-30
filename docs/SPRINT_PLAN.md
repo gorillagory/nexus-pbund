@@ -92,19 +92,20 @@ Packet 037 locks the Sprint 4 direction before adding new runtime behavior. Auto
 
 Sprint 4 focuses on production hardening, operator observability, workflow integrity, verification maturity, and onboarding quality for the supervised factory.
 
-The Sprint 4 plan is maintained in `docs/SPRINT_4_PLAN.md`. The recommended next packet is Packet 038 — Environment Validation And Startup Diagnostics.
+The Sprint 4 plan is maintained in `docs/SPRINT_4_PLAN.md`. Packet 038 adds notification-only mobile operator awareness through outbound Discord alerts.
 
 ## Sprint 4 Packet Roadmap
 
 1. Packet 037 — Sprint 4 Direction Lock. Type: docs/planning, safety. Boundary: documents direction only; no runtime behavior. Complete.
-2. Packet 038 — Environment Validation And Startup Diagnostics. Type: infra, safety, observability. Boundary: diagnostics only; no execution routes, no Git writes, no raw secrets, no Auto-Pilot.
-3. Packet 039 — Work Packet Lifecycle State Map. Type: workflow, UI, safety. Boundary: state visibility and metadata guidance only; no execution, no automatic trust, no branch or Git writes.
-4. Packet 040 — Linked Operator Context Timeline. Type: observability, UI. Boundary: read-only timeline and append-only notes only; no retry, continue, execution, trust automation, or Git mutation.
-5. Packet 041 — Preflight Verifier Registry. Type: testing, safety, workflow. Boundary: checks and reporting only; no auto-fix, no execution routes, no workflow packet execution.
-6. Packet 042 — CI Report Artifact Polish. Type: infra, testing, observability. Boundary: CI reporting only; no deployment automation, no execution expansion, no secrets.
-7. Packet 043 — Operator Troubleshooting Matrix. Type: docs, onboarding, recovery. Boundary: documentation only; no runtime behavior.
-8. Packet 044 — Discord Setup And Notification Harness. Type: integration, docs, testing. Boundary: Discord remains capture-only or notification-only; no Discord-triggered Codex, task, packet, Git, trust, recovery, or Auto-Pilot actions.
-9. Packet 045 — Sprint 4 Closure And Next Direction Lock. Type: docs/planning. Boundary: planning only; no runtime behavior.
+2. Packet 038 — Mobile Operator Notification Bridge. Type: integration, observability, safety. Boundary: outbound Discord phone alerts only; no Discord command execution, Codex execution, task/packet execution, Git writes, trust changes, retry/continue automation, or Auto-Pilot. Complete.
+3. Packet 039 — Environment Validation And Startup Diagnostics. Type: infra, safety, observability. Boundary: diagnostics only; no execution routes, no Git writes, no raw secrets, no Auto-Pilot.
+4. Packet 040 — Work Packet Lifecycle State Map. Type: workflow, UI, safety. Boundary: state visibility and metadata guidance only; no execution, no automatic trust, no branch or Git writes.
+5. Packet 041 — Linked Operator Context Timeline. Type: observability, UI. Boundary: read-only timeline and append-only notes only; no retry, continue, execution, trust automation, or Git mutation.
+6. Packet 042 — Preflight Verifier Registry. Type: testing, safety, workflow. Boundary: checks and reporting only; no auto-fix, no execution routes, no workflow packet execution.
+7. Packet 043 — CI Report Artifact Polish. Type: infra, testing, observability. Boundary: CI reporting only; no deployment automation, no execution expansion, no secrets.
+8. Packet 044 — Operator Troubleshooting Matrix. Type: docs, onboarding, recovery. Boundary: documentation only; no runtime behavior.
+9. Packet 045 — Discord Setup And Notification Harness. Type: integration, docs, testing. Boundary: Discord remains capture-only or notification-only; no Discord-triggered Codex, task, packet, Git, trust, recovery, or Auto-Pilot actions.
+10. Packet 046 — Sprint 4 Closure And Next Direction Lock. Type: docs/planning. Boundary: planning only; no runtime behavior.
 
 ## Local Configuration Notes
 

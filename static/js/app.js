@@ -52,6 +52,8 @@ window.NexusApp = {
     selectedOperatorIntervention: null,
     operatorReviewEvents: [],
     operatorReviewFilters: null,
+    operatorNotifications: [],
+    operatorNotificationStatus: null,
     promptVaultTemplates: [],
     selectedPromptTemplate: null,
 
@@ -234,8 +236,10 @@ window.NexusApp = {
 
             this.latestFactoryConsole = data;
             this.latestCiStatus = data.ci || this.latestCiStatus;
+            this.operatorNotificationStatus = data.operator_notifications || this.operatorNotificationStatus;
             await this.loadFactoryConsoleSummary(false);
             this.renderFactoryConsole(data);
+            this.loadOperatorNotifications(false);
             this.loadFactoryPreflightStatus();
             this.loadFactoryCiStatus();
         } catch (error) {
@@ -368,11 +372,13 @@ window.NexusApp = {
         const events = Array.isArray(data?.recent_events) ? data.recent_events : [];
         const runs = Array.isArray(data?.recent_runs) ? data.recent_runs : [];
         const discordRouter = data?.discord_router || {};
+        const operatorNotifications = data?.operator_notifications || this.operatorNotificationStatus || {};
 
         this.renderFactorySummaryCards(factory, git);
         this.renderFactoryCurrentState(factory, runner);
         this.renderFactorySafeActions(factory, git);
         this.renderDiscordRouterStatus(discordRouter);
+        this.renderOperatorNotificationStatus(operatorNotifications, this.operatorNotifications);
         this.renderFactoryFailureRecovery(factory, runner, runs);
         this.renderFactoryGitStatus(git);
         this.renderFactoryEvents(events);
@@ -396,6 +402,7 @@ window.NexusApp = {
             ["Interventions", summary.open_intervention_count ?? "-", Number(summary.open_intervention_count || 0) ? "factory-status-fail" : "factory-status-pass"],
             ["Readiness Attention", summary.readiness_attention_count ?? "-", Number(summary.readiness_attention_count || 0) ? "factory-status-fail" : "factory-status-pass"],
             ["Trusted Mode", summary.trusted_packet_mode_enabled ? "enabled" : "disabled", summary.trusted_packet_mode_enabled ? "factory-status-running" : "factory-status-idle"],
+            ["Mobile Alerts", summary.operator_notifications?.enabled ? "enabled" : "disabled", summary.operator_notifications?.enabled ? "factory-status-pass" : "factory-status-idle"],
             ["Preflight Status", preflight?.local_last_result || ci?.local_preflight?.status || "unknown", this.factoryStatusClass(preflight?.local_last_result || ci?.local_preflight?.status || "unknown")],
         ];
 
@@ -461,6 +468,109 @@ window.NexusApp = {
                 `).join("")}
             </div>
         `;
+    },
+
+    async loadOperatorNotifications(showLoading = true) {
+        const statusTarget = document.getElementById("operator-notifications-status");
+        const recentTarget = document.getElementById("operator-notifications-recent");
+        if (showLoading && statusTarget) {
+            statusTarget.innerHTML = '<div class="col-12 text-secondary small">Loading mobile alert status...</div>';
+        }
+        try {
+            const response = await fetch("/api/operator-notifications/recent?limit=10");
+            const data = await response.json();
+            if (!response.ok || data.status !== "success") {
+                throw new Error(data.message || "Unable to load mobile operator alerts.");
+            }
+            this.operatorNotificationStatus = data.operator_notifications || {};
+            this.operatorNotifications = Array.isArray(data.items) ? data.items : [];
+            this.renderOperatorNotificationStatus(this.operatorNotificationStatus, this.operatorNotifications);
+        } catch (error) {
+            if (recentTarget) {
+                recentTarget.textContent = `Mobile alert status unavailable: ${error.message}`;
+            }
+        }
+    },
+
+    renderOperatorNotificationStatus(status, items = []) {
+        const statusTarget = document.getElementById("operator-notifications-status");
+        const recentTarget = document.getElementById("operator-notifications-recent");
+        if (!statusTarget && !recentTarget) return;
+        const enabled = Boolean(status?.enabled);
+        const cards = [
+            ["Enabled", enabled ? "enabled" : "disabled", enabled ? "factory-status-pass" : "factory-status-idle"],
+            ["Webhook", status?.webhook_configured ? "configured" : "not configured", status?.webhook_configured ? "factory-status-pass" : "factory-status-fail"],
+            ["Dashboard URL", status?.dashboard_url_configured ? "configured" : "not configured", status?.dashboard_url_configured ? "factory-status-pass" : "factory-status-idle"],
+            ["Min Severity", status?.min_severity || "info", "factory-status-neutral"],
+            ["Cooldown", `${status?.cooldown_seconds ?? 30}s`, "factory-status-neutral"],
+            ["Mode", status?.mode || "notification_only", "factory-status-pass"],
+        ];
+        if (statusTarget) {
+            statusTarget.innerHTML = "";
+            cards.forEach(([label, value, statusClass]) => {
+                const column = document.createElement("div");
+                column.className = "col-sm-6 col-xl-2";
+                column.innerHTML = `
+                    <div class="factory-summary-card">
+                        <div class="factory-summary-label">${this.escapeHtml(label)}</div>
+                        <div class="factory-summary-value ${this.escapeHtml(statusClass)}">${this.escapeHtml(value)}</div>
+                    </div>
+                `;
+                statusTarget.appendChild(column);
+            });
+        }
+        if (!recentTarget) return;
+        if (!items.length) {
+            recentTarget.textContent = "No notification history recorded.";
+            return;
+        }
+        recentTarget.innerHTML = items.map((item) => `
+            <div class="operator-intervention-list-item">
+                <span class="operator-intervention-list-title">${this.escapeHtml(item.title || "Notification")}</span>
+                <span class="operator-intervention-list-meta">
+                    <span class="prompt-vault-badge operator-intervention-severity-${this.escapeHtml(item.severity || "info")}">${this.escapeHtml(item.severity || "info")}</span>
+                    <span class="prompt-vault-badge operator-intervention-status-${this.escapeHtml(item.delivery_status || "skipped")}">${this.escapeHtml(item.delivery_status || "skipped")}</span>
+                    <span>${this.escapeHtml(this.formatFactoryTime(item.created_at))}</span>
+                </span>
+                <span>${this.escapeHtml(item.summary || "")}</span>
+                ${item.failure_reason ? `<span class="text-warning">${this.escapeHtml(item.failure_reason)}</span>` : ""}
+            </div>
+        `).join("");
+    },
+
+    async sendOperatorTestNotification() {
+        if (!(await NexusCore.confirmAction("Send a notification-only Discord test alert?", {
+            title: "Test Mobile Alert",
+            confirmLabel: "Send Test",
+        }))) {
+            return;
+        }
+        const button = document.getElementById("operator-notification-test-button");
+        const originalLabel = button?.textContent;
+        if (button) {
+            button.disabled = true;
+            button.textContent = "Sending...";
+        }
+        try {
+            const response = await fetch("/api/operator-notifications/test", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ confirm_send: true }),
+            });
+            const data = await response.json();
+            if (!response.ok || data.status !== "success") {
+                throw new Error(data.message || "Unable to send test notification.");
+            }
+            NexusCore.showToast(`Mobile alert test ${data.delivery_status || "recorded"}.`, "success");
+            await this.loadOperatorNotifications(false);
+        } catch (error) {
+            NexusCore.showToast(`Mobile alert test error: ${error.message}`, "error");
+        } finally {
+            if (button) {
+                button.disabled = false;
+                button.textContent = originalLabel || "Test Notification";
+            }
+        }
     },
 
     renderFactoryCurrentState(factory, runner) {

@@ -52,6 +52,7 @@ Codex should inspect local context, make routine implementation decisions, run v
 - Treat Discord as capture-only. Discord hardening may reject non-allowlisted, stale, replayed, unsigned, or unauthenticated payloads before inbox capture, but it must never execute Codex, tasks, packets, Git actions, trust changes, or Auto-Pilot.
 - Use `docs/OPERATOR_RUNBOOK.md`, `docs/DEPLOYMENT_RUNBOOK.md`, and `docs/RECOVERY_RUNBOOK.md` for day-to-day operation, deployment verification, recovery, baseline tagging, and new-chat handoff.
 - Use `docs/SPRINT_4_PLAN.md` for Sprint 4 packet direction. Sprint 4 is production hardening, operator observability, workflow integrity, verification maturity, and onboarding quality while keeping execution supervised and explicit.
+- Treat Mobile Operator Alerts as notification-only. Alert text must be redacted and bounded, must not include raw webhook URLs or secrets, and must never imply Discord execution.
 
 ## Safety Rails
 

@@ -11,6 +11,7 @@ Recovery is supervised. Inspect first, record decisions, verify locally, and onl
 5. Add an operator note.
 6. Create or update an Operator Intervention Queue item if human action is needed.
 7. Add an Operator Review History note for the decision.
+8. Check Mobile Operator Alerts if the operator needs phone notification for attention-required states.
 
 ## Review Required Flow
 
@@ -65,3 +66,7 @@ If the failure touched a specific packet, run that packet verifier directly and 
 ## Discord Capture Recovery
 
 Rejected Discord payloads do not create inbox items. Review the Discord Router status and capture audit, then fix allowlists, timestamp tolerance, signature settings, or shared secret configuration. Do not treat Discord as an execution path.
+
+## Mobile Notification Recovery
+
+Mobile Operator Alerts are notification-only. If alerts fail, inspect Factory Console status and recent notification records, verify the webhook is configured without exposing the raw URL, and send a test notification. Notification failure must not change the original workflow result and must not become a retry, continue, execution, Git, trust, or Auto-Pilot path.

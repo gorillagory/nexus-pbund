@@ -28,6 +28,7 @@ from models import (
     Footprint,
     Message,
     OperatorIntervention,
+    OperatorNotification,
     OperatorReviewEvent,
     OrchestrationInboxItem,
     PromptTemplate,
@@ -90,6 +91,13 @@ from src.services.operator_interventions import (
     resolve_intervention,
     serialize_intervention,
     update_intervention,
+)
+from src.services.operator_notifications import (
+    list_recent_notifications,
+    notification_status,
+    send_discord_notification,
+    send_test_notification,
+    serialize_notification,
 )
 from src.services.operator_review_history import (
     build_timeline_filters,
@@ -755,6 +763,29 @@ def _safe_create_review_event(db, workspace_id, **payload):
         except Exception:
             pass
         print("Operator review event creation failed: {}".format(exception))
+        return None
+
+
+def _safe_send_operator_notification(db, workspace_id, settings, **payload):
+    try:
+        return send_discord_notification(
+            db,
+            workspace_id,
+            settings,
+            event_type=payload.get("event_type") or "operator_attention",
+            severity=payload.get("severity") or "info",
+            title=payload.get("title") or "Nexus operator notification",
+            summary=payload.get("summary") or "",
+            dedupe_key=payload.get("dedupe_key"),
+            dashboard_path=payload.get("dashboard_path"),
+            record_skipped=False,
+        )
+    except Exception as exception:
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        print("Operator notification failed: {}".format(exception))
         return None
 
 
@@ -1722,6 +1753,7 @@ class NexusDashboard:
                         "runner": runner_state,
                     },
                     "discord_router": discord_router_status(self.engine.settings),
+                    "operator_notifications": notification_status(self.engine.settings),
                     "git": git_summary,
                     "ci": ci_summary,
                     "recent_events": [serialize_factory_event(event) for event in events],
@@ -1740,6 +1772,9 @@ class NexusDashboard:
                 "review_event_count": 0,
                 "readiness_attention_count": 0,
                 "latest_review_event": None,
+                "recent_notification_count": 0,
+                "latest_notification": None,
+                "operator_notifications": notification_status(self.engine.settings),
                 "trusted_packet_mode_enabled": bool(self.engine.settings.get("trusted_packet_mode_enabled")),
                 "git": {
                     "branch": git_summary.get("branch"),
@@ -1804,6 +1839,23 @@ class NexusDashboard:
                     )
                     if latest_review is not None:
                         summary["latest_review_event"] = serialize_review_event(latest_review)
+                    summary["recent_notification_count"] = db.execute(
+                        select(func.count())
+                        .select_from(OperatorNotification)
+                        .where(OperatorNotification.workspace_id == workspace_id)
+                    ).scalar_one()
+                    latest_notification = (
+                        db.execute(
+                            select(OperatorNotification)
+                            .where(OperatorNotification.workspace_id == workspace_id)
+                            .order_by(OperatorNotification.created_at.desc(), OperatorNotification.id.desc())
+                            .limit(1)
+                        )
+                        .scalars()
+                        .first()
+                    )
+                    if latest_notification is not None:
+                        summary["latest_notification"] = serialize_notification(latest_notification)
                     return jsonify({"status": "success", "summary": summary})
                 finally:
                     db_context.close()
@@ -2155,6 +2207,74 @@ class NexusDashboard:
         def get_discord_router_status():
             return jsonify({"status": "success", "discord_router": discord_router_status(self.engine.settings)})
 
+        @self.app.route("/api/operator-notifications/status", methods=["GET"])
+        def get_operator_notifications_status():
+            return jsonify(
+                {
+                    "status": "success",
+                    "operator_notifications": notification_status(self.engine.settings),
+                }
+            )
+
+        @self.app.route("/api/operator-notifications/recent", methods=["GET"])
+        def get_operator_notifications_recent():
+            limit = request.args.get("limit", type=int) or 20
+            db_context = get_db()
+            db = next(db_context)
+            try:
+                workspace_id = get_workspace_id(self.engine.target_dir)
+                if workspace_id is None:
+                    return jsonify({"status": "error", "message": "Active workspace not found."}), 400
+                notifications = list_recent_notifications(db, workspace_id, limit=limit)
+                return jsonify(
+                    {
+                        "status": "success",
+                        "operator_notifications": notification_status(self.engine.settings),
+                        "items": [serialize_notification(item) for item in notifications],
+                    }
+                )
+            except Exception as exception:
+                return jsonify({"status": "error", "message": "Operator notifications unavailable: {}".format(exception)}), 503
+            finally:
+                db_context.close()
+
+        @self.app.route("/api/operator-notifications/test", methods=["POST"])
+        def post_operator_notifications_test():
+            payload = request.get_json(silent=True) or {}
+            if not isinstance(payload, dict):
+                return jsonify({"status": "error", "message": "JSON object is required."}), 400
+            db_context = get_db()
+            db = next(db_context)
+            try:
+                workspace_id = get_workspace_id(self.engine.target_dir)
+                if workspace_id is None:
+                    return jsonify({"status": "error", "message": "Active workspace not found."}), 400
+                result = send_test_notification(
+                    db,
+                    workspace_id,
+                    self.engine.settings,
+                    confirm_send=payload.get("confirm_send") is True,
+                )
+                notification = result.get("notification")
+                status_code = 200 if result.get("status") == "sent" else 202
+                return jsonify(
+                    {
+                        "status": "success",
+                        "delivery_status": result.get("status"),
+                        "message": result.get("message"),
+                        "notification": serialize_notification(notification),
+                        "operator_notifications": notification_status(self.engine.settings),
+                    }
+                ), status_code
+            except ValueError as exception:
+                db.rollback()
+                return jsonify({"status": "error", "message": str(exception)}), 400
+            except Exception as exception:
+                db.rollback()
+                return jsonify({"status": "error", "message": "Test notification could not be sent: {}".format(exception)}), 503
+            finally:
+                db_context.close()
+
         @self.app.route("/api/discord-router/ingest", methods=["POST"])
         def ingest_discord_router_event():
             payload = request.get_json(silent=True)
@@ -2202,6 +2322,17 @@ class NexusDashboard:
                                 "author_id": identity.get("author_id"),
                             },
                         },
+                    )
+                    _safe_send_operator_notification(
+                        db,
+                        workspace_id,
+                        self.engine.settings,
+                        event_type="discord_capture_rejected",
+                        severity="warning",
+                        title="Discord capture rejected",
+                        summary=str(exception),
+                        dedupe_key="discord_capture_rejected:{}".format(identity.get("event_id") or "unknown"),
+                        dashboard_path="",
                     )
                     return jsonify({"status": "error", "message": str(exception)}), 403
                 inbox_data = normalize_discord_event(payload)
@@ -2650,6 +2781,17 @@ class NexusDashboard:
                 if workspace_id is None:
                     return jsonify({"status": "error", "message": "Active workspace not found."}), 400
                 item = create_intervention(db, workspace_id, payload)
+                _safe_send_operator_notification(
+                    db,
+                    workspace_id,
+                    self.engine.settings,
+                    event_type="operator_intervention_created",
+                    severity=item.severity,
+                    title="Operator intervention created",
+                    summary="{}: {}".format(item.title, item.details),
+                    dedupe_key="operator_intervention_created:{}".format(item.id),
+                    dashboard_path="",
+                )
                 return jsonify({"status": "success", "item": serialize_intervention(item)}), 201
             except ValueError as exception:
                 db.rollback()
@@ -3366,6 +3508,17 @@ class NexusDashboard:
                     status=task.status,
                     metadata={"previous_status": previous_status},
                 )
+                _safe_send_operator_notification(
+                    db,
+                    workspace_id,
+                    self.engine.settings,
+                    event_type="task_marked_review_required",
+                    severity="warning",
+                    title="Task marked review required",
+                    summary="Task #{} needs operator review: {}".format(task.id, reason),
+                    dedupe_key="task_marked_review_required:{}".format(task.id),
+                    dashboard_path="",
+                )
                 return jsonify(
                     {
                         "status": "success",
@@ -3866,6 +4019,17 @@ class NexusDashboard:
                 if not trust_gate.get("eligible"):
                     with self.packet_runner_lock:
                         self.packet_runner_state["message"] = "Trusted Packet Mode blocked an untrusted packet."
+                    _safe_send_operator_notification(
+                        db,
+                        workspace_id,
+                        self.engine.settings,
+                        event_type="trusted_packet_blocked",
+                        severity="blocked",
+                        title="Trusted Packet Mode blocked a packet",
+                        summary="Work packet #{} was blocked because trust_status is not trusted.".format(work_packet_id),
+                        dedupe_key="trusted_packet_blocked:{}".format(work_packet_id),
+                        dashboard_path="",
+                    )
                     return jsonify(
                         {
                             "status": "error",
@@ -3913,6 +4077,17 @@ class NexusDashboard:
                     payload={"task_count": len(packet_tasks), "execution_mode": execution_mode},
                 )
                 events_created += 1 if event is not None else 0
+                _safe_send_operator_notification(
+                    db,
+                    workspace_id,
+                    self.engine.settings,
+                    event_type="packet_run_started",
+                    severity="info",
+                    title="Packet run started",
+                    summary="Packet #{} started: {}".format(work_packet_id, work_packet.title),
+                    dedupe_key="packet_run_started:{}".format(work_packet_id),
+                    dashboard_path="",
+                )
 
                 for link, task in packet_tasks:
                     with self.packet_runner_lock:
@@ -4035,6 +4210,17 @@ class NexusDashboard:
                         },
                     )
                     events_created += 1 if event is not None else 0
+                    _safe_send_operator_notification(
+                        db,
+                        workspace_id,
+                        self.engine.settings,
+                        event_type="packet_run_failed",
+                        severity="critical",
+                        title="Packet run failed",
+                        summary=message,
+                        dedupe_key="packet_run_failed:{}".format(work_packet_id),
+                        dashboard_path="",
+                    )
                     _safe_db_commit(db)
                     break
 
@@ -4054,6 +4240,22 @@ class NexusDashboard:
                         },
                     )
                     events_created += 1 if event is not None else 0
+                    _safe_send_operator_notification(
+                        db,
+                        workspace_id,
+                        self.engine.settings,
+                        event_type="packet_run_completed",
+                        severity="info",
+                        title="Packet run passed",
+                        summary="Packet #{} completed with {} completed, {} failed, and {} skipped tasks.".format(
+                            work_packet_id,
+                            completed_count,
+                            failed_count,
+                            skipped_count,
+                        ),
+                        dedupe_key="packet_run_completed:{}".format(work_packet_id),
+                        dashboard_path="",
+                    )
                     _safe_db_commit(db)
 
                 with self.packet_runner_lock:

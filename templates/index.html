@@ -105,6 +105,34 @@
                             </select>
                         </div>
                         <div class="col-md-6">
+                            <label class="form-label text-secondary small fw-bold">MOBILE OPERATOR ALERTS</label>
+                            <select id="input-operator-notify-discord-enabled" class="form-select">
+                                <option value="false">Disabled</option>
+                                <option value="true">Enabled</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label text-secondary small fw-bold">DISCORD NOTIFICATION WEBHOOK</label>
+                            <input type="password" id="input-operator-notify-discord-webhook-url" class="form-control font-monospace">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label text-secondary small fw-bold">OPERATOR DASHBOARD URL</label>
+                            <input type="password" id="input-operator-dashboard-url" class="form-control font-monospace" placeholder="Tailscale, VPN, or tunnel URL">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label text-secondary small fw-bold">ALERT MIN SEVERITY</label>
+                            <select id="input-operator-notify-min-severity" class="form-select">
+                                <option value="info">info</option>
+                                <option value="warning">warning</option>
+                                <option value="blocked">blocked</option>
+                                <option value="critical">critical</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label text-secondary small fw-bold">ALERT COOLDOWN SECONDS</label>
+                            <input type="number" min="0" max="3600" id="input-operator-notify-cooldown-seconds" class="form-control font-monospace" placeholder="30">
+                        </div>
+                        <div class="col-md-6">
                             <div class="d-flex justify-content-between align-items-center mb-1">
                                 <label class="form-label text-secondary small fw-bold mb-0">CURATED GEMINI MODELS</label>
                                 <small id="gemini-model-summary" class="text-secondary"></small>
@@ -546,6 +574,23 @@
                             </div>
                             <section id="factory-discord-router-panel" class="factory-console-panel mb-4">
                                 <div class="text-secondary small">Discord router status not loaded.</div>
+                            </section>
+                            <section id="operator-notifications-panel" class="factory-console-panel mb-4">
+                                <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-3">
+                                    <div>
+                                        <h4 class="h6 fw-semibold mb-1">Mobile Operator Alerts</h4>
+                                        <p class="text-secondary small mb-0">Outbound Discord notifications only. No phone or Discord execution controls are available.</p>
+                                    </div>
+                                    <div class="d-flex gap-2 flex-wrap">
+                                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="NexusApp.loadOperatorNotifications()">Refresh Alerts</button>
+                                        <button id="operator-notification-test-button" type="button" class="btn btn-primary btn-sm" onclick="NexusApp.sendOperatorTestNotification()">Test Notification</button>
+                                    </div>
+                                </div>
+                                <div id="operator-notifications-status" class="row g-3 mb-3">
+                                    <div class="col-12 text-secondary small">Mobile alert status not loaded.</div>
+                                </div>
+                                <div id="operator-notifications-recent" class="operator-intervention-list text-secondary small">No notification history loaded.</div>
+                                <span class="d-none">/api/operator-notifications/status /api/operator-notifications/test /api/operator-notifications/recent Mobile Operator Alerts notification-only no Discord command execution</span>
                             </section>
                             <section id="factory-failure-recovery-panel" class="factory-console-panel mb-4">
                                 <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-3">

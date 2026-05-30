@@ -4,7 +4,8 @@
 - Current branch: `main`
 - Current commit at prior chat handoff: `208dbdbaecd646b013a590fae2db32d06daff408`
 - Prior chat handoff summary: `208dbdb add chat handoff for next session`
-- Latest Packet 037 baseline tag: `nexus-sprint-4-direction-baseline-2026-05-30`
+- Latest Packet 038 baseline tag: `nexus-mobile-operator-notifications-baseline-2026-05-30`
+- Previous Packet 037 baseline tag: `nexus-sprint-4-direction-baseline-2026-05-30`
 - Previous Packet 036 baseline tag: `nexus-deployment-operator-runbooks-baseline-2026-05-30`
 - Previous Packet 035 baseline tag: `nexus-discord-capture-hardening-baseline-2026-05-30`
 - Recent visible baseline tags:
@@ -40,6 +41,7 @@
 - Discord Capture Hardening
 - Deployment and Operator Runbooks
 - Sprint 4 Direction Lock
+- Mobile Operator Notification Bridge
 - Workflow Lock docs
 - Orchestration-ready workflow foundation
 - Supervised packet runner
@@ -65,6 +67,7 @@
 - No `git reset` or `git clean` unless explicitly approved.
 - No destructive database operations, including drop, truncate, bulk delete, or schema-destructive migration without explicit approval.
 - No raw API key exposure in logs, docs, reports, commits, prompts, or UI output.
+- No raw Discord webhook URL exposure in logs, docs, reports, commits, prompts, notifications, API responses, events, or UI output.
 - No Auto-Pilot unless explicitly building or testing it.
 - Do not call `/api/tasks/auto-run` unless explicitly intended.
 - Do not call `/api/tasks/run-one` unless explicitly intended.
@@ -111,7 +114,8 @@
 - Packet 035 — Discord Capture Hardening complete
 - Packet 036 — Deployment And Operator Runbooks complete
 - Packet 037 — Sprint 4 Direction Lock complete
-- Next — Packet 038 — Environment Validation And Startup Diagnostics
+- Packet 038 — Mobile Operator Notification Bridge complete
+- Next — Packet 039 — Environment Validation And Startup Diagnostics
 
 ## New Chat Startup Instructions
 Ask the user to run this local context capture before planning new implementation work:
@@ -144,4 +148,4 @@ Prefer one pasteable Codex operator prompt for local execution. Reduce manual co
 
 Keep the safety rails in this document. Do not force push, reset, clean, run destructive database operations, expose API keys, or start Auto-Pilot unless the user explicitly asks for that exact work.
 
-Packet 037 locks Sprint 4 direction. Sprint 3 is complete. The next recommended packet is Packet 038 — Environment Validation And Startup Diagnostics. Keep the work supervised: no Auto-Pilot, no direct Discord execution, no broad Git writes, no automatic recovery, no automatic trust, and no execution without explicit operator action.
+Packet 038 adds notification-only mobile operator Discord alerts. Sprint 3 is complete and Sprint 4 is active. The next recommended packet is Packet 039 — Environment Validation And Startup Diagnostics. Keep the work supervised: no Auto-Pilot, no direct Discord execution, no broad Git writes, no automatic recovery, no automatic trust, and no execution without explicit operator action.

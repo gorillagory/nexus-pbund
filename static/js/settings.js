@@ -23,11 +23,24 @@ window.NexusSettings = {
             document.getElementById("input-discord-replay-guard-enabled").value = data.discord_replay_guard_enabled === false ? "false" : "true";
             document.getElementById("input-discord-timestamp-tolerance-seconds").value = data.discord_timestamp_tolerance_seconds || 0;
             document.getElementById("input-trusted-packet-mode-enabled").value = data.trusted_packet_mode_enabled ? "true" : "false";
+            document.getElementById("input-operator-notify-discord-enabled").value = data.operator_notify_discord_enabled ? "true" : "false";
+            document.getElementById("input-operator-notify-min-severity").value = data.operator_notify_min_severity || "info";
+            document.getElementById("input-operator-notify-cooldown-seconds").value = data.operator_notify_cooldown_seconds || 30;
             const discordSecretEl = document.getElementById("input-discord-ingest-secret");
             discordSecretEl.value = "";
             discordSecretEl.placeholder = data.discord_ingest_secret_configured
                 ? "Configured — leave blank to keep existing secret"
                 : "Set shared ingest secret";
+            const operatorWebhookEl = document.getElementById("input-operator-notify-discord-webhook-url");
+            operatorWebhookEl.value = "";
+            operatorWebhookEl.placeholder = data.operator_notify_discord_webhook_configured
+                ? "Configured — leave blank to keep existing webhook"
+                : "Set Discord notification webhook";
+            const operatorDashboardEl = document.getElementById("input-operator-dashboard-url");
+            operatorDashboardEl.value = "";
+            operatorDashboardEl.placeholder = data.operator_dashboard_url_configured
+                ? "Configured — leave blank to keep existing dashboard URL"
+                : "Set Tailscale, VPN, or tunnel URL";
             [
                 ["input-discord-allowed-guild-ids", data.discord_allowed_guild_ids_configured, "guild allowlist"],
                 ["input-discord-allowed-channel-ids", data.discord_allowed_channel_ids_configured, "channel allowlist"],
@@ -66,6 +79,11 @@ window.NexusSettings = {
             discord_timestamp_tolerance_seconds: Number(document.getElementById("input-discord-timestamp-tolerance-seconds").value || 0),
             discord_replay_guard_enabled: document.getElementById("input-discord-replay-guard-enabled").value === "true",
             trusted_packet_mode_enabled: document.getElementById("input-trusted-packet-mode-enabled").value === "true",
+            operator_notify_discord_enabled: document.getElementById("input-operator-notify-discord-enabled").value === "true",
+            operator_notify_discord_webhook_url: document.getElementById("input-operator-notify-discord-webhook-url").value.trim(),
+            operator_dashboard_url: document.getElementById("input-operator-dashboard-url").value.trim(),
+            operator_notify_min_severity: document.getElementById("input-operator-notify-min-severity").value,
+            operator_notify_cooldown_seconds: Number(document.getElementById("input-operator-notify-cooldown-seconds").value || 30),
         };
 
         try {

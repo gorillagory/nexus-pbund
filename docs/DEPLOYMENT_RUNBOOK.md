@@ -19,6 +19,11 @@ DISCORD_ALLOWED_CHANNEL_IDS=
 DISCORD_ALLOWED_AUTHOR_IDS=
 DISCORD_TIMESTAMP_TOLERANCE_SECONDS=0
 DISCORD_REPLAY_GUARD_ENABLED=true
+NEXUS_OPERATOR_NOTIFY_DISCORD_ENABLED=false
+NEXUS_OPERATOR_NOTIFY_DISCORD_WEBHOOK_URL=
+NEXUS_OPERATOR_DASHBOARD_URL=
+NEXUS_OPERATOR_NOTIFY_MIN_SEVERITY=info
+NEXUS_OPERATOR_NOTIFY_COOLDOWN_SECONDS=30
 ```
 
 Never commit real secret values. Public settings, dashboard status, reports, and audit events must show configured/not configured or counts only.
@@ -32,6 +37,17 @@ Never commit real secret values. Public settings, dashboard status, reports, and
 - Timestamp tolerance rejects stale payloads when timestamps are present.
 - Replay guard rejects duplicate accepted event IDs.
 - Discord cannot execute Codex, tasks, packets, Git actions, trust changes, retry/continue behavior, or Auto-Pilot.
+
+## Mobile Operator Notification Notes
+
+- Mobile Operator Alerts are outbound Discord notifications only.
+- `NEXUS_OPERATOR_NOTIFY_DISCORD_ENABLED=true` enables notification attempts.
+- `NEXUS_OPERATOR_NOTIFY_DISCORD_WEBHOOK_URL` must contain the Discord webhook URL, but the raw URL must never appear in docs, logs, reports, UI, API responses, notifications, or events.
+- `NEXUS_OPERATOR_DASHBOARD_URL` may point to a Tailscale, VPN, or approved tunnel URL for mobile dashboard access.
+- `NEXUS_OPERATOR_NOTIFY_MIN_SEVERITY` accepts `info`, `warning`, `blocked`, or `critical`.
+- `NEXUS_OPERATOR_NOTIFY_COOLDOWN_SECONDS` limits repeated alerts with the same dedupe key.
+- Test the bridge from Factory Console after deployment. Test notification only sends an alert and records delivery status; it does not execute anything.
+- Discord notifications cannot execute Codex, tasks, packets, Git actions, trust changes, retry/continue behavior, or Auto-Pilot.
 
 ## Schema Sync
 
@@ -98,6 +114,7 @@ If a deployment is bad:
 
 - Repo branch and status inspected.
 - Environment variables configured without raw secret exposure.
+- Mobile notification webhook configured only in environment/settings, never committed.
 - Schema sync run if models changed.
 - Static asset syntax checked if JS changed.
 - Local quick preflight passed.

@@ -280,6 +280,27 @@ class OperatorReviewEvent(Base):
     updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
+class OperatorNotification(Base):
+    __tablename__ = "operator_notifications"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    workspace_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("workspaces.id"), nullable=False
+    )
+    channel: Mapped[str] = mapped_column(String(32), nullable=False, default="discord", server_default="discord")
+    event_type: Mapped[str] = mapped_column(String(64), nullable=False)
+    severity: Mapped[str] = mapped_column(String(32), nullable=False, default="info", server_default="info")
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    summary: Mapped[str] = mapped_column(Text, nullable=False)
+    delivery_status: Mapped[str] = mapped_column(String(32), nullable=False, default="pending", server_default="pending")
+    failure_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    dedupe_key: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    delivered_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
 class WorkPacket(Base):
     __tablename__ = "work_packets"
 

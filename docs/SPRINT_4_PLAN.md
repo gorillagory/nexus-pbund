@@ -8,9 +8,10 @@ This sprint must keep Nexus in Supervised Factory Alpha. Execution remains super
 
 ## Current Baseline
 
-- Latest completed baseline: `nexus-deployment-operator-runbooks-baseline-2026-05-30`
+- Latest completed baseline: `nexus-sprint-4-direction-baseline-2026-05-30`
 - Sprint 3 status: complete at Packet 036.
-- Next packet: Packet 038 -- Environment Validation And Startup Diagnostics.
+- Packet 037 status: Sprint 4 Direction Lock complete.
+- Next packet: Packet 038 -- Mobile Operator Notification Bridge.
 
 ## Sprint 3 Delivered
 
@@ -36,6 +37,7 @@ This sprint must keep Nexus in Supervised Factory Alpha. Execution remains super
 - Operator Intervention Queue tracks human decisions, blockers, and review items manually.
 - Operator Review History records append-only governance and review events.
 - Factory Console groups supervised factory surfaces and shows read-only summary visibility.
+- Mobile Operator Notification Bridge sends outbound Discord alerts for operator attention without enabling mobile execution.
 - Git Explorer provides read-only branch, status, commit, tag, change, and bounded diff visibility.
 - Branch Per Packet prepares one validated packet branch from clean `main` after explicit confirmation.
 - Recovery controls support failed-run inspection, notes, review-required marking, and supervised recovery decisions.
@@ -45,6 +47,7 @@ This sprint must keep Nexus in Supervised Factory Alpha. Execution remains super
 
 ## Remaining Gaps
 
+- Mobile awareness is needed while the operator is away from the terminal.
 - Startup and environment diagnostics are still spread across runbooks and ad hoc checks.
 - Configuration sanity is not summarized in one operator-safe health view.
 - Run details, events, review history, interventions, readiness, trust, and inbox conversion context are still too disconnected.
@@ -58,19 +61,21 @@ This sprint must keep Nexus in Supervised Factory Alpha. Execution remains super
 
 ## Packet 038+ Roadmap
 
-1. Packet 038 -- Environment Validation And Startup Diagnostics. Type: infra, safety, observability. Goal: add safe local startup diagnostics, environment validation, health status, and operator-safe config summaries. Safety boundary: diagnostics only; no execution routes, no Git writes, no raw secrets, no Auto-Pilot.
-2. Packet 039 -- Work Packet Lifecycle State Map. Type: workflow, UI, safety. Goal: document and surface packet lifecycle states from capture through drafting, readiness, trust, supervised execution, recovery, and baseline. Safety boundary: state visibility and metadata guidance only; no execution, no automatic trust, no branch or Git writes.
-3. Packet 040 -- Linked Operator Context Timeline. Type: observability, UI. Goal: connect inbox items, conversions, drafts, readiness checks, trust decisions, interventions, review events, and execution runs into a readable operator context trail. Safety boundary: read-only timeline and append-only notes only; no retry, continue, execution, trust automation, or Git mutation.
-4. Packet 041 -- Preflight Verifier Registry. Type: testing, safety, workflow. Goal: organize packet and feature verifiers into a registry with ownership, coverage, and expected commands. Safety boundary: checks and reporting only; no auto-fix, no execution routes, no workflow packet execution.
-5. Packet 042 -- CI Report Artifact Polish. Type: infra, testing, observability. Goal: improve CI preflight output, packet-aware report artifacts, and operator-readable failure summaries. Safety boundary: CI reporting only; no deployment automation, no execution expansion, no secrets.
-6. Packet 043 -- Operator Troubleshooting Matrix. Type: docs, onboarding, recovery. Goal: map common operator symptoms to safe inspection commands, runbook sections, and escalation points. Safety boundary: documentation only; no runtime behavior.
-7. Packet 044 -- Discord Setup And Notification Harness. Type: integration, docs, testing. Goal: document hardened Discord setup and add a safe capture/notification test harness if needed. Safety boundary: Discord remains capture-only or notification-only; no Discord-triggered Codex, task, packet, Git, trust, recovery, or Auto-Pilot actions.
-8. Packet 045 -- Sprint 4 Closure And Next Direction Lock. Type: docs, planning. Goal: close Sprint 4, summarize delivered hardening, and decide the next supervised roadmap. Safety boundary: planning only; no runtime behavior.
+1. Packet 038 -- Mobile Operator Notification Bridge. Type: integration, observability, safety. Goal: send outbound Discord phone alerts when Nexus needs operator attention. Safety boundary: notification-only; no Discord command execution, no Codex/task/packet execution, no Git writes, no trust changes, no retry/continue automation, no Auto-Pilot.
+2. Packet 039 -- Environment Validation And Startup Diagnostics. Type: infra, safety, observability. Goal: add safe local startup diagnostics, environment validation, health status, and operator-safe config summaries. Safety boundary: diagnostics only; no execution routes, no Git writes, no raw secrets, no Auto-Pilot.
+3. Packet 040 -- Work Packet Lifecycle State Map. Type: workflow, UI, safety. Goal: document and surface packet lifecycle states from capture through drafting, readiness, trust, supervised execution, recovery, and baseline. Safety boundary: state visibility and metadata guidance only; no execution, no automatic trust, no branch or Git writes.
+4. Packet 041 -- Linked Operator Context Timeline. Type: observability, UI. Goal: connect inbox items, conversions, drafts, readiness checks, trust decisions, interventions, review events, notifications, and execution runs into a readable operator context trail. Safety boundary: read-only timeline and append-only notes only; no retry, continue, execution, trust automation, or Git mutation.
+5. Packet 042 -- Preflight Verifier Registry. Type: testing, safety, workflow. Goal: organize packet and feature verifiers into a registry with ownership, coverage, and expected commands. Safety boundary: checks and reporting only; no auto-fix, no execution routes, no workflow packet execution.
+6. Packet 043 -- CI Report Artifact Polish. Type: infra, testing, observability. Goal: improve CI preflight output, packet-aware report artifacts, and operator-readable failure summaries. Safety boundary: CI reporting only; no deployment automation, no execution expansion, no secrets.
+7. Packet 044 -- Operator Troubleshooting Matrix. Type: docs, onboarding, recovery. Goal: map common operator symptoms to safe inspection commands, runbook sections, and escalation points. Safety boundary: documentation only; no runtime behavior.
+8. Packet 045 -- Discord Setup And Notification Harness. Type: integration, docs, testing. Goal: document hardened Discord setup and safe capture/notification checks. Safety boundary: Discord remains capture-only or notification-only; no Discord-triggered Codex, task, packet, Git, trust, recovery, or Auto-Pilot actions.
+9. Packet 046 -- Sprint 4 Closure And Next Direction Lock. Type: docs, planning. Goal: close Sprint 4, summarize delivered hardening, and decide the next supervised roadmap. Safety boundary: planning only; no runtime behavior.
 
 ## Safety Boundaries
 
 - Auto-Pilot remains locked unless a future packet explicitly scopes research, build, or test work for it.
 - Discord remains capture-only. Discord must not execute Codex, tasks, packets, Git actions, trust changes, recovery, or Auto-Pilot.
+- Outbound Discord notifications are phone alerts only. They must not include raw secrets, webhook URLs, full stdout/stderr, or command execution controls.
 - Git Explorer remains read-only.
 - Branch Per Packet remains narrow and may only prepare a validated packet branch after clean-worktree checks and explicit confirmation.
 - Trusted Packet Mode remains restrictive only. It may block supervised packet execution when enabled; it must not execute or trust automatically.

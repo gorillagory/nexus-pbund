@@ -33,6 +33,31 @@ python3 scripts/nexus_preflight.py --packet 36 --report /tmp/nexus-preflight-pac
 - Use Human Review for Operator Intervention Queue, Operator Review History, and recovery visibility.
 - Use Vault & Settings for Prompt Vault, provider settings, resources, and history.
 
+## Mobile Operator Alerts
+
+Use Mobile Operator Alerts when away from the terminal and needing phone awareness. Alerts are outbound Discord notifications only. They do not create a Discord command surface and cannot execute Codex, tasks, packets, Git actions, trust changes, retry/continue behavior, or Auto-Pilot.
+
+Configure locally with environment variables or saved settings:
+
+```bash
+NEXUS_OPERATOR_NOTIFY_DISCORD_ENABLED=true
+NEXUS_OPERATOR_NOTIFY_DISCORD_WEBHOOK_URL=<discord webhook url>
+NEXUS_OPERATOR_DASHBOARD_URL=<operator dashboard url>
+NEXUS_OPERATOR_NOTIFY_MIN_SEVERITY=info
+NEXUS_OPERATOR_NOTIFY_COOLDOWN_SECONDS=30
+```
+
+Use a Tailscale, VPN, or approved tunnel URL for `NEXUS_OPERATOR_DASHBOARD_URL` if the dashboard needs mobile access. Do not expose the dashboard publicly without an operator-approved access control layer.
+
+From Factory Console:
+
+1. Confirm Mobile Operator Alerts show enabled or disabled.
+2. Confirm webhook and dashboard URL show configured/not configured only.
+3. Use Test Notification to send a notification-only alert.
+4. Keep acting from the terminal or dashboard. Do not attempt mobile execution through Discord.
+
+Notification messages must not include raw webhook URLs, API keys, full stdout/stderr, raw environment values, or secrets.
+
 ## Capture And Triage
 
 Capture raw ideas in Orchestration Inbox first. Discord-captured intent also lands in the inbox and remains capture-only. Every inbox item must become a scoped task, staged untrusted work packet, document update audit candidate, or audited discard.
@@ -87,6 +112,7 @@ cat docs/CHAT_HANDOFF.md
 cat docs/WORKFLOW_LOCK.md
 cat docs/SPRINT_PLAN.md
 cat docs/SPRINT_3_PLAN.md
+cat docs/SPRINT_4_PLAN.md
 cat docs/OPERATOR_RUNBOOK.md
 cat docs/DEPLOYMENT_RUNBOOK.md
 cat docs/RECOVERY_RUNBOOK.md
@@ -98,6 +124,7 @@ cat docs/RECOVERY_RUNBOOK.md
 - No direct Discord execution.
 - No destructive database operations.
 - No raw secret exposure in docs, reports, UI, API responses, events, inbox items, or prompts.
+- No raw Discord webhook URL exposure in docs, reports, UI, API responses, events, notifications, or prompts.
 - Git Explorer is read-only.
 - No force push, reset, clean, branch deletion, or broad Git write controls in the app.
 - No `shell=True` or `subprocess.Popen`.

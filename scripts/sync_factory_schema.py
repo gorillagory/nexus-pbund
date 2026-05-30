@@ -185,6 +185,19 @@ FACTORY_COLUMNS = {
         ("created_at", "TIMESTAMP WITH TIME ZONE"),
         ("updated_at", "TIMESTAMP WITH TIME ZONE"),
     ],
+    "operator_notifications": [
+        ("workspace_id", "INTEGER"),
+        ("channel", "VARCHAR(32)"),
+        ("event_type", "VARCHAR(64)"),
+        ("severity", "VARCHAR(32)"),
+        ("title", "VARCHAR(255)"),
+        ("summary", "TEXT"),
+        ("delivery_status", "VARCHAR(32)"),
+        ("failure_reason", "TEXT"),
+        ("dedupe_key", "VARCHAR(255)"),
+        ("created_at", "TIMESTAMP WITH TIME ZONE"),
+        ("delivered_at", "TIMESTAMP WITH TIME ZONE"),
+    ],
 }
 
 
