@@ -13,7 +13,7 @@ from threading import Lock, Thread
 import psutil
 import requests
 from flask import Flask, Response, jsonify, render_template, request, stream_with_context
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from watchdog.observers import Observer
 
@@ -27,6 +27,8 @@ from models import (
     FactoryEvent,
     Footprint,
     Message,
+    OperatorIntervention,
+    OperatorReviewEvent,
     OrchestrationInboxItem,
     PromptTemplate,
     Task,
@@ -1724,6 +1726,87 @@ class NexusDashboard:
                     "recent_runs": [serialize_execution_run(run) for run in runs],
                 }
             )
+
+        @self.app.route("/api/factory-console/summary", methods=["GET"])
+        def get_factory_console_summary():
+            git_summary = summarize_git_changes(self.engine.target_dir)
+            workspace_id = None
+            summary = {
+                "open_inbox_count": 0,
+                "active_work_packet_count": 0,
+                "open_intervention_count": 0,
+                "review_event_count": 0,
+                "readiness_attention_count": 0,
+                "latest_review_event": None,
+                "trusted_packet_mode_enabled": bool(self.engine.settings.get("trusted_packet_mode_enabled")),
+                "git": {
+                    "branch": git_summary.get("branch"),
+                    "is_dirty": bool(git_summary.get("is_dirty")),
+                    "changed_file_count": len(git_summary.get("changed_files") or []),
+                },
+                "boundary": "read_only_visibility_only",
+            }
+            try:
+                workspace_id = get_workspace_id(self.engine.target_dir)
+                db_context = get_db()
+                db = next(db_context)
+                try:
+                    if workspace_id is None:
+                        return jsonify({"status": "success", "summary": summary})
+                    summary["open_inbox_count"] = db.execute(
+                        select(func.count())
+                        .select_from(OrchestrationInboxItem)
+                        .where(
+                            OrchestrationInboxItem.workspace_id == workspace_id,
+                            OrchestrationInboxItem.status.in_(("captured", "triaged")),
+                        )
+                    ).scalar_one()
+                    summary["active_work_packet_count"] = db.execute(
+                        select(func.count())
+                        .select_from(WorkPacket)
+                        .where(
+                            WorkPacket.workspace_id == workspace_id,
+                            WorkPacket.status.in_(("staged", "running", "review", "review_required")),
+                        )
+                    ).scalar_one()
+                    summary["open_intervention_count"] = db.execute(
+                        select(func.count())
+                        .select_from(OperatorIntervention)
+                        .where(
+                            OperatorIntervention.workspace_id == workspace_id,
+                            OperatorIntervention.status.in_(("open", "acknowledged")),
+                        )
+                    ).scalar_one()
+                    summary["review_event_count"] = db.execute(
+                        select(func.count())
+                        .select_from(OperatorReviewEvent)
+                        .where(OperatorReviewEvent.workspace_id == workspace_id)
+                    ).scalar_one()
+                    summary["readiness_attention_count"] = db.execute(
+                        select(func.count())
+                        .select_from(WorkPacket)
+                        .where(
+                            WorkPacket.workspace_id == workspace_id,
+                            WorkPacket.readiness_status.in_(("incomplete", "blocked")),
+                        )
+                    ).scalar_one()
+                    latest_review = (
+                        db.execute(
+                            select(OperatorReviewEvent)
+                            .where(OperatorReviewEvent.workspace_id == workspace_id)
+                            .order_by(OperatorReviewEvent.created_at.desc(), OperatorReviewEvent.id.desc())
+                            .limit(1)
+                        )
+                        .scalars()
+                        .first()
+                    )
+                    if latest_review is not None:
+                        summary["latest_review_event"] = serialize_review_event(latest_review)
+                    return jsonify({"status": "success", "summary": summary})
+                finally:
+                    db_context.close()
+            except Exception as exception:
+                return jsonify({"status": "error", "message": "Factory console summary unavailable: {}".format(exception)}), 503
 
         @self.app.route("/api/factory/events", methods=["GET"])
         def get_factory_events():

@@ -77,6 +77,8 @@ Packet 026 added the Operator Intervention Queue as the human review and decisio
 
 Packet 027 added Trusted Packet Mode as a supervised trust gate. Operators may mark reviewed work packets as trusted or revoke trust with explicit confirmation and a recorded reason. Enabling Trusted Packet Mode does not execute anything, does not unlock Auto-Pilot, and does not bypass explicit operator execution. When enabled, supervised packet execution rejects packets unless `trust_status=trusted`.
 
+Packet 033 consolidated the Factory Console into grouped operator surfaces: Command Center, Intake & Triage, Packet Preparation, Human Review, and Vault & Settings. It may show read-only summary counts and status cards, but it does not add execution behavior, Git write controls, automatic trust changes, retry/continue automation, or Auto-Pilot behavior.
+
 ## Recovery Flow
 
 When a run fails:
@@ -110,6 +112,8 @@ The Operator Intervention Queue is record keeping only. It may create, acknowled
 Operator Review History is consolidated audit visibility only. It may append review events and manual notes, but it must not replace inbox conversion, readiness, trust, intervention, recovery, or draft records, and it must not become a hidden execution, trust, recovery, or Git write path.
 
 Trusted Packet Mode is restrictive only. It may update packet trust metadata and settings, and it may block supervised packet execution for untrusted packets. It must not add autonomous execution, direct Codex execution, retry/continue automation, or Git write controls.
+
+Factory Console Consolidation is navigation/visibility only. It may summarize existing supervised surfaces, but it must not add new run controls, new Git write controls, trust auto-marking, retry/continue automation, or Auto-Pilot unlocks.
 
 ## Sprint 3 Direction Lock
 

@@ -324,11 +324,28 @@
                 </button>
             </div>
             <nav class="nav flex-column px-3 py-4 gap-1" aria-label="Primary navigation">
+                <div class="nav-section-label">Command Center</div>
                 <button type="button" id="tab-dashboard-btn" class="nav-link active text-start" onclick="NexusApp.showView('dashboard')">
                     <i class="bi bi-grid-1x2 me-3"></i>Dashboard
                 </button>
-                <button type="button" id="tab-resources-btn" class="nav-link text-start" onclick="NexusApp.showView('resources')">
-                    <i class="bi bi-cpu me-3"></i>Resource Monitor
+                <button type="button" id="tab-git-btn" class="nav-link text-start" onclick="NexusApp.showView('git-explorer')">
+                    <i class="bi bi-git me-3"></i>Git Explorer
+                </button>
+                <div class="nav-section-label">Intake & Triage</div>
+                <button type="button" id="tab-inbox-btn" class="nav-link text-start" onclick="NexusApp.showView('orchestration-inbox')">
+                    <i class="bi bi-inbox me-3"></i>Orchestration Inbox
+                </button>
+                <div class="nav-section-label">Packet Preparation</div>
+                <button type="button" id="tab-board-btn" class="nav-link text-start" onclick="NexusApp.showView('board')">
+                    <i class="bi bi-kanban me-3"></i>Orchestration Board
+                </button>
+                <div class="nav-section-label">Human Review</div>
+                <button type="button" id="tab-interventions-btn" class="nav-link text-start" onclick="NexusApp.showView('operator-interventions')">
+                    <i class="bi bi-clipboard-check me-3"></i>Review & Interventions
+                </button>
+                <div class="nav-section-label">Vault & Settings</div>
+                <button type="button" id="tab-prompts-btn" class="nav-link text-start" onclick="NexusApp.showView('prompt-vault')">
+                    <i class="bi bi-journal-text me-3"></i>Prompt Vault
                 </button>
                 <button type="button" id="tab-arch-btn" class="nav-link text-start" onclick="NexusApp.showView('explorer')">
                     <i class="bi bi-folder2-open me-3"></i>File Explorer
@@ -336,20 +353,8 @@
                 <button type="button" id="tab-chat-btn" class="nav-link text-start" onclick="NexusApp.showView('chat')">
                     <i class="bi bi-chat-square-text me-3"></i>CTO Copilot
                 </button>
-                <button type="button" id="tab-board-btn" class="nav-link text-start" onclick="NexusApp.showView('board')">
-                    <i class="bi bi-kanban me-3"></i>Orchestration Board
-                </button>
-                <button type="button" id="tab-git-btn" class="nav-link text-start" onclick="NexusApp.showView('git-explorer')">
-                    <i class="bi bi-git me-3"></i>Git Explorer
-                </button>
-                <button type="button" id="tab-inbox-btn" class="nav-link text-start" onclick="NexusApp.showView('orchestration-inbox')">
-                    <i class="bi bi-inbox me-3"></i>Orchestration Inbox
-                </button>
-                <button type="button" id="tab-interventions-btn" class="nav-link text-start" onclick="NexusApp.showView('operator-interventions')">
-                    <i class="bi bi-clipboard-check me-3"></i>Intervention Queue
-                </button>
-                <button type="button" id="tab-prompts-btn" class="nav-link text-start" onclick="NexusApp.showView('prompt-vault')">
-                    <i class="bi bi-journal-text me-3"></i>Prompt Vault
+                <button type="button" id="tab-resources-btn" class="nav-link text-start" onclick="NexusApp.showView('resources')">
+                    <i class="bi bi-cpu me-3"></i>Resource Monitor
                 </button>
                 <button type="button" id="tab-history-btn" class="nav-link text-start" onclick="NexusApp.showView('history')">
                     <i class="bi bi-clock-history me-3"></i>Project History
@@ -387,6 +392,50 @@
 
             <div class="content-area p-4">
                 <div id="view-dashboard" class="spa-view">
+                    <section class="factory-console-map card bg-white border-0 shadow-sm mb-4">
+                        <div class="card-body p-4">
+                            <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-3">
+                                <div>
+                                    <h3 class="h5 fw-semibold mb-1">Supervised Factory Console</h3>
+                                    <p class="text-secondary mb-0">Grouped navigation for capture, packet preparation, human review, and read-only command-center visibility. No new execution or Git write controls are added here.</p>
+                                </div>
+                                <span class="factory-status-badge factory-status-idle">manual-first</span>
+                            </div>
+                            <div class="factory-console-map-grid">
+                                <section class="factory-console-map-group">
+                                    <h4>Command Center</h4>
+                                    <p>Factory status, mode, preflight, CI, Git Explorer summary, and Branch Per Packet status.</p>
+                                    <div class="d-flex gap-2 flex-wrap">
+                                        <button type="button" class="btn btn-outline-primary btn-sm" onclick="NexusApp.showView('dashboard')">Factory Console</button>
+                                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="NexusApp.showView('git-explorer')">Git Explorer</button>
+                                    </div>
+                                </section>
+                                <section class="factory-console-map-group">
+                                    <h4>Intake & Triage</h4>
+                                    <p>Orchestration Inbox, inbox conversion flow, and Discord Router capture status.</p>
+                                    <button type="button" class="btn btn-outline-primary btn-sm" onclick="NexusApp.showView('orchestration-inbox')">Open Inbox</button>
+                                </section>
+                                <section class="factory-console-map-group">
+                                    <h4>Packet Preparation</h4>
+                                    <p>Work Packet Manager, Packet Drafting Assistant, Readiness Checklist, and Trusted Packet Mode.</p>
+                                    <button type="button" class="btn btn-outline-primary btn-sm" onclick="NexusApp.showView('board')">Open Board</button>
+                                </section>
+                                <section class="factory-console-map-group">
+                                    <h4>Human Review</h4>
+                                    <p>Operator Intervention Queue, Operator Review History, and recovery audit visibility.</p>
+                                    <button type="button" class="btn btn-outline-primary btn-sm" onclick="NexusApp.showView('operator-interventions')">Open Review</button>
+                                </section>
+                                <section class="factory-console-map-group">
+                                    <h4>Vault & Settings</h4>
+                                    <p>Prompt Vault, provider settings, local resources, project history, and supporting context tools.</p>
+                                    <div class="d-flex gap-2 flex-wrap">
+                                        <button type="button" class="btn btn-outline-primary btn-sm" onclick="NexusApp.showView('prompt-vault')">Prompt Vault</button>
+                                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="NexusSettings.open()">Settings</button>
+                                    </div>
+                                </section>
+                            </div>
+                        </div>
+                    </section>
                     <div class="row g-4 mb-4">
                         <div class="col-lg-8">
                             <div class="card bg-white border-0 shadow-sm h-100">

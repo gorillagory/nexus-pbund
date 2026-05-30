@@ -19,6 +19,7 @@ Sprint 2 is complete. It delivered a remote-operable supervised factory foundati
 - Packet Drafting Assistant for deterministic Prompt Vault based packet prompt drafts.
 - Work Packet Readiness Checklist for planning, safety, and verification metadata review.
 - Operator Review History for consolidated human governance and decision audit events.
+- Factory Console Consolidation for grouped navigation and read-only dashboard summary visibility.
 - Packet 027 Trusted Packet Mode foundation.
 - Supervised packet runner and Run One Task.
 - Factory Console visibility, execution ledger, changed-file tracking, recovery controls, and recovery audit notes.
@@ -48,11 +49,12 @@ Readiness checklist rule: Work Packet Readiness Checklist evaluates and stores r
 
 Operator review history rule: Operator Review History is audit and visibility only. It records human review decisions and governance events, preserves original source records, and must not execute packets, trust packets automatically, recover automatically, perform Git actions, retry/continue runs, or start Auto-Pilot.
 
+Factory Console consolidation rule: the consolidated Factory Console is navigation and visibility only. It may group dashboard surfaces and show read-only summary counts, but it must not add execution behavior, Git write controls, automatic trust changes, retry/continue behavior, or Auto-Pilot behavior. Git Explorer remains read-only.
+
 Auto-Pilot remains locked. Do not build, enable, or rely on Auto-Pilot unless a future packet explicitly scopes Auto-Pilot build/test work.
 
 ## Remaining Workflow Gaps
 
-- Factory Console and dashboard surfaces grew during Sprint 2 and need consolidation for repeated operator use.
 - Preflight coverage is broad but not yet packet-aware.
 - Discord capture is safe but lacks channel allowlisting or stronger signature-style verification.
 - Deployment and operator runbooks are still thin.
@@ -70,8 +72,8 @@ Do not automatically choose Auto-Pilot. Auto-Pilot remains out of scope until ex
 3. Packet 030 — Packet Drafting Assistant. Type: workflow, backend, UI. Boundary: uses Prompt Vault templates and selected context to draft, save, review, and copy packet text; does not run Codex, stage automatically, or trust packets. Complete.
 4. Packet 031 — Work Packet Readiness Checklist. Type: safety, backend, UI. Boundary: validates safety rules, files allowed, verification commands, and trust visibility before readiness; does not execute or trust packets. Complete.
 5. Packet 032 — Operator Review History. Type: workflow, backend, UI. Boundary: records triage, trust/revoke, intervention, readiness, and recovery decisions; no automatic recovery or execution. Complete.
-6. Packet 033 — Factory Console Consolidation. Type: UI. Boundary: reorganizes existing visibility and controls; no new execution or Git write capability. Next recommended packet.
-7. Packet 034 — Packet-Aware Preflight Expansion. Type: safety, testing. Boundary: adds checks and reports only; no execution route calls.
+6. Packet 033 — Factory Console Consolidation. Type: UI. Boundary: reorganizes existing visibility and controls; no new execution or Git write capability. Complete.
+7. Packet 034 — Packet-Aware Preflight Expansion. Type: safety, testing. Boundary: adds checks and reports only; no execution route calls. Next recommended packet.
 8. Packet 035 — Discord Capture Hardening. Type: integration, safety. Boundary: channel allowlisting or stronger verification for capture-only ingest; Discord still cannot execute work.
 9. Packet 036 — Deployment And Operator Runbooks. Type: docs/planning. Boundary: documentation only; no runtime changes unless verification requires a docs checker.
 

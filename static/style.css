@@ -202,6 +202,16 @@ body {
     color: #0d6efd;
 }
 
+.nav-section-label {
+    color: #6c757d;
+    font-size: 0.68rem;
+    font-weight: 800;
+    letter-spacing: 0;
+    margin: 0.8rem 0 0.2rem;
+    padding: 0 1rem;
+    text-transform: uppercase;
+}
+
 .app-main {
     margin-left: 260px;
     min-height: 100vh;
@@ -446,6 +456,33 @@ pre {
     border: 1px solid #e6edf5;
     border-radius: 8px;
     padding: 1rem;
+}
+
+.factory-console-map-grid {
+    display: grid;
+    gap: 0.75rem;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.factory-console-map-group {
+    background: #f8fafc;
+    border: 1px solid #e6edf5;
+    border-radius: 8px;
+    min-height: 160px;
+    padding: 1rem;
+}
+
+.factory-console-map-group h4 {
+    color: #212529;
+    font-size: 0.95rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+}
+
+.factory-console-map-group p {
+    color: #6c757d;
+    font-size: 0.85rem;
+    min-height: 3rem;
 }
 
 .factory-summary-card,

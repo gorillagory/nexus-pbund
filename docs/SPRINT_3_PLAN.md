@@ -75,7 +75,9 @@ Type: UI.
 
 Reorganize Factory Console, Git Explorer, Branch Per Packet, Intervention Queue, and Trusted Packet surfaces for faster repeated operation.
 
-Safety boundary: UI organization only. No new execution route calls and no new Git write controls. Next recommended packet.
+Safety boundary: UI organization only. No new execution route calls and no new Git write controls.
+
+Status: complete. Packet 033 groups the dashboard into Command Center, Intake & Triage, Packet Preparation, Human Review, and Vault & Settings, and adds a read-only Factory Console summary endpoint for counts and status cards. It is navigation/visibility only: it does not add execution behavior, Git write actions, trust auto-marking, retry/continue behavior, or Auto-Pilot behavior.
 
 ### Packet 034 — Packet-Aware Preflight Expansion
 
@@ -84,6 +86,8 @@ Type: safety, testing.
 Add packet-specific checks for required docs, safety boundaries, route restrictions, verifier presence, and no-token execution safety.
 
 Safety boundary: checks and reports only. No packet execution.
+
+Status: next recommended packet.
 
 ### Packet 035 — Discord Capture Hardening
 

@@ -36,6 +36,7 @@ window.NexusApp = {
     latestStagedWorkPacket: null,
     latestCostLedger: null,
     latestFactoryConsole: null,
+    latestFactoryConsoleSummary: null,
     latestPreflightStatus: null,
     latestCiStatus: null,
     latestGitExplorer: null,
@@ -233,6 +234,7 @@ window.NexusApp = {
 
             this.latestFactoryConsole = data;
             this.latestCiStatus = data.ci || this.latestCiStatus;
+            await this.loadFactoryConsoleSummary(false);
             this.renderFactoryConsole(data);
             this.loadFactoryPreflightStatus();
             this.loadFactoryCiStatus();
@@ -244,6 +246,25 @@ window.NexusApp = {
                 message.textContent = `Unable to load factory console: ${error.message}`;
                 target.appendChild(message);
             }
+        }
+    },
+
+    async loadFactoryConsoleSummary(renderOnly = true) {
+        try {
+            const response = await fetch("/api/factory-console/summary");
+            const data = await response.json();
+            if (!response.ok || data.status !== "success") {
+                throw new Error(data.message || "Unable to load factory console summary.");
+            }
+            this.latestFactoryConsoleSummary = data.summary || {};
+            if (renderOnly && this.latestFactoryConsole) {
+                this.renderFactorySummaryCards(this.latestFactoryConsole.factory || {}, this.latestFactoryConsole.git || {});
+            }
+        } catch (error) {
+            this.latestFactoryConsoleSummary = {
+                error: error.message,
+                boundary: "read_only_visibility_only",
+            };
         }
     },
 
@@ -364,19 +385,24 @@ window.NexusApp = {
 
         const preflight = this.latestPreflightStatus || {};
         const ci = this.latestCiStatus || {};
+        const summary = this.latestFactoryConsoleSummary || {};
+        const summaryGit = summary.git || {};
         const cards = [
             ["Mode", factory?.execution_mode || "unknown", this.factoryStatusClass(factory?.execution_mode || "manual")],
             ["Automatic Analysis", factory?.automatic_analysis_enabled ? "enabled" : "disabled", factory?.automatic_analysis_enabled ? "factory-status-fail" : "factory-status-pass"],
-            ["Git State", git?.is_dirty ? "dirty" : "clean", this.factoryStatusClass(git?.is_dirty ? "dirty" : "clean")],
-            ["Recent Runs", factory?.recent_run_count ?? 0, "factory-status-neutral"],
-            ["Recent Events", factory?.recent_event_count ?? 0, "factory-status-neutral"],
+            ["Git Branch", summaryGit.branch || git?.branch || "unknown", summaryGit.is_dirty || git?.is_dirty ? "factory-status-fail" : "factory-status-pass"],
+            ["Inbox To Triage", summary.open_inbox_count ?? "-", Number(summary.open_inbox_count || 0) ? "factory-status-running" : "factory-status-pass"],
+            ["Active Packets", summary.active_work_packet_count ?? "-", Number(summary.active_work_packet_count || 0) ? "factory-status-running" : "factory-status-idle"],
+            ["Interventions", summary.open_intervention_count ?? "-", Number(summary.open_intervention_count || 0) ? "factory-status-fail" : "factory-status-pass"],
+            ["Readiness Attention", summary.readiness_attention_count ?? "-", Number(summary.readiness_attention_count || 0) ? "factory-status-fail" : "factory-status-pass"],
+            ["Trusted Mode", summary.trusted_packet_mode_enabled ? "enabled" : "disabled", summary.trusted_packet_mode_enabled ? "factory-status-running" : "factory-status-idle"],
             ["Preflight Status", preflight?.local_last_result || ci?.local_preflight?.status || "unknown", this.factoryStatusClass(preflight?.local_last_result || ci?.local_preflight?.status || "unknown")],
         ];
 
         target.innerHTML = "";
         cards.forEach(([label, value, statusClass]) => {
             const column = document.createElement("div");
-            column.className = "col-sm-6 col-xl-2";
+            column.className = "col-sm-6 col-xl-3";
             column.innerHTML = `
                 <div class="factory-summary-card">
                     <div class="factory-summary-label">${this.escapeHtml(label)}</div>
@@ -385,6 +411,19 @@ window.NexusApp = {
             `;
             target.appendChild(column);
         });
+        if (summary.latest_review_event) {
+            const latest = summary.latest_review_event;
+            const column = document.createElement("div");
+            column.className = "col-12";
+            column.innerHTML = `
+                <div class="factory-summary-card">
+                    <div class="factory-summary-label">Latest Review Event</div>
+                    <div class="factory-summary-value factory-status-neutral">${this.escapeHtml(latest.title || "Review event")}</div>
+                    <div class="small text-secondary">${this.escapeHtml(latest.event_type || "manual_note")} | ${this.escapeHtml(this.formatFactoryTime(latest.created_at))}</div>
+                </div>
+            `;
+            target.appendChild(column);
+        }
     },
 
     renderDiscordRouterStatus(discordRouter) {
