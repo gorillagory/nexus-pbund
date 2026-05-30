@@ -57,13 +57,15 @@ Track whether a staged packet includes mission, safety rules, files allowed, ver
 
 Safety boundary: readiness metadata only. Does not execute or bypass trust. Next recommended packet.
 
+Status: complete. Packet 031 adds readiness metadata on work packets, deterministic checklist evaluation, readiness score/status/missing items, notes, and a Work Packet Manager panel. It is validation and guidance only: it does not execute packets, trust packets automatically, bypass Trusted Packet Mode, retry/continue runs, or perform Git actions.
+
 ### Packet 032 — Operator Review History
 
 Type: workflow, backend, UI.
 
 Create a consolidated audit trail for triage decisions, trust/revoke decisions, interventions, and recovery notes.
 
-Safety boundary: audit trail only. No automatic recovery, retry, continue, or execution.
+Safety boundary: audit trail only. No automatic recovery, retry, continue, or execution. Next recommended packet.
 
 ### Packet 033 — Factory Console Consolidation
 

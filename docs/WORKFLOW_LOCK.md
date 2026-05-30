@@ -52,6 +52,8 @@ The vault is for storing and copying prompts. It must not execute Codex, start A
 
 Drafted work can be staged to Kanban when it is scoped and has safety rules. Staging is not execution. Staged work is reviewed in the board before a supervised mode runs it.
 
+Packet 031 added the Work Packet Readiness Checklist. It evaluates planning, safety, scope, verification, report, trust visibility, and branch-preparation metadata for a work packet. It may store readiness status, score, missing items, notes, and checker metadata. It is validation/guidance only and must not execute packets, trust packets automatically, bypass Trusted Packet Mode, perform Git writes, retry or continue runs, or start Auto-Pilot.
+
 ## Supervised Execution Modes
 
 - `manual`: no automation. The operator inspects, edits, stages, and copies commands.

@@ -252,6 +252,12 @@ class WorkPacket(Base):
     trust_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     trust_reviewer: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
     trust_notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    readiness_status: Mapped[str] = mapped_column(String(32), nullable=False, default="incomplete", server_default="incomplete")
+    readiness_checked_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    readiness_checked_by: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    readiness_notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    readiness_score: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    readiness_missing_items: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

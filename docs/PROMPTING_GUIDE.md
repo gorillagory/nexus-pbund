@@ -46,6 +46,7 @@ Codex should inspect local context, make routine implementation decisions, run v
 - Write final reports to `/tmp`.
 - Keep reusable successful prompts in the Prompt Vault.
 - Use Packet Drafting Assistant to generate, edit, save, review, and copy packet prompts from Prompt Vault templates and selected context. It is draft-only and does not execute the prompt.
+- Use Work Packet Readiness Checklist before trust or supervised execution to identify missing safety, scope, verification, and report metadata. It is guidance only and does not trust or execute packets.
 
 ## Safety Rails
 

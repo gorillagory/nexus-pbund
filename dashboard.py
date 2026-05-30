@@ -117,6 +117,12 @@ from src.services.trusted_packets import (
     serialize_trust_metadata,
     summarize_trust_gate,
 )
+from src.services.work_packet_readiness import (
+    evaluate_and_store_readiness,
+    evaluate_readiness_checklist,
+    serialize_readiness,
+    update_readiness_metadata,
+)
 from src.services.work_packet_parser import extract_codex_commands, parse_work_packet
 
 
@@ -3298,6 +3304,73 @@ class NexusDashboard:
             finally:
                 db_context.close()
 
+        @self.app.route("/api/work-packets/<int:work_packet_id>/readiness", methods=["GET"])
+        def get_work_packet_readiness(work_packet_id):
+            db_context = get_db()
+            db = next(db_context)
+            try:
+                active_workspace_id = get_workspace_id(self.engine.target_dir)
+                work_packet = db.get(WorkPacket, work_packet_id)
+                if work_packet is None or work_packet.workspace_id != active_workspace_id:
+                    return jsonify({"status": "error", "message": "Work packet not found."}), 404
+                evaluation = evaluate_readiness_checklist(db, work_packet)
+                return jsonify(
+                    {
+                        "status": "success",
+                        "readiness": serialize_readiness(work_packet, evaluation=evaluation),
+                    }
+                )
+            except Exception as exception:
+                return jsonify({"status": "error", "message": "Work packet readiness unavailable: {}".format(exception)}), 503
+            finally:
+                db_context.close()
+
+        @self.app.route("/api/work-packets/<int:work_packet_id>/readiness/evaluate", methods=["POST"])
+        def evaluate_work_packet_readiness(work_packet_id):
+            payload = request.get_json(silent=True) or {}
+            if not isinstance(payload, dict):
+                return jsonify({"status": "error", "message": "JSON object is required."}), 400
+            db_context = get_db()
+            db = next(db_context)
+            try:
+                active_workspace_id = get_workspace_id(self.engine.target_dir)
+                work_packet = db.get(WorkPacket, work_packet_id)
+                if work_packet is None or work_packet.workspace_id != active_workspace_id:
+                    return jsonify({"status": "error", "message": "Work packet not found."}), 404
+                readiness = evaluate_and_store_readiness(db, work_packet, payload)
+                return jsonify({"status": "success", "readiness": readiness})
+            except ValueError as exception:
+                db.rollback()
+                return jsonify({"status": "error", "message": str(exception)}), 400
+            except Exception as exception:
+                db.rollback()
+                return jsonify({"status": "error", "message": "Work packet readiness could not be evaluated: {}".format(exception)}), 503
+            finally:
+                db_context.close()
+
+        @self.app.route("/api/work-packets/<int:work_packet_id>/readiness", methods=["PATCH"])
+        def update_work_packet_readiness(work_packet_id):
+            payload = request.get_json(silent=True) or {}
+            if not isinstance(payload, dict):
+                return jsonify({"status": "error", "message": "JSON object is required."}), 400
+            db_context = get_db()
+            db = next(db_context)
+            try:
+                active_workspace_id = get_workspace_id(self.engine.target_dir)
+                work_packet = db.get(WorkPacket, work_packet_id)
+                if work_packet is None or work_packet.workspace_id != active_workspace_id:
+                    return jsonify({"status": "error", "message": "Work packet not found."}), 404
+                readiness = update_readiness_metadata(db, work_packet, payload)
+                return jsonify({"status": "success", "readiness": readiness})
+            except ValueError as exception:
+                db.rollback()
+                return jsonify({"status": "error", "message": str(exception)}), 400
+            except Exception as exception:
+                db.rollback()
+                return jsonify({"status": "error", "message": "Work packet readiness could not be updated: {}".format(exception)}), 503
+            finally:
+                db_context.close()
+
         @self.app.route("/api/work-packets/run", methods=["POST"])
         def run_work_packet():
             payload = request.get_json(silent=True)
@@ -3942,6 +4015,7 @@ class NexusDashboard:
                             "stop_condition": work_packet.stop_condition,
                             "estimated_minutes": work_packet.estimated_minutes,
                             "status": work_packet.status,
+                            "readiness": serialize_readiness(work_packet),
                             "created_at": work_packet.created_at.isoformat() if work_packet.created_at else None,
                             "started_at": work_packet.started_at.isoformat() if work_packet.started_at else None,
                             "completed_at": work_packet.completed_at.isoformat() if work_packet.completed_at else None,

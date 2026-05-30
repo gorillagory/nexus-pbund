@@ -853,6 +853,7 @@ pre {
 .operator-intervention-panel,
 .operator-intervention-detail,
 .packet-drafting-panel,
+.work-packet-readiness-panel,
 .trusted-packet-panel {
     background: #fff;
     border: 1px solid #e6edf5;

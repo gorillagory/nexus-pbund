@@ -44,6 +44,7 @@ window.NexusApp = {
     latestInboxConversionOptions: null,
     latestPacketDrafting: null,
     selectedPacketPromptDraft: null,
+    latestWorkPacketReadiness: null,
     orchestrationInboxItems: [],
     selectedOrchestrationInboxItem: null,
     operatorInterventions: [],
@@ -2104,6 +2105,40 @@ window.NexusApp = {
                             <button id="revoke-trust-packet-btn" type="button" class="btn btn-outline-warning btn-sm" onclick="NexusApp.revokeSelectedWorkPacketTrust()" disabled>Revoke Trust</button>
                         </div>
                     </div>
+                    <div id="work-packet-readiness-panel" class="work-packet-readiness-panel mb-3">
+                        <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-3">
+                            <div>
+                                <h6 class="text-dark fw-semibold mb-1">Work Packet Readiness Checklist</h6>
+                                <p class="text-secondary small mb-0">Validation and guidance only. Readiness does not execute packets, trust packets, recover, or perform Git actions.</p>
+                            </div>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="NexusApp.loadWorkPacketReadiness()">Refresh Readiness</button>
+                        </div>
+                        <div id="work-packet-readiness-status" class="small text-secondary mb-3">Stage a work packet to evaluate readiness.</div>
+                        <div id="work-packet-readiness-checklist" class="small text-secondary mb-3"></div>
+                        <div class="row g-2">
+                            <div class="col-md-4">
+                                <label for="work-packet-readiness-status-input" class="form-label small text-secondary mb-1">Readiness Status</label>
+                                <select id="work-packet-readiness-status-input" class="form-select form-select-sm">
+                                    <option value="incomplete">incomplete</option>
+                                    <option value="ready_for_review">ready_for_review</option>
+                                    <option value="ready_for_trust">ready_for_trust</option>
+                                    <option value="blocked">blocked</option>
+                                </select>
+                            </div>
+                            <div class="col-md-8">
+                                <label for="work-packet-readiness-checked-by" class="form-label small text-secondary mb-1">Checked By</label>
+                                <input id="work-packet-readiness-checked-by" class="form-control form-control-sm" maxlength="128" autocomplete="off">
+                            </div>
+                            <div class="col-12">
+                                <label for="work-packet-readiness-notes" class="form-label small text-secondary mb-1">Readiness Notes</label>
+                                <textarea id="work-packet-readiness-notes" class="form-control form-control-sm" rows="3"></textarea>
+                            </div>
+                        </div>
+                        <div class="d-flex gap-2 flex-wrap mt-3">
+                            <button id="evaluate-readiness-btn" type="button" class="btn btn-outline-primary btn-sm" onclick="NexusApp.evaluateSelectedWorkPacketReadiness()" disabled>Evaluate Readiness</button>
+                            <button id="update-readiness-btn" type="button" class="btn btn-outline-secondary btn-sm" onclick="NexusApp.updateSelectedWorkPacketReadiness()" disabled>Update Readiness Notes</button>
+                        </div>
+                    </div>
                     <textarea id="work-packet-input" class="form-control font-monospace small mb-3" rows="8" placeholder="Paste a work packet containing codex &quot;...&quot; commands"></textarea>
                     <div id="work-packet-preview" class="border rounded bg-white p-3 small text-secondary">
                         Preview extracted tasks before staging them to To-Do.
@@ -2300,6 +2335,7 @@ window.NexusApp = {
         this.updateAutoPilotUI();
         this.renderCostLedger(this.latestCostLedger);
         this.loadTrustedPacketStatus();
+        this.loadWorkPacketReadiness();
         this.loadPacketDraftingStatus();
         this.loadCostLedger();
     },
@@ -2712,6 +2748,7 @@ window.NexusApp = {
             await this.loadKanban();
             this.renderWorkPacketRunnerStatus();
             await this.loadTrustedPacketStatus();
+            await this.loadWorkPacketReadiness();
             NexusCore.showToast(`Staged ${data.created_count} task${data.created_count === 1 ? "" : "s"} to Kanban.`, "success");
         } catch (error) {
             NexusCore.showToast(`Error: ${error.message}`, "error");
@@ -2824,6 +2861,148 @@ window.NexusApp = {
             if (panel) {
                 panel.textContent = `Trusted Packet Mode unavailable: ${error.message}`;
             }
+        }
+    },
+
+    readinessPayload(confirmField) {
+        return {
+            [confirmField]: true,
+            readiness_status: document.getElementById("work-packet-readiness-status-input")?.value || "incomplete",
+            readiness_checked_by: document.getElementById("work-packet-readiness-checked-by")?.value || "",
+            readiness_notes: document.getElementById("work-packet-readiness-notes")?.value || "",
+        };
+    },
+
+    async loadWorkPacketReadiness() {
+        const panel = document.getElementById("work-packet-readiness-status");
+        const packetId = this.latestStagedWorkPacket?.work_packet_id;
+        if (!panel) return;
+        if (!packetId) {
+            this.latestWorkPacketReadiness = null;
+            panel.textContent = "Stage a work packet to evaluate readiness.";
+            this.renderWorkPacketReadiness();
+            return;
+        }
+        panel.textContent = "Loading Work Packet Readiness Checklist...";
+        try {
+            const response = await fetch(`/api/work-packets/${packetId}/readiness`);
+            const data = await response.json();
+            if (!response.ok || data.status !== "success") {
+                throw new Error(data.message || "Unable to load work packet readiness.");
+            }
+            this.latestWorkPacketReadiness = data.readiness || null;
+            this.renderWorkPacketReadiness();
+        } catch (error) {
+            panel.textContent = `Work packet readiness unavailable: ${error.message}`;
+        }
+    },
+
+    renderWorkPacketReadiness() {
+        const panel = document.getElementById("work-packet-readiness-status");
+        const checklistPanel = document.getElementById("work-packet-readiness-checklist");
+        const evaluateButton = document.getElementById("evaluate-readiness-btn");
+        const updateButton = document.getElementById("update-readiness-btn");
+        const packetId = this.latestStagedWorkPacket?.work_packet_id;
+        const readiness = this.latestWorkPacketReadiness || {};
+        const evaluation = readiness.evaluation || {};
+        if (evaluateButton) evaluateButton.disabled = !packetId;
+        if (updateButton) updateButton.disabled = !packetId;
+        if (!packetId) {
+            if (checklistPanel) checklistPanel.textContent = "";
+            return;
+        }
+        const status = readiness.readiness_status || evaluation.status || "incomplete";
+        const score = readiness.readiness_score ?? evaluation.score ?? 0;
+        const trust = readiness.trust || this.latestStagedWorkPacket?.trust || {};
+        if (panel) {
+            panel.innerHTML = `
+                <div class="d-flex flex-wrap gap-2 mb-2">
+                    <span class="prompt-vault-badge">status ${this.escapeHtml(status)}</span>
+                    <span class="prompt-vault-badge">score ${Number(score) || 0}%</span>
+                    <span class="prompt-vault-badge">trust ${this.escapeHtml(trust.trust_status || "unreviewed")}</span>
+                    <span class="prompt-vault-badge">draft ${evaluation.context?.has_prompt_draft ? "linked" : "none"}</span>
+                </div>
+                <div>${this.escapeHtml(evaluation.summary || "Readiness has not been evaluated yet.")}</div>
+                <div class="text-secondary">${this.escapeHtml(readiness.readiness_checked_at ? `Checked ${this.formatFactoryTime(readiness.readiness_checked_at)}` : "")}</div>
+            `;
+        }
+        const statusInput = document.getElementById("work-packet-readiness-status-input");
+        const checkedBy = document.getElementById("work-packet-readiness-checked-by");
+        const notes = document.getElementById("work-packet-readiness-notes");
+        if (statusInput) statusInput.value = status;
+        if (checkedBy) checkedBy.value = readiness.readiness_checked_by || "";
+        if (notes) notes.value = readiness.readiness_notes || "";
+        if (checklistPanel) {
+            const checklist = Array.isArray(evaluation.checklist) ? evaluation.checklist : [];
+            if (!checklist.length) {
+                checklistPanel.textContent = "Readiness checklist will appear after evaluation.";
+            } else {
+                checklistPanel.innerHTML = checklist.map((item) => `
+                    <div class="border rounded bg-white p-2 mb-2">
+                        <div class="d-flex justify-content-between gap-2 flex-wrap">
+                            <strong class="${item.passed ? "text-success" : "text-danger"}">${this.escapeHtml(item.passed ? "PASS" : "MISSING")} ${this.escapeHtml(item.label || item.key)}</strong>
+                            <span class="text-secondary">${item.required ? "required" : "optional"}</span>
+                        </div>
+                        <div>${this.escapeHtml(item.detail || "")}</div>
+                    </div>
+                `).join("");
+            }
+        }
+    },
+
+    async evaluateSelectedWorkPacketReadiness() {
+        const packetId = this.latestStagedWorkPacket?.work_packet_id;
+        if (!packetId) return;
+        if (!(await NexusCore.confirmAction("Evaluate readiness metadata for this work packet?", {
+            title: "Evaluate Readiness",
+            confirmLabel: "Evaluate",
+            variant: "primary",
+        }))) {
+            return;
+        }
+        try {
+            const response = await fetch(`/api/work-packets/${packetId}/readiness/evaluate`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(this.readinessPayload("confirm_evaluate")),
+            });
+            const data = await response.json();
+            if (!response.ok || data.status !== "success") {
+                throw new Error(data.message || "Unable to evaluate readiness.");
+            }
+            this.latestWorkPacketReadiness = data.readiness;
+            this.renderWorkPacketReadiness();
+            NexusCore.showToast("Work packet readiness evaluated.", "success");
+        } catch (error) {
+            NexusCore.showToast(`Readiness error: ${error.message}`, "error");
+        }
+    },
+
+    async updateSelectedWorkPacketReadiness() {
+        const packetId = this.latestStagedWorkPacket?.work_packet_id;
+        if (!packetId) return;
+        if (!(await NexusCore.confirmAction("Update readiness notes and status?", {
+            title: "Update Readiness",
+            confirmLabel: "Update",
+            variant: "primary",
+        }))) {
+            return;
+        }
+        try {
+            const response = await fetch(`/api/work-packets/${packetId}/readiness`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(this.readinessPayload("confirm_update")),
+            });
+            const data = await response.json();
+            if (!response.ok || data.status !== "success") {
+                throw new Error(data.message || "Unable to update readiness.");
+            }
+            this.latestWorkPacketReadiness = data.readiness;
+            this.renderWorkPacketReadiness();
+            NexusCore.showToast("Work packet readiness updated.", "success");
+        } catch (error) {
+            NexusCore.showToast(`Readiness update failed: ${error.message}`, "error");
         }
     },
 

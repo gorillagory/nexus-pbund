@@ -36,6 +36,7 @@ PY_COMPILE_FILES = [
     "src/services/packet_drafting.py",
     "src/services/prompt_vault.py",
     "src/services/trusted_packets.py",
+    "src/services/work_packet_readiness.py",
 ]
 
 VERIFY_SCRIPTS = [
