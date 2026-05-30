@@ -42,9 +42,11 @@ from src.services.codex_runner import CodexRunner
 from src.services.ci_status import summarize_ci_status
 from src.services.cost_ledger import append_cost_event, read_cost_events, summarize_cost_events
 from src.services.discord_router import (
+    create_discord_capture_event,
     discord_router_status,
+    event_identity,
     normalize_discord_event,
-    verify_ingest_secret,
+    validate_discord_capture,
 )
 from src.services.factory_events import (
     create_factory_event,
@@ -2155,22 +2157,82 @@ class NexusDashboard:
 
         @self.app.route("/api/discord-router/ingest", methods=["POST"])
         def ingest_discord_router_event():
-            authorized, auth_error = verify_ingest_secret(self.engine.settings, request.headers)
-            if not authorized:
-                return jsonify({"status": "error", "message": auth_error}), 403
-
             payload = request.get_json(silent=True)
             if not isinstance(payload, dict):
                 return jsonify({"status": "error", "message": "JSON object is required."}), 400
 
             db_context = get_db()
             db = next(db_context)
+            identity = event_identity(payload)
             try:
                 workspace_id = get_workspace_id(self.engine.target_dir)
                 if workspace_id is None:
                     return jsonify({"status": "error", "message": "Active workspace not found."}), 400
+                try:
+                    identity = validate_discord_capture(
+                        self.engine.settings,
+                        request.headers,
+                        payload,
+                        db=db,
+                        workspace_id=workspace_id,
+                        raw_body=request.get_data(cache=True),
+                    )
+                except ValueError as exception:
+                    create_discord_capture_event(
+                        db,
+                        workspace_id,
+                        identity,
+                        accepted=False,
+                        rejection_reason=str(exception),
+                    )
+                    create_review_event(
+                        db,
+                        workspace_id,
+                        {
+                            "event_type": "manual_note",
+                            "action": "discord_capture_rejected",
+                            "title": "Discord capture rejected",
+                            "summary": str(exception),
+                            "source_type": "discord_capture",
+                            "source_id": identity.get("event_id") or "unknown",
+                            "severity": "warning",
+                            "metadata": {
+                                "guild_id": identity.get("guild_id"),
+                                "channel_id": identity.get("channel_id"),
+                                "author_id": identity.get("author_id"),
+                            },
+                        },
+                    )
+                    return jsonify({"status": "error", "message": str(exception)}), 403
                 inbox_data = normalize_discord_event(payload)
                 item = create_inbox_item(db, workspace_id, inbox_data)
+                create_discord_capture_event(
+                    db,
+                    workspace_id,
+                    identity,
+                    accepted=True,
+                    inbox_item_id=item.id,
+                )
+                create_review_event(
+                    db,
+                    workspace_id,
+                    {
+                        "event_type": "manual_note",
+                        "action": "discord_capture_accepted",
+                        "title": "Discord capture accepted",
+                        "summary": "Discord-originated intent captured for supervised inbox triage.",
+                        "source_type": "discord_capture",
+                        "source_id": identity.get("event_id") or "unknown",
+                        "related_type": "orchestration_inbox_item",
+                        "related_id": str(item.id),
+                        "severity": "info",
+                        "metadata": {
+                            "guild_id": identity.get("guild_id"),
+                            "channel_id": identity.get("channel_id"),
+                            "author_id": identity.get("author_id"),
+                        },
+                    },
+                )
                 return jsonify({"status": "success", "item": serialize_inbox_item(item)}), 201
             except ValueError as exception:
                 db.rollback()

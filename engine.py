@@ -336,6 +336,12 @@ class NexusEngine:
             "execution_mode": "manual",
             "discord_router_enabled": False,
             "discord_ingest_secret": "",
+            "discord_signature_required": False,
+            "discord_allowed_guild_ids": "",
+            "discord_allowed_channel_ids": "",
+            "discord_allowed_author_ids": "",
+            "discord_timestamp_tolerance_seconds": 0,
+            "discord_replay_guard_enabled": True,
             "trusted_packet_mode_enabled": False,
         }
 
@@ -373,12 +379,29 @@ class NexusEngine:
         discord_env_enabled = os.getenv("DISCORD_ROUTER_ENABLED")
         if discord_env_enabled is not None:
             defaults["discord_router_enabled"] = normalize_bool(discord_env_enabled)
+        discord_signature_required = os.getenv("DISCORD_SIGNATURE_REQUIRED")
+        if discord_signature_required is not None:
+            defaults["discord_signature_required"] = normalize_bool(discord_signature_required)
+        for setting_key, env_key in (
+            ("discord_allowed_guild_ids", "DISCORD_ALLOWED_GUILD_IDS"),
+            ("discord_allowed_channel_ids", "DISCORD_ALLOWED_CHANNEL_IDS"),
+            ("discord_allowed_author_ids", "DISCORD_ALLOWED_AUTHOR_IDS"),
+            ("discord_timestamp_tolerance_seconds", "DISCORD_TIMESTAMP_TOLERANCE_SECONDS"),
+        ):
+            env_value = os.getenv(env_key)
+            if env_value is not None:
+                defaults[setting_key] = env_value.strip()
+        discord_replay_guard = os.getenv("DISCORD_REPLAY_GUARD_ENABLED")
+        if discord_replay_guard is not None:
+            defaults["discord_replay_guard_enabled"] = normalize_bool(discord_replay_guard)
 
         if defaults["model_selection_mode"] not in {"auto", "manual"}:
             defaults["model_selection_mode"] = "auto"
 
         defaults["execution_mode"] = normalize_execution_mode(defaults.get("execution_mode"))
         defaults["discord_router_enabled"] = normalize_bool(defaults.get("discord_router_enabled"))
+        defaults["discord_signature_required"] = normalize_bool(defaults.get("discord_signature_required"))
+        defaults["discord_replay_guard_enabled"] = normalize_bool(defaults.get("discord_replay_guard_enabled"))
         defaults["trusted_packet_mode_enabled"] = normalize_bool(defaults.get("trusted_packet_mode_enabled"))
 
         return defaults
@@ -395,9 +418,23 @@ class NexusEngine:
             "execution_mode",
             "discord_router_enabled",
             "discord_ingest_secret",
+            "discord_signature_required",
+            "discord_allowed_guild_ids",
+            "discord_allowed_channel_ids",
+            "discord_allowed_author_ids",
+            "discord_timestamp_tolerance_seconds",
+            "discord_replay_guard_enabled",
             "trusted_packet_mode_enabled",
         }
-        secret_keys = {"api_key", "gemini_api_key", "openai_api_key", "discord_ingest_secret"}
+        secret_keys = {
+            "api_key",
+            "gemini_api_key",
+            "openai_api_key",
+            "discord_ingest_secret",
+            "discord_allowed_guild_ids",
+            "discord_allowed_channel_ids",
+            "discord_allowed_author_ids",
+        }
 
         for key, value in new_settings.items():
             if key in allowed_keys:
@@ -416,6 +453,13 @@ class NexusEngine:
 
         self.settings["execution_mode"] = normalize_execution_mode(self.settings.get("execution_mode"))
         self.settings["discord_router_enabled"] = normalize_bool(self.settings.get("discord_router_enabled"))
+        self.settings["discord_signature_required"] = normalize_bool(self.settings.get("discord_signature_required"))
+        self.settings["discord_replay_guard_enabled"] = normalize_bool(self.settings.get("discord_replay_guard_enabled"))
+        try:
+            tolerance = int(str(self.settings.get("discord_timestamp_tolerance_seconds") or "0").strip())
+        except ValueError:
+            tolerance = 0
+        self.settings["discord_timestamp_tolerance_seconds"] = max(0, min(tolerance, 86400))
         self.settings["trusted_packet_mode_enabled"] = normalize_bool(self.settings.get("trusted_packet_mode_enabled"))
 
         with open(self.settings_file, "w", encoding="utf-8") as file:
@@ -448,9 +492,14 @@ class NexusEngine:
         public.pop("openai_api_key", None)
         public.pop("api_key", None)
         public.pop("discord_ingest_secret", None)
+        public.pop("discord_allowed_guild_ids", None)
+        public.pop("discord_allowed_channel_ids", None)
+        public.pop("discord_allowed_author_ids", None)
         public["execution_mode"] = self.get_execution_mode()
         public["automatic_analysis_enabled"] = self.is_automatic_analysis_enabled()
         public["discord_router_enabled"] = normalize_bool(self.settings.get("discord_router_enabled"))
+        public["discord_signature_required"] = normalize_bool(self.settings.get("discord_signature_required"))
+        public["discord_replay_guard_enabled"] = normalize_bool(self.settings.get("discord_replay_guard_enabled"))
         public["trusted_packet_mode_enabled"] = normalize_bool(self.settings.get("trusted_packet_mode_enabled"))
 
         gemini_key = (self.settings.get("gemini_api_key") or "").strip()
@@ -463,6 +512,10 @@ class NexusEngine:
         public["gemini_api_key_configured"] = bool(gemini_key or gemini_env_key)
         public["openai_api_key_configured"] = bool(openai_key or openai_env_key)
         public["discord_ingest_secret_configured"] = bool(discord_secret or discord_env_secret)
+        public["discord_allowed_guild_ids_configured"] = bool((self.settings.get("discord_allowed_guild_ids") or "").strip())
+        public["discord_allowed_channel_ids_configured"] = bool((self.settings.get("discord_allowed_channel_ids") or "").strip())
+        public["discord_allowed_author_ids_configured"] = bool((self.settings.get("discord_allowed_author_ids") or "").strip())
+        public["discord_timestamp_tolerance_seconds"] = self.settings.get("discord_timestamp_tolerance_seconds") or 0
         return public
 
     def list_models(self, provider=None, force=False):

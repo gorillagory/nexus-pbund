@@ -19,12 +19,26 @@ window.NexusSettings = {
                 : "Enter API key";
             document.getElementById("input-openai-model").value = data.openai_model || "";
             document.getElementById("input-discord-router-enabled").value = data.discord_router_enabled ? "true" : "false";
+            document.getElementById("input-discord-signature-required").value = data.discord_signature_required ? "true" : "false";
+            document.getElementById("input-discord-replay-guard-enabled").value = data.discord_replay_guard_enabled === false ? "false" : "true";
+            document.getElementById("input-discord-timestamp-tolerance-seconds").value = data.discord_timestamp_tolerance_seconds || 0;
             document.getElementById("input-trusted-packet-mode-enabled").value = data.trusted_packet_mode_enabled ? "true" : "false";
             const discordSecretEl = document.getElementById("input-discord-ingest-secret");
             discordSecretEl.value = "";
             discordSecretEl.placeholder = data.discord_ingest_secret_configured
                 ? "Configured — leave blank to keep existing secret"
                 : "Set shared ingest secret";
+            [
+                ["input-discord-allowed-guild-ids", data.discord_allowed_guild_ids_configured, "guild allowlist"],
+                ["input-discord-allowed-channel-ids", data.discord_allowed_channel_ids_configured, "channel allowlist"],
+                ["input-discord-allowed-author-ids", data.discord_allowed_author_ids_configured, "author allowlist"],
+            ].forEach(([id, configured, label]) => {
+                const el = document.getElementById(id);
+                el.value = "";
+                el.placeholder = configured
+                    ? `Configured — leave blank to keep existing ${label}`
+                    : `Set optional ${label}`;
+            });
 
             this.syncProviderSwitch(data.provider || "auto");
             await this.refreshModelPreview();
@@ -45,6 +59,12 @@ window.NexusSettings = {
             openai_model: document.getElementById("input-openai-model").value.trim(),
             discord_router_enabled: document.getElementById("input-discord-router-enabled").value === "true",
             discord_ingest_secret: document.getElementById("input-discord-ingest-secret").value.trim(),
+            discord_signature_required: document.getElementById("input-discord-signature-required").value === "true",
+            discord_allowed_guild_ids: document.getElementById("input-discord-allowed-guild-ids").value.trim(),
+            discord_allowed_channel_ids: document.getElementById("input-discord-allowed-channel-ids").value.trim(),
+            discord_allowed_author_ids: document.getElementById("input-discord-allowed-author-ids").value.trim(),
+            discord_timestamp_tolerance_seconds: Number(document.getElementById("input-discord-timestamp-tolerance-seconds").value || 0),
+            discord_replay_guard_enabled: document.getElementById("input-discord-replay-guard-enabled").value === "true",
             trusted_packet_mode_enabled: document.getElementById("input-trusted-packet-mode-enabled").value === "true",
         };
 

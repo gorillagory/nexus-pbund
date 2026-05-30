@@ -21,6 +21,7 @@ Sprint 2 is complete. It delivered a remote-operable supervised factory foundati
 - Operator Review History for consolidated human governance and decision audit events.
 - Factory Console Consolidation for grouped navigation and read-only dashboard summary visibility.
 - Packet-Aware Preflight Expansion for packet-specific local checks and bounded operator reports.
+- Discord Capture Hardening for allowlisted, timestamp-aware, replay-guarded capture intake.
 - Packet 027 Trusted Packet Mode foundation.
 - Supervised packet runner and Run One Task.
 - Factory Console visibility, execution ledger, changed-file tracking, recovery controls, and recovery audit notes.
@@ -33,6 +34,8 @@ Sprint 2 is complete. It delivered a remote-operable supervised factory foundati
 Inbox capture rule: raw ideas are captured first, then triaged into a scoped task, work packet, document update, or explicit discard. The inbox must not execute work.
 
 Discord router rule: Discord-originated intent is accepted only through the capture router, stored as source `discord`, and then triaged in the Orchestration Inbox. Discord must not directly start Codex, tasks, packets, or Auto-Pilot.
+
+Discord capture hardening rule: Discord remains capture-only. Hardening controls restrict what can enter the Orchestration Inbox through shared-secret/signature checks, optional guild/channel/author allowlists, timestamp tolerance, and replay guard audit. Rejected payloads must not create inbox items or leak secrets. Discord cannot execute Codex, tasks, packets, Git actions, trust changes, recovery, or Auto-Pilot.
 
 Git Explorer rule: dashboard Git inspection is read-only. It may show branch, status, commits, baseline tags, changed files, diff stat, and bounded redacted diff previews. It must not expose git write actions.
 
@@ -60,7 +63,6 @@ Auto-Pilot remains locked. Do not build, enable, or rely on Auto-Pilot unless a 
 
 ## Remaining Workflow Gaps
 
-- Discord capture is safe but lacks channel allowlisting or stronger signature-style verification.
 - Deployment and operator runbooks are still thin.
 
 ## Sprint 3 Direction
@@ -78,8 +80,8 @@ Do not automatically choose Auto-Pilot. Auto-Pilot remains out of scope until ex
 5. Packet 032 — Operator Review History. Type: workflow, backend, UI. Boundary: records triage, trust/revoke, intervention, readiness, and recovery decisions; no automatic recovery or execution. Complete.
 6. Packet 033 — Factory Console Consolidation. Type: UI. Boundary: reorganizes existing visibility and controls; no new execution or Git write capability. Complete.
 7. Packet 034 — Packet-Aware Preflight Expansion. Type: safety, testing. Boundary: adds checks and reports only; no execution route calls. Complete.
-8. Packet 035 — Discord Capture Hardening. Type: integration, safety. Boundary: channel allowlisting or stronger verification for capture-only ingest; Discord still cannot execute work. Next recommended packet.
-9. Packet 036 — Deployment And Operator Runbooks. Type: docs/planning. Boundary: documentation only; no runtime changes unless verification requires a docs checker.
+8. Packet 035 — Discord Capture Hardening. Type: integration, safety. Boundary: channel allowlisting or stronger verification for capture-only ingest; Discord still cannot execute work. Complete.
+9. Packet 036 — Deployment And Operator Runbooks. Type: docs/planning. Boundary: documentation only; no runtime changes unless verification requires a docs checker. Next recommended packet.
 
 ## Local Configuration Notes
 

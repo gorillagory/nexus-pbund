@@ -10,6 +10,8 @@ Packet 022 added the Orchestration Inbox foundation for manual capture and later
 
 Packet 023 added the Discord Event Router foundation. Discord-originated operator intent is captured into the Orchestration Inbox with source `discord`; Discord messages do not execute tasks, packets, Codex, or Auto-Pilot directly.
 
+Packet 035 hardened Discord capture. Discord ingest now supports optional signature verification, guild/channel/author allowlists, timestamp tolerance, replay guard audit, and redacted capture status. These controls only decide whether payloads may enter the Orchestration Inbox. Rejected payloads do not create inbox items and must not leak secrets.
+
 ## Triage
 
 Triage asks four questions:
@@ -22,6 +24,8 @@ Triage asks four questions:
 If the answers are unclear, Codex should inspect local context first and ask the human only when the decision is risky or cannot be inferred.
 
 Discord-captured items follow the same triage rule as manual inbox items. Each captured message must become a scoped task, work packet, document update, or explicit discard before any supervised execution path is considered.
+
+Discord remains capture-only after hardening. It cannot execute Codex, run tasks, run packets, perform Git actions, trust packets, retry or continue work, or start Auto-Pilot.
 
 Packet 029 added the Inbox Triage Conversion Flow. Captured or triaged inbox items may be converted only into non-executing workflow records: a staged untrusted work packet, a manual todo task, a document update audit candidate, or an audited discard. Conversion requires explicit operator confirmation, records a conversion audit, and never calls Codex, task execution, packet execution, Git write actions, recovery automation, Discord execution, or Auto-Pilot. Converted work packets stay `trust_status=unreviewed` until explicitly trusted.
 

@@ -68,6 +68,36 @@
                             <input type="password" id="input-discord-ingest-secret" class="form-control font-monospace">
                         </div>
                         <div class="col-md-6">
+                            <label class="form-label text-secondary small fw-bold">DISCORD SIGNATURE REQUIRED</label>
+                            <select id="input-discord-signature-required" class="form-select">
+                                <option value="false">Disabled</option>
+                                <option value="true">Required</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label text-secondary small fw-bold">DISCORD REPLAY GUARD</label>
+                            <select id="input-discord-replay-guard-enabled" class="form-select">
+                                <option value="true">Enabled</option>
+                                <option value="false">Disabled</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label text-secondary small fw-bold">DISCORD ALLOWED GUILD IDS</label>
+                            <input type="password" id="input-discord-allowed-guild-ids" class="form-control font-monospace" placeholder="optional comma-separated IDs">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label text-secondary small fw-bold">DISCORD ALLOWED CHANNEL IDS</label>
+                            <input type="password" id="input-discord-allowed-channel-ids" class="form-control font-monospace" placeholder="optional comma-separated IDs">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label text-secondary small fw-bold">DISCORD ALLOWED AUTHOR IDS</label>
+                            <input type="password" id="input-discord-allowed-author-ids" class="form-control font-monospace" placeholder="optional comma-separated IDs">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label text-secondary small fw-bold">DISCORD TIMESTAMP TOLERANCE SECONDS</label>
+                            <input type="number" min="0" max="86400" id="input-discord-timestamp-tolerance-seconds" class="form-control font-monospace" placeholder="0 disables stale-payload checks">
+                        </div>
+                        <div class="col-md-6">
                             <label class="form-label text-secondary small fw-bold">TRUSTED PACKET MODE</label>
                             <select id="input-trusted-packet-mode-enabled" class="form-select">
                                 <option value="false">Disabled</option>

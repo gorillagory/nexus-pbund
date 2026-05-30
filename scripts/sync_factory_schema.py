@@ -112,6 +112,17 @@ FACTORY_COLUMNS = {
         ("created_at", "TIMESTAMP WITH TIME ZONE"),
         ("updated_at", "TIMESTAMP WITH TIME ZONE"),
     ],
+    "discord_capture_events": [
+        ("workspace_id", "INTEGER"),
+        ("event_id", "VARCHAR(128)"),
+        ("guild_id", "VARCHAR(128)"),
+        ("channel_id", "VARCHAR(128)"),
+        ("author_id", "VARCHAR(128)"),
+        ("accepted", "INTEGER"),
+        ("rejection_reason", "VARCHAR(255)"),
+        ("inbox_item_id", "INTEGER"),
+        ("created_at", "TIMESTAMP WITH TIME ZONE"),
+    ],
     "inbox_conversions": [
         ("workspace_id", "INTEGER"),
         ("inbox_item_id", "INTEGER"),

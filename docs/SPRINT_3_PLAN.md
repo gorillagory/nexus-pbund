@@ -97,7 +97,7 @@ Add channel allowlisting or stronger signature-style verification for Discord ca
 
 Safety boundary: capture-only. Discord must not directly start Codex, tasks, packets, Git actions, or Auto-Pilot.
 
-Status: next recommended packet.
+Status: complete. Packet 035 adds shared-secret plus optional HMAC signature verification, guild/channel/author allowlist checks, timestamp tolerance, replay guard tracking, capture audit records, redacted status, and audit-only review history notes for Discord capture accept/reject decisions. It remains capture-only: Discord cannot execute Codex, tasks, packets, Git actions, trust changes, retry/continue behavior, or Auto-Pilot.
 
 ### Packet 036 — Deployment And Operator Runbooks
 
@@ -106,6 +106,8 @@ Type: docs/planning.
 Document setup, env vars, dashboard operations, recovery playbook, baseline tagging, and new-chat handoff practice.
 
 Safety boundary: documentation only unless a verifier is added.
+
+Status: next recommended packet.
 
 ## Out Of Scope Until Explicit Approval
 

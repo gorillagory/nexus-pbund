@@ -431,26 +431,34 @@ window.NexusApp = {
         if (!target) return;
         const enabled = Boolean(discordRouter?.enabled);
         const secretConfigured = Boolean(discordRouter?.secret_configured);
+        const signatureRequired = Boolean(discordRouter?.signature_required);
         const mode = discordRouter?.mode || "capture_only";
+        const statusRows = [
+            ["Mode", mode],
+            ["Ingest Secret", secretConfigured ? "configured" : "not configured"],
+            ["Signature Required", signatureRequired ? "required" : "not required"],
+            ["Guild Allowlist", discordRouter?.guild_allowlist_configured ? `configured (${discordRouter.guild_allowlist_count || 0})` : "not configured"],
+            ["Channel Allowlist", discordRouter?.channel_allowlist_configured ? `configured (${discordRouter.channel_allowlist_count || 0})` : "not configured"],
+            ["Author Allowlist", discordRouter?.author_allowlist_configured ? `configured (${discordRouter.author_allowlist_count || 0})` : "not configured"],
+            ["Timestamp Tolerance", discordRouter?.timestamp_tolerance_configured ? `${discordRouter.timestamp_tolerance_seconds || 0}s` : "not configured"],
+            ["Replay Guard", discordRouter?.replay_guard_configured ? "enabled" : "disabled"],
+            ["Endpoint", "/api/discord-router/ingest"],
+        ];
         target.innerHTML = `
             <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
                 <div>
                     <h4 class="h6 fw-semibold mb-1">Discord Event Router</h4>
-                    <p class="text-secondary small mb-0">Capture-only ingest to Orchestration Inbox. Triage remains required before any work is staged.</p>
+                    <p class="text-secondary small mb-0">Capture-only ingest to Orchestration Inbox. Hardened checks restrict what can enter triage.</p>
                 </div>
                 <span class="factory-status-badge ${enabled ? "factory-status-pass" : "factory-status-idle"}">${enabled ? "enabled" : "disabled"}</span>
             </div>
-            <div class="factory-run-event mt-3">
-                <strong>Mode</strong>
-                <span>${this.escapeHtml(mode)}</span>
-            </div>
-            <div class="factory-run-event">
-                <strong>Ingest Secret</strong>
-                <span>${secretConfigured ? "configured" : "not configured"}</span>
-            </div>
-            <div class="factory-run-event">
-                <strong>Endpoint</strong>
-                <span>/api/discord-router/ingest</span>
+            <div class="mt-3">
+                ${statusRows.map(([label, value]) => `
+                    <div class="factory-run-event">
+                        <strong>${this.escapeHtml(label)}</strong>
+                        <span>${this.escapeHtml(value)}</span>
+                    </div>
+                `).join("")}
             </div>
         `;
     },

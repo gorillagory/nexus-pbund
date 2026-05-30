@@ -159,6 +159,25 @@ class OrchestrationInboxItem(Base):
     updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
+class DiscordCaptureEvent(Base):
+    __tablename__ = "discord_capture_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    workspace_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("workspaces.id"), nullable=False
+    )
+    event_id: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    guild_id: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    channel_id: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    author_id: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    accepted: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    rejection_reason: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    inbox_item_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("orchestration_inbox_items.id"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
 class InboxConversion(Base):
     __tablename__ = "inbox_conversions"
 
