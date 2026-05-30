@@ -87,7 +87,7 @@ Add packet-specific checks for required docs, safety boundaries, route restricti
 
 Safety boundary: checks and reports only. No packet execution.
 
-Status: next recommended packet.
+Status: complete. Packet 034 adds `python3 scripts/nexus_preflight.py --packet <number>`, `--report <path>`, and `--list-packet-checks`. It discovers strict packet verifier scripts, runs bounded local verification commands, and writes redacted packet-aware operator reports. It is checks/reporting only: it does not execute packets, run Codex, auto-fix files, write Git state, call app execution routes, replace human review, bypass readiness, trust packets, or start Auto-Pilot.
 
 ### Packet 035 — Discord Capture Hardening
 
@@ -96,6 +96,8 @@ Type: integration, safety.
 Add channel allowlisting or stronger signature-style verification for Discord capture.
 
 Safety boundary: capture-only. Discord must not directly start Codex, tasks, packets, Git actions, or Auto-Pilot.
+
+Status: next recommended packet.
 
 ### Packet 036 — Deployment And Operator Runbooks
 

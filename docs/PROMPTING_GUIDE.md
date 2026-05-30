@@ -48,6 +48,7 @@ Codex should inspect local context, make routine implementation decisions, run v
 - Use Packet Drafting Assistant to generate, edit, save, review, and copy packet prompts from Prompt Vault templates and selected context. It is draft-only and does not execute the prompt.
 - Use Work Packet Readiness Checklist before trust or supervised execution to identify missing safety, scope, verification, and report metadata. It is guidance only and does not trust or execute packets.
 - Use Operator Review History to inspect or add audit notes for human governance decisions. It is audit-only visibility and does not execute, trust, recover, or mutate Git state.
+- Use packet-aware preflight for local checks/reporting before merge: `python3 scripts/nexus_preflight.py --packet 34 --report /tmp/nexus-preflight-packet-034.md`. It does not execute packets, run Codex, auto-fix files, write Git state, or replace human review, readiness, or trust.
 
 ## Safety Rails
 

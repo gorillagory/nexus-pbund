@@ -4,8 +4,8 @@
 - Current branch: `main`
 - Current commit at prior chat handoff: `208dbdbaecd646b013a590fae2db32d06daff408`
 - Prior chat handoff summary: `208dbdb add chat handoff for next session`
-- Latest Packet 033 baseline tag: `nexus-factory-console-consolidation-baseline-2026-05-30`
-- Previous Packet 032 baseline tag: `nexus-operator-review-history-baseline-2026-05-30`
+- Latest Packet 034 baseline tag: `nexus-packet-aware-preflight-baseline-2026-05-30`
+- Previous Packet 033 baseline tag: `nexus-factory-console-consolidation-baseline-2026-05-30`
 - Recent visible baseline tags:
   - `nexus-workflow-lock-prompt-vault-baseline-2026-05-29`
   - `nexus-recovery-audit-baseline-2026-05-29`
@@ -35,6 +35,7 @@
 - Work Packet Readiness Checklist
 - Operator Review History
 - Factory Console Consolidation
+- Packet-Aware Preflight Expansion
 - Workflow Lock docs
 - Orchestration-ready workflow foundation
 - Supervised packet runner
@@ -102,7 +103,7 @@
 - Packet 031 — Work Packet Readiness Checklist complete
 - Packet 032 — Operator Review History complete
 - Packet 033 — Factory Console Consolidation complete
-- Packet 034 — Packet-Aware Preflight Expansion
+- Packet 034 — Packet-Aware Preflight Expansion complete
 - Packet 035 — Discord Capture Hardening
 - Packet 036 — Deployment And Operator Runbooks
 
@@ -114,6 +115,7 @@ cd ~/garage/workspaces/nexus-pbund
 git status --short
 git log --oneline --decorate -20
 python3 scripts/nexus_preflight.py --quick
+python3 scripts/nexus_preflight.py --list-packet-checks
 cat docs/CHAT_HANDOFF.md
 cat docs/WORKFLOW_LOCK.md
 cat docs/SPRINT_PLAN.md
@@ -132,4 +134,4 @@ Prefer one pasteable Codex operator prompt for local execution. Reduce manual co
 
 Keep the safety rails in this document. Do not force push, reset, clean, run destructive database operations, expose API keys, or start Auto-Pilot unless the user explicitly asks for that exact work.
 
-Packet 033 consolidates Factory Console navigation into Command Center, Intake & Triage, Packet Preparation, Human Review, and Vault & Settings, with read-only summary visibility only. The next recommended packet is Packet 034 — Packet-Aware Preflight Expansion. Keep the work supervised: no Auto-Pilot, no direct Discord execution, no broad Git writes, no automatic recovery, no automatic trust, and no execution without explicit operator action.
+Packet 034 adds packet-aware local preflight with strict verifier discovery and bounded redacted reports. It is checks/reporting only and does not execute packets, run Codex, auto-fix files, write Git state, replace human review, bypass readiness, trust packets, or start Auto-Pilot. The next recommended packet is Packet 035 — Discord Capture Hardening. Keep the work supervised: no Auto-Pilot, no direct Discord execution, no broad Git writes, no automatic recovery, no automatic trust, and no execution without explicit operator action.

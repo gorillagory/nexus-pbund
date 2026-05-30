@@ -97,6 +97,14 @@ Run local preflight before merge:
 python3 scripts/nexus_preflight.py --quick
 ```
 
+For packet-aware local checks, run:
+
+```bash
+python3 scripts/nexus_preflight.py --packet 34 --report /tmp/nexus-preflight-packet-034.md
+```
+
+Packet-aware preflight discovers strict packet verifier scripts under `scripts/`, runs local checks with bounded output, and can write a redacted operator report. It is checks/reporting only: it does not execute packets, run Codex, call app execution routes, auto-fix files, write Git state, trust packets, replace human review, bypass readiness, or start Auto-Pilot.
+
 GitHub Actions runs quick strict preflight on push and pull request to `main`.
 
 ## Git And Tag Baseline Practice
@@ -120,6 +128,8 @@ Factory Console Consolidation is navigation/visibility only. It may summarize ex
 Sprint 3 focuses on supervised workflow quality: inbox conversion, packet drafting, readiness checks, review history, console consolidation, packet-aware preflight, capture hardening, and operator runbooks.
 
 Sprint 3 must preserve explicit execution. No Sprint 3 packet should start Auto-Pilot, make Discord execute directly, make Git Explorer write to the repo, broaden app-level Git writes beyond Branch Per Packet, automate recovery, or bypass Trusted Packet Mode without explicit approval.
+
+Packet-aware preflight does not replace the locked workflow. Human review, readiness checks, trusted packet decisions, supervised execution, recovery review, baseline tagging, and push remain explicit operator steps.
 
 ## Safety Rules
 
