@@ -107,7 +107,13 @@ Document setup, env vars, dashboard operations, recovery playbook, baseline tagg
 
 Safety boundary: documentation only unless a verifier is added.
 
-Status: next recommended packet.
+Status: complete. Packet 036 adds Operator, Deployment, and Recovery runbooks plus verifier coverage. It is documentation/runbook only and does not add runtime behavior, app execution controls, Git write UI/API, retry/continue automation, trust automation, direct Discord execution, or Auto-Pilot behavior.
+
+## Sprint 3 Closure
+
+Sprint 3 is complete. It delivered supervised workflow quality improvements from inbox conversion through runbooks while preserving explicit human execution.
+
+Recommended next step: create a Sprint 4 Direction Lock before implementing additional feature work. Auto-Pilot, direct execution expansion, broad Git write controls, trusted auto-execution, and retry/continue automation remain out of scope until explicitly approved.
 
 ## Out Of Scope Until Explicit Approval
 

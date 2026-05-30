@@ -22,6 +22,7 @@ Sprint 2 is complete. It delivered a remote-operable supervised factory foundati
 - Factory Console Consolidation for grouped navigation and read-only dashboard summary visibility.
 - Packet-Aware Preflight Expansion for packet-specific local checks and bounded operator reports.
 - Discord Capture Hardening for allowlisted, timestamp-aware, replay-guarded capture intake.
+- Deployment and Operator Runbooks for consistent operation, verification, recovery, deployment, and handoff.
 - Packet 027 Trusted Packet Mode foundation.
 - Supervised packet runner and Run One Task.
 - Factory Console visibility, execution ledger, changed-file tracking, recovery controls, and recovery audit notes.
@@ -61,9 +62,7 @@ Packet-aware preflight does not auto-fix files, does not write Git state, and do
 
 Auto-Pilot remains locked. Do not build, enable, or rely on Auto-Pilot unless a future packet explicitly scopes Auto-Pilot build/test work.
 
-## Remaining Workflow Gaps
-
-- Deployment and operator runbooks are still thin.
+Runbook rule: `docs/OPERATOR_RUNBOOK.md`, `docs/DEPLOYMENT_RUNBOOK.md`, and `docs/RECOVERY_RUNBOOK.md` are the operator references for daily workflow, deployment checks, recovery, baseline tagging, and new-chat handoff. They are documentation only and do not add runtime execution behavior.
 
 ## Sprint 3 Direction
 
@@ -81,7 +80,13 @@ Do not automatically choose Auto-Pilot. Auto-Pilot remains out of scope until ex
 6. Packet 033 — Factory Console Consolidation. Type: UI. Boundary: reorganizes existing visibility and controls; no new execution or Git write capability. Complete.
 7. Packet 034 — Packet-Aware Preflight Expansion. Type: safety, testing. Boundary: adds checks and reports only; no execution route calls. Complete.
 8. Packet 035 — Discord Capture Hardening. Type: integration, safety. Boundary: channel allowlisting or stronger verification for capture-only ingest; Discord still cannot execute work. Complete.
-9. Packet 036 — Deployment And Operator Runbooks. Type: docs/planning. Boundary: documentation only; no runtime changes unless verification requires a docs checker. Next recommended packet.
+9. Packet 036 — Deployment And Operator Runbooks. Type: docs/planning. Boundary: documentation only; no runtime changes unless verification requires a docs checker. Complete.
+
+## Sprint 3 Closure
+
+Sprint 3 is complete at Packet 036. The supervised factory now has capture-first intake, triage conversion, packet drafting, readiness checks, review history, console consolidation, packet-aware preflight, hardened Discord capture, and operator/deployment/recovery runbooks.
+
+Next planning should define Sprint 4 before adding new runtime behavior. Auto-Pilot remains locked until explicitly scoped.
 
 ## Local Configuration Notes
 

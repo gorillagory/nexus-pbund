@@ -50,6 +50,7 @@ Codex should inspect local context, make routine implementation decisions, run v
 - Use Operator Review History to inspect or add audit notes for human governance decisions. It is audit-only visibility and does not execute, trust, recover, or mutate Git state.
 - Use packet-aware preflight for local checks/reporting before merge: `python3 scripts/nexus_preflight.py --packet 34 --report /tmp/nexus-preflight-packet-034.md`. It does not execute packets, run Codex, auto-fix files, write Git state, or replace human review, readiness, or trust.
 - Treat Discord as capture-only. Discord hardening may reject non-allowlisted, stale, replayed, unsigned, or unauthenticated payloads before inbox capture, but it must never execute Codex, tasks, packets, Git actions, trust changes, or Auto-Pilot.
+- Use `docs/OPERATOR_RUNBOOK.md`, `docs/DEPLOYMENT_RUNBOOK.md`, and `docs/RECOVERY_RUNBOOK.md` for day-to-day operation, deployment verification, recovery, baseline tagging, and new-chat handoff.
 
 ## Safety Rails
 

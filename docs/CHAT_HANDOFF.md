@@ -4,8 +4,8 @@
 - Current branch: `main`
 - Current commit at prior chat handoff: `208dbdbaecd646b013a590fae2db32d06daff408`
 - Prior chat handoff summary: `208dbdb add chat handoff for next session`
-- Latest Packet 035 baseline tag: `nexus-discord-capture-hardening-baseline-2026-05-30`
-- Previous Packet 034 baseline tag: `nexus-packet-aware-preflight-baseline-2026-05-30`
+- Latest Packet 036 baseline tag: `nexus-deployment-operator-runbooks-baseline-2026-05-30`
+- Previous Packet 035 baseline tag: `nexus-discord-capture-hardening-baseline-2026-05-30`
 - Recent visible baseline tags:
   - `nexus-workflow-lock-prompt-vault-baseline-2026-05-29`
   - `nexus-recovery-audit-baseline-2026-05-29`
@@ -37,6 +37,7 @@
 - Factory Console Consolidation
 - Packet-Aware Preflight Expansion
 - Discord Capture Hardening
+- Deployment and Operator Runbooks
 - Workflow Lock docs
 - Orchestration-ready workflow foundation
 - Supervised packet runner
@@ -106,7 +107,8 @@
 - Packet 033 — Factory Console Consolidation complete
 - Packet 034 — Packet-Aware Preflight Expansion complete
 - Packet 035 — Discord Capture Hardening complete
-- Packet 036 — Deployment And Operator Runbooks
+- Packet 036 — Deployment And Operator Runbooks complete
+- Next — Sprint 4 Direction Lock
 
 ## New Chat Startup Instructions
 Ask the user to run this local context capture before planning new implementation work:
@@ -122,6 +124,9 @@ cat docs/WORKFLOW_LOCK.md
 cat docs/SPRINT_PLAN.md
 cat docs/SPRINT_3_PLAN.md
 cat docs/PROMPTING_GUIDE.md
+cat docs/OPERATOR_RUNBOOK.md
+cat docs/DEPLOYMENT_RUNBOOK.md
+cat docs/RECOVERY_RUNBOOK.md
 ```
 
 Paste the command output into the new ChatGPT chat.
@@ -135,4 +140,4 @@ Prefer one pasteable Codex operator prompt for local execution. Reduce manual co
 
 Keep the safety rails in this document. Do not force push, reset, clean, run destructive database operations, expose API keys, or start Auto-Pilot unless the user explicitly asks for that exact work.
 
-Packet 035 hardens Discord capture with optional signature verification, guild/channel/author allowlists, timestamp tolerance, replay guard audit, and redacted status. Discord remains capture-only and cannot execute Codex, tasks, packets, Git actions, trust changes, retry/continue behavior, or Auto-Pilot. The next recommended packet is Packet 036 — Deployment And Operator Runbooks. Keep the work supervised: no Auto-Pilot, no direct Discord execution, no broad Git writes, no automatic recovery, no automatic trust, and no execution without explicit operator action.
+Packet 036 adds Operator, Deployment, and Recovery runbooks. Sprint 3 is complete. The next recommended step is Sprint 4 Direction Lock before new runtime feature work. Keep the work supervised: no Auto-Pilot, no direct Discord execution, no broad Git writes, no automatic recovery, no automatic trust, and no execution without explicit operator action.

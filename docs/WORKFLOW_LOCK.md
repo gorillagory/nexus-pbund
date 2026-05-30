@@ -147,3 +147,13 @@ Packet-aware preflight does not replace the locked workflow. Human review, readi
 ## Operator Rule
 
 Codex should do routine operator tasks: repo checks, implementation, verification, commit, merge, tag, push, and `/tmp` reports. The human should approve major or risky direction and intervene on blockers.
+
+## Runbooks
+
+Use the runbooks for repeatable operation:
+
+- `docs/OPERATOR_RUNBOOK.md` for daily supervised factory operation and new-chat handoff.
+- `docs/DEPLOYMENT_RUNBOOK.md` for environment, schema sync, verification, CI, baseline tagging, and safe rollback guidance.
+- `docs/RECOVERY_RUNBOOK.md` for failed run inspection, review-required handling, intervention history, and recovery verification.
+
+These runbooks are documentation only. They do not add runtime execution behavior, Git write controls, retry/continue automation, trust automation, direct Discord execution, or Auto-Pilot behavior.
