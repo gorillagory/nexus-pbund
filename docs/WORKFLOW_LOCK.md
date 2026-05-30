@@ -101,6 +101,12 @@ The Operator Intervention Queue is record keeping only. It may create, acknowled
 
 Trusted Packet Mode is restrictive only. It may update packet trust metadata and settings, and it may block supervised packet execution for untrusted packets. It must not add autonomous execution, direct Codex execution, retry/continue automation, or Git write controls.
 
+## Sprint 3 Direction Lock
+
+Sprint 3 focuses on supervised workflow quality: inbox conversion, packet drafting, readiness checks, review history, console consolidation, packet-aware preflight, capture hardening, and operator runbooks.
+
+Sprint 3 must preserve explicit execution. No Sprint 3 packet should start Auto-Pilot, make Discord execute directly, make Git Explorer write to the repo, broaden app-level Git writes beyond Branch Per Packet, automate recovery, or bypass Trusted Packet Mode without explicit approval.
+
 ## Safety Rules
 
 - no force push.
