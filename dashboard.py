@@ -61,6 +61,14 @@ from src.services.git_explorer import (
     get_recent_baseline_tags,
     get_recent_commits,
 )
+from src.services.inbox_triage_conversion import (
+    convert_inbox_to_document_update,
+    convert_inbox_to_task,
+    convert_inbox_to_work_packet,
+    discard_inbox_with_audit,
+    serialize_conversion,
+    summarize_eligible_inbox_item,
+)
 from src.services.orchestration_inbox import (
     create_inbox_item,
     discard_inbox_item,
@@ -2139,6 +2147,157 @@ class NexusDashboard:
             except Exception as exception:
                 db.rollback()
                 return jsonify({"status": "error", "message": "Inbox item could not be discarded: {}".format(exception)}), 503
+            finally:
+                db_context.close()
+
+        @self.app.route("/api/orchestration-inbox/items/<int:item_id>/conversion-options", methods=["GET"])
+        def get_orchestration_inbox_conversion_options(item_id):
+            db_context = get_db()
+            db = next(db_context)
+            try:
+                workspace_id = get_workspace_id(self.engine.target_dir)
+                if workspace_id is None:
+                    return jsonify({"status": "error", "message": "Active workspace not found."}), 400
+                item = get_inbox_item(db, workspace_id, item_id)
+                if item is None:
+                    return jsonify({"status": "error", "message": "Inbox item not found."}), 404
+                return jsonify(
+                    {
+                        "status": "success",
+                        "conversion_options": summarize_eligible_inbox_item(item),
+                    }
+                )
+            except Exception as exception:
+                return jsonify({"status": "error", "message": "Inbox conversion options unavailable: {}".format(exception)}), 503
+            finally:
+                db_context.close()
+
+        @self.app.route("/api/orchestration-inbox/items/<int:item_id>/convert/work-packet", methods=["POST"])
+        def convert_orchestration_inbox_item_to_work_packet(item_id):
+            payload = request.get_json(silent=True) or {}
+            if not isinstance(payload, dict):
+                return jsonify({"status": "error", "message": "JSON object is required."}), 400
+            db_context = get_db()
+            db = next(db_context)
+            try:
+                workspace_id = get_workspace_id(self.engine.target_dir)
+                if workspace_id is None:
+                    return jsonify({"status": "error", "message": "Active workspace not found."}), 400
+                item = get_inbox_item(db, workspace_id, item_id)
+                if item is None:
+                    return jsonify({"status": "error", "message": "Inbox item not found."}), 404
+                result = convert_inbox_to_work_packet(db, workspace_id, item, payload)
+                return jsonify(
+                    {
+                        "status": "success",
+                        "item": serialize_inbox_item(result["item"]),
+                        "conversion": serialize_conversion(result["conversion"]),
+                        "work_packet_id": result["work_packet"].id,
+                        "packet_title": result["work_packet"].title,
+                        "trust": result["trust"],
+                        "task": serialize_task(result["task"]),
+                    }
+                ), 201
+            except ValueError as exception:
+                db.rollback()
+                return jsonify({"status": "error", "message": str(exception)}), 400
+            except Exception as exception:
+                db.rollback()
+                return jsonify({"status": "error", "message": "Inbox item could not be converted to work packet: {}".format(exception)}), 503
+            finally:
+                db_context.close()
+
+        @self.app.route("/api/orchestration-inbox/items/<int:item_id>/convert/task", methods=["POST"])
+        def convert_orchestration_inbox_item_to_task(item_id):
+            payload = request.get_json(silent=True) or {}
+            if not isinstance(payload, dict):
+                return jsonify({"status": "error", "message": "JSON object is required."}), 400
+            db_context = get_db()
+            db = next(db_context)
+            try:
+                workspace_id = get_workspace_id(self.engine.target_dir)
+                if workspace_id is None:
+                    return jsonify({"status": "error", "message": "Active workspace not found."}), 400
+                item = get_inbox_item(db, workspace_id, item_id)
+                if item is None:
+                    return jsonify({"status": "error", "message": "Inbox item not found."}), 404
+                result = convert_inbox_to_task(db, workspace_id, item, payload)
+                return jsonify(
+                    {
+                        "status": "success",
+                        "item": serialize_inbox_item(result["item"]),
+                        "conversion": serialize_conversion(result["conversion"]),
+                        "task": serialize_task(result["task"]),
+                    }
+                ), 201
+            except ValueError as exception:
+                db.rollback()
+                return jsonify({"status": "error", "message": str(exception)}), 400
+            except Exception as exception:
+                db.rollback()
+                return jsonify({"status": "error", "message": "Inbox item could not be converted to task: {}".format(exception)}), 503
+            finally:
+                db_context.close()
+
+        @self.app.route("/api/orchestration-inbox/items/<int:item_id>/convert/document-update", methods=["POST"])
+        def convert_orchestration_inbox_item_to_document_update(item_id):
+            payload = request.get_json(silent=True) or {}
+            if not isinstance(payload, dict):
+                return jsonify({"status": "error", "message": "JSON object is required."}), 400
+            db_context = get_db()
+            db = next(db_context)
+            try:
+                workspace_id = get_workspace_id(self.engine.target_dir)
+                if workspace_id is None:
+                    return jsonify({"status": "error", "message": "Active workspace not found."}), 400
+                item = get_inbox_item(db, workspace_id, item_id)
+                if item is None:
+                    return jsonify({"status": "error", "message": "Inbox item not found."}), 404
+                result = convert_inbox_to_document_update(db, workspace_id, item, payload)
+                return jsonify(
+                    {
+                        "status": "success",
+                        "item": serialize_inbox_item(result["item"]),
+                        "conversion": serialize_conversion(result["conversion"]),
+                    }
+                ), 201
+            except ValueError as exception:
+                db.rollback()
+                return jsonify({"status": "error", "message": str(exception)}), 400
+            except Exception as exception:
+                db.rollback()
+                return jsonify({"status": "error", "message": "Inbox item could not be marked as document update: {}".format(exception)}), 503
+            finally:
+                db_context.close()
+
+        @self.app.route("/api/orchestration-inbox/items/<int:item_id>/discard-with-audit", methods=["POST"])
+        def discard_orchestration_inbox_item_with_audit(item_id):
+            payload = request.get_json(silent=True) or {}
+            if not isinstance(payload, dict):
+                return jsonify({"status": "error", "message": "JSON object is required."}), 400
+            db_context = get_db()
+            db = next(db_context)
+            try:
+                workspace_id = get_workspace_id(self.engine.target_dir)
+                if workspace_id is None:
+                    return jsonify({"status": "error", "message": "Active workspace not found."}), 400
+                item = get_inbox_item(db, workspace_id, item_id)
+                if item is None:
+                    return jsonify({"status": "error", "message": "Inbox item not found."}), 404
+                result = discard_inbox_with_audit(db, workspace_id, item, payload)
+                return jsonify(
+                    {
+                        "status": "success",
+                        "item": serialize_inbox_item(result["item"]),
+                        "conversion": serialize_conversion(result["conversion"]),
+                    }
+                ), 201
+            except ValueError as exception:
+                db.rollback()
+                return jsonify({"status": "error", "message": str(exception)}), 400
+            except Exception as exception:
+                db.rollback()
+                return jsonify({"status": "error", "message": "Inbox item could not be discarded with audit: {}".format(exception)}), 503
             finally:
                 db_context.close()
 

@@ -23,6 +23,8 @@ If the answers are unclear, Codex should inspect local context first and ask the
 
 Discord-captured items follow the same triage rule as manual inbox items. Each captured message must become a scoped task, work packet, document update, or explicit discard before any supervised execution path is considered.
 
+Packet 029 added the Inbox Triage Conversion Flow. Captured or triaged inbox items may be converted only into non-executing workflow records: a staged untrusted work packet, a manual todo task, a document update audit candidate, or an audited discard. Conversion requires explicit operator confirmation, records a conversion audit, and never calls Codex, task execution, packet execution, Git write actions, recovery automation, Discord execution, or Auto-Pilot. Converted work packets stay `trust_status=unreviewed` until explicitly trusted.
+
 ## Packet Drafting
 
 Packets use the Codex operator prompt structure:

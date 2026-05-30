@@ -835,8 +835,58 @@
                                                 <textarea id="orchestration-inbox-triage-notes" class="form-control form-control-sm" rows="5"></textarea>
                                             </div>
                                         </form>
+                                        <section id="orchestration-inbox-conversion-panel" class="orchestration-inbox-conversion-panel d-none mt-3">
+                                            <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-3">
+                                                <div>
+                                                    <h4 class="h6 fw-semibold mb-1">Inbox Conversion</h4>
+                                                    <div id="orchestration-inbox-conversion-status" class="text-secondary small">Select a captured or triaged item.</div>
+                                                </div>
+                                            </div>
+                                            <div class="row g-2 mb-2">
+                                                <div class="col-md-6">
+                                                    <label for="orchestration-inbox-convert-title" class="form-label small text-secondary mb-1">Packet / Task Title</label>
+                                                    <input id="orchestration-inbox-convert-title" class="form-control form-control-sm" maxlength="255">
+                                                </div>
+                                                <div class="col-md-3">
+                                                    <label for="orchestration-inbox-convert-risk" class="form-label small text-secondary mb-1">Packet Risk</label>
+                                                    <select id="orchestration-inbox-convert-risk" class="form-select form-select-sm">
+                                                        <option value="medium">medium</option>
+                                                        <option value="low">low</option>
+                                                        <option value="high">high</option>
+                                                    </select>
+                                                </div>
+                                                <div class="col-md-3">
+                                                    <label for="orchestration-inbox-convert-minutes" class="form-label small text-secondary mb-1">Estimate</label>
+                                                    <input id="orchestration-inbox-convert-minutes" class="form-control form-control-sm" maxlength="64" placeholder="30 min">
+                                                </div>
+                                            </div>
+                                            <div class="mb-2">
+                                                <label for="orchestration-inbox-convert-summary" class="form-label small text-secondary mb-1">Goal / Summary</label>
+                                                <textarea id="orchestration-inbox-convert-summary" class="form-control form-control-sm" rows="3"></textarea>
+                                            </div>
+                                            <div class="row g-2 mb-2">
+                                                <div class="col-md-6">
+                                                    <label for="orchestration-inbox-convert-safety" class="form-label small text-secondary mb-1">Safety Notes</label>
+                                                    <textarea id="orchestration-inbox-convert-safety" class="form-control form-control-sm" rows="3"></textarea>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <label for="orchestration-inbox-convert-verification" class="form-label small text-secondary mb-1">Verification Notes</label>
+                                                    <textarea id="orchestration-inbox-convert-verification" class="form-control form-control-sm" rows="3"></textarea>
+                                                </div>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label for="orchestration-inbox-convert-notes" class="form-label small text-secondary mb-1">Conversion / Discard Notes</label>
+                                                <textarea id="orchestration-inbox-convert-notes" class="form-control form-control-sm" rows="3"></textarea>
+                                            </div>
+                                            <div class="d-flex gap-2 flex-wrap">
+                                                <button type="button" class="btn btn-primary btn-sm" onclick="NexusApp.convertSelectedInboxItemToWorkPacket()">Convert To Work Packet</button>
+                                                <button type="button" class="btn btn-outline-primary btn-sm" onclick="NexusApp.convertSelectedInboxItemToTask()">Convert To Task</button>
+                                                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="NexusApp.convertSelectedInboxItemToDocumentUpdate()">Mark Document Update</button>
+                                                <button type="button" class="btn btn-outline-warning btn-sm" onclick="NexusApp.discardSelectedInboxItemWithAudit()">Discard With Audit</button>
+                                            </div>
+                                        </section>
                                     </section>
-                                    <span class="d-none">/api/orchestration-inbox/items Orchestration Inbox captured triaged staged discarded</span>
+                                    <span class="d-none">/api/orchestration-inbox/items /api/orchestration-inbox/items/&lt;id&gt;/conversion-options /api/orchestration-inbox/items/&lt;id&gt;/convert/work-packet /api/orchestration-inbox/items/&lt;id&gt;/convert/task /api/orchestration-inbox/items/&lt;id&gt;/convert/document-update /api/orchestration-inbox/items/&lt;id&gt;/discard-with-audit Orchestration Inbox captured triaged staged discarded conversion audit</span>
                                 </div>
                             </div>
                         </div>

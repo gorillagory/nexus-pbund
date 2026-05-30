@@ -41,6 +41,7 @@ window.NexusApp = {
     latestGitExplorer: null,
     latestPacketBranchStatus: null,
     latestTrustedPacketMode: null,
+    latestInboxConversionOptions: null,
     orchestrationInboxItems: [],
     selectedOrchestrationInboxItem: null,
     operatorInterventions: [],
@@ -2904,16 +2905,19 @@ window.NexusApp = {
         const emptyState = document.getElementById("orchestration-inbox-empty");
         const form = document.getElementById("orchestration-inbox-triage-form");
         const meta = document.getElementById("orchestration-inbox-detail-meta");
+        const conversionPanel = document.getElementById("orchestration-inbox-conversion-panel");
         if (!form || !emptyState) return;
 
         if (!item) {
             emptyState.classList.remove("d-none");
             form.classList.add("d-none");
+            conversionPanel?.classList.add("d-none");
             return;
         }
 
         emptyState.classList.add("d-none");
         form.classList.remove("d-none");
+        conversionPanel?.classList.remove("d-none");
         document.getElementById("orchestration-inbox-item-id").value = item.id || "";
         document.getElementById("orchestration-inbox-triage-title").value = item.title || "";
         document.getElementById("orchestration-inbox-triage-raw-intent").value = item.raw_intent || "";
@@ -2921,9 +2925,15 @@ window.NexusApp = {
         document.getElementById("orchestration-inbox-triage-priority").value = item.priority || "normal";
         document.getElementById("orchestration-inbox-triage-category").value = item.category || "";
         document.getElementById("orchestration-inbox-triage-notes").value = item.triage_notes || "";
+        document.getElementById("orchestration-inbox-convert-title").value = item.title || "";
+        document.getElementById("orchestration-inbox-convert-summary").value = item.raw_intent || "";
+        document.getElementById("orchestration-inbox-convert-safety").value = "No execution during conversion. Review before any supervised run.";
+        document.getElementById("orchestration-inbox-convert-verification").value = "Run packet-specific verifier and preflight before baseline.";
+        document.getElementById("orchestration-inbox-convert-notes").value = item.triage_notes || "";
         if (meta) {
             meta.textContent = `Source ${item.source || "manual"} | Created ${this.formatFactoryTime(item.created_at)} | Updated ${this.formatFactoryTime(item.updated_at)}`;
         }
+        this.loadOrchestrationInboxConversionOptions(item.id);
     },
 
     orchestrationInboxCaptureData() {
@@ -2997,6 +3007,167 @@ window.NexusApp = {
             NexusCore.showToast("Inbox item updated.", "success");
         } catch (error) {
             NexusCore.showToast(`Triage error: ${error.message}`, "error");
+        }
+    },
+
+    async loadOrchestrationInboxConversionOptions(itemId) {
+        const status = document.getElementById("orchestration-inbox-conversion-status");
+        if (status) {
+            status.textContent = "Loading conversion options...";
+        }
+        try {
+            const response = await fetch(`/api/orchestration-inbox/items/${itemId}/conversion-options`);
+            const payload = await response.json();
+            if (!response.ok || payload.status !== "success") {
+                throw new Error(payload.message || "Unable to load conversion options.");
+            }
+            this.latestInboxConversionOptions = payload.conversion_options || null;
+            this.renderInboxConversionOptions(this.latestInboxConversionOptions);
+        } catch (error) {
+            if (status) {
+                status.textContent = `Conversion options unavailable: ${error.message}`;
+            }
+        }
+    },
+
+    renderInboxConversionOptions(options) {
+        const status = document.getElementById("orchestration-inbox-conversion-status");
+        if (!status) return;
+        if (!options) {
+            status.textContent = "Select a captured or triaged item.";
+            return;
+        }
+        const targets = Array.isArray(options.targets) ? options.targets : [];
+        const supported = targets
+            .filter((target) => target.supported)
+            .map((target) => target.label)
+            .join(", ");
+        status.textContent = options.eligible
+            ? `Eligible targets: ${supported || "none"}. Conversion creates records only.`
+            : options.reason || "This item is not eligible for conversion.";
+    },
+
+    inboxConversionData() {
+        return {
+            packet_title: document.getElementById("orchestration-inbox-convert-title")?.value || "",
+            title: document.getElementById("orchestration-inbox-convert-title")?.value || "",
+            goal: document.getElementById("orchestration-inbox-convert-summary")?.value || "",
+            summary: document.getElementById("orchestration-inbox-convert-summary")?.value || "",
+            task_description: document.getElementById("orchestration-inbox-convert-summary")?.value || "",
+            document_notes: document.getElementById("orchestration-inbox-convert-notes")?.value
+                || document.getElementById("orchestration-inbox-convert-summary")?.value
+                || "",
+            discard_reason: document.getElementById("orchestration-inbox-convert-notes")?.value || "",
+            safety_notes: document.getElementById("orchestration-inbox-convert-safety")?.value || "",
+            verification_notes: document.getElementById("orchestration-inbox-convert-verification")?.value || "",
+            conversion_notes: document.getElementById("orchestration-inbox-convert-notes")?.value
+                || document.getElementById("orchestration-inbox-convert-summary")?.value
+                || "",
+            operator_notes: document.getElementById("orchestration-inbox-convert-notes")?.value || "",
+            risk_level: document.getElementById("orchestration-inbox-convert-risk")?.value || "medium",
+            estimated_minutes: document.getElementById("orchestration-inbox-convert-minutes")?.value || "",
+        };
+    },
+
+    async postInboxConversion(endpoint, payload, successMessage) {
+        const itemId = this.selectedOrchestrationInboxItem?.id;
+        if (!itemId) return null;
+        const response = await fetch(`/api/orchestration-inbox/items/${itemId}/${endpoint}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+        });
+        const result = await response.json();
+        if (!response.ok || result.status !== "success") {
+            throw new Error(result.message || "Inbox conversion failed.");
+        }
+        await this.loadOrchestrationInboxItems();
+        this.renderOrchestrationInboxDetail(result.item);
+        NexusCore.showToast(successMessage, "success");
+        return result;
+    },
+
+    async convertSelectedInboxItemToWorkPacket() {
+        const itemId = this.selectedOrchestrationInboxItem?.id;
+        if (!itemId) return;
+        if (!(await NexusCore.confirmAction("Convert this inbox item to a staged, untrusted work packet?", {
+            title: "Convert To Work Packet",
+            confirmLabel: "Convert",
+            variant: "primary",
+        }))) {
+            return;
+        }
+        try {
+            const payload = {
+                ...this.inboxConversionData(),
+                confirm_convert: true,
+            };
+            await this.postInboxConversion("convert/work-packet", payload, "Inbox item converted to staged work packet.");
+        } catch (error) {
+            NexusCore.showToast(`Conversion error: ${error.message}`, "error");
+        }
+    },
+
+    async convertSelectedInboxItemToTask() {
+        const itemId = this.selectedOrchestrationInboxItem?.id;
+        if (!itemId) return;
+        if (!(await NexusCore.confirmAction("Convert this inbox item to a manual todo task?", {
+            title: "Convert To Task",
+            confirmLabel: "Convert",
+            variant: "primary",
+        }))) {
+            return;
+        }
+        try {
+            const payload = {
+                ...this.inboxConversionData(),
+                confirm_convert: true,
+            };
+            await this.postInboxConversion("convert/task", payload, "Inbox item converted to manual task.");
+        } catch (error) {
+            NexusCore.showToast(`Conversion error: ${error.message}`, "error");
+        }
+    },
+
+    async convertSelectedInboxItemToDocumentUpdate() {
+        const itemId = this.selectedOrchestrationInboxItem?.id;
+        if (!itemId) return;
+        if (!(await NexusCore.confirmAction("Mark this inbox item as an audited document update candidate?", {
+            title: "Document Update Candidate",
+            confirmLabel: "Mark Candidate",
+            variant: "primary",
+        }))) {
+            return;
+        }
+        try {
+            const payload = {
+                ...this.inboxConversionData(),
+                confirm_convert: true,
+            };
+            await this.postInboxConversion("convert/document-update", payload, "Inbox item marked as document update candidate.");
+        } catch (error) {
+            NexusCore.showToast(`Conversion error: ${error.message}`, "error");
+        }
+    },
+
+    async discardSelectedInboxItemWithAudit() {
+        const itemId = this.selectedOrchestrationInboxItem?.id;
+        if (!itemId) return;
+        if (!(await NexusCore.confirmAction("Discard this inbox item and record an audit reason?", {
+            title: "Discard With Audit",
+            confirmLabel: "Discard",
+            variant: "warning",
+        }))) {
+            return;
+        }
+        try {
+            const payload = {
+                ...this.inboxConversionData(),
+                confirm_discard: true,
+            };
+            await this.postInboxConversion("discard-with-audit", payload, "Inbox item discarded with audit trail.");
+        } catch (error) {
+            NexusCore.showToast(`Discard error: ${error.message}`, "error");
         }
     },
 

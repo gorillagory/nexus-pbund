@@ -15,6 +15,7 @@ Sprint 2 is complete. It delivered a remote-operable supervised factory foundati
 - Branch Per Packet for narrow supervised packet branch preparation.
 - Operator Intervention Queue for human review and decision tracking.
 - Trusted Packet Mode for reviewed packet trust metadata and restrictive execution gating.
+- Inbox Triage Conversion Flow for turning captured or triaged ideas into non-executing workflow records with audit notes.
 - Packet 027 Trusted Packet Mode foundation.
 - Supervised packet runner and Run One Task.
 - Factory Console visibility, execution ledger, changed-file tracking, recovery controls, and recovery audit notes.
@@ -36,11 +37,12 @@ Operator Intervention Queue rule: the queue records human review items, blockers
 
 Trusted Packet Mode rule: operators may mark reviewed packets trusted or revoke trust with explicit confirmation and a recorded reason. Enabling Trusted Packet Mode does not execute automatically and does not unlock Auto-Pilot. When enabled, supervised packet execution is restricted to packets with `trust_status=trusted`.
 
+Inbox conversion rule: captured or triaged inbox items may be converted only into reviewed non-executing records: staged work packet, manual todo task, document update audit candidate, or audited discard. Converted work packets remain `trust_status=unreviewed` until explicitly trusted. Discard keeps the inbox item and records an audit entry.
+
 Auto-Pilot remains locked. Do not build, enable, or rely on Auto-Pilot unless a future packet explicitly scopes Auto-Pilot build/test work.
 
 ## Remaining Workflow Gaps
 
-- Inbox items cannot yet be converted into a task, work packet, document update, or discard audit from a guided flow.
 - Packet drafting still depends on manual prompt composition even though Prompt Vault exists.
 - Work packet readiness is not yet enforced before staging or trust review.
 - Trust/revoke, triage, intervention, and recovery decisions are not consolidated into one operator review history.
@@ -58,8 +60,8 @@ Do not automatically choose Auto-Pilot. Auto-Pilot remains out of scope until ex
 ## Recommended Packet Roadmap
 
 1. Packet 028 — Sprint 3 Direction Lock. Type: docs/planning, safety. Boundary: documents direction only; no runtime behavior.
-2. Packet 029 — Inbox Triage Conversion Flow. Type: workflow, backend, UI. Boundary: converts inbox items into task, work packet draft, document update note, or discard audit only; no execution.
-3. Packet 030 — Packet Drafting Assistant. Type: workflow, UI. Boundary: uses Prompt Vault templates to draft/copy packet text; does not run Codex or stage automatically.
+2. Packet 029 — Inbox Triage Conversion Flow. Type: workflow, backend, UI. Boundary: converts inbox items into task, staged untrusted work packet, document update note, or discard audit only; no execution. Complete.
+3. Packet 030 — Packet Drafting Assistant. Type: workflow, UI. Boundary: uses Prompt Vault templates to draft/copy packet text; does not run Codex or stage automatically. Next recommended packet.
 4. Packet 031 — Work Packet Readiness Checklist. Type: safety, backend, UI. Boundary: validates safety rules, files allowed, verification commands, and trust fields before readiness; does not execute.
 5. Packet 032 — Operator Review History. Type: workflow, backend, UI. Boundary: records triage, trust/revoke, intervention, and recovery decisions; no automatic recovery or execution.
 6. Packet 033 — Factory Console Consolidation. Type: UI. Boundary: reorganizes existing visibility and controls; no new execution or Git write capability.

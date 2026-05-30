@@ -37,13 +37,15 @@ Build a guided flow that converts inbox items into one of four outcomes: task, w
 
 Safety boundary: conversion only. No Codex execution, no packet run, no task run, no Auto-Pilot.
 
+Status: complete. Packet 029 adds audited conversion records, staged untrusted work packet creation, manual todo task creation, document update audit candidates, and audited discard. Converted packets remain `trust_status=unreviewed` until an operator explicitly trusts them.
+
 ### Packet 030 — Packet Drafting Assistant
 
 Type: workflow, UI.
 
 Use Prompt Vault templates and inbox context to help draft packet text that the operator can review and copy or stage.
 
-Safety boundary: drafting and copying only. No automatic staging or execution.
+Safety boundary: drafting and copying only. No automatic staging or execution. Next recommended packet.
 
 ### Packet 031 — Work Packet Readiness Checklist
 

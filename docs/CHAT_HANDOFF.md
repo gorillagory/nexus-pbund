@@ -4,8 +4,8 @@
 - Current branch: `main`
 - Current commit at prior chat handoff: `208dbdbaecd646b013a590fae2db32d06daff408`
 - Prior chat handoff summary: `208dbdb add chat handoff for next session`
-- Latest Packet 028 baseline tag: `nexus-sprint-3-direction-baseline-2026-05-30`
-- Previous Packet 027 baseline tag: `nexus-trusted-packet-mode-baseline-2026-05-30`
+- Latest Packet 029 baseline tag: `nexus-inbox-triage-conversion-baseline-2026-05-30`
+- Previous Packet 028 baseline tag: `nexus-sprint-3-direction-baseline-2026-05-30`
 - Recent visible baseline tags:
   - `nexus-workflow-lock-prompt-vault-baseline-2026-05-29`
   - `nexus-recovery-audit-baseline-2026-05-29`
@@ -30,6 +30,7 @@
 - Operator Intervention Queue
 - Trusted Packet Mode
 - Sprint 3 Direction Lock
+- Inbox Triage Conversion Flow
 - Workflow Lock docs
 - Orchestration-ready workflow foundation
 - Supervised packet runner
@@ -92,7 +93,7 @@
 - Packet 026 — Operator Intervention Queue complete
 - Packet 027 — Trusted Packet Mode complete
 - Packet 028 — Sprint 3 Direction Lock complete
-- Packet 029 — Inbox Triage Conversion Flow
+- Packet 029 — Inbox Triage Conversion Flow complete
 - Packet 030 — Packet Drafting Assistant
 - Packet 031 — Work Packet Readiness Checklist
 - Packet 032 — Operator Review History
@@ -127,4 +128,4 @@ Prefer one pasteable Codex operator prompt for local execution. Reduce manual co
 
 Keep the safety rails in this document. Do not force push, reset, clean, run destructive database operations, expose API keys, or start Auto-Pilot unless the user explicitly asks for that exact work.
 
-Packet 028 locks Sprint 3 direction. The next recommended packet is Packet 029 — Inbox Triage Conversion Flow. Keep the work supervised: no Auto-Pilot, no direct Discord execution, no broad Git writes, no automatic recovery, and no execution without explicit operator action.
+Packet 029 adds supervised inbox conversion into staged untrusted work packets, manual todo tasks, document update audit candidates, and audited discard. The next recommended packet is Packet 030 — Packet Drafting Assistant. Keep the work supervised: no Auto-Pilot, no direct Discord execution, no broad Git writes, no automatic recovery, and no execution without explicit operator action.

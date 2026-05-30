@@ -29,6 +29,7 @@ PY_COMPILE_FILES = [
     "src/services/factory_events.py",
     "src/services/git_changes.py",
     "src/services/git_explorer.py",
+    "src/services/inbox_triage_conversion.py",
     "src/services/orchestration_inbox.py",
     "src/services/operator_interventions.py",
     "src/services/packet_branch.py",

@@ -106,6 +106,17 @@ FACTORY_COLUMNS = {
         ("created_at", "TIMESTAMP WITH TIME ZONE"),
         ("updated_at", "TIMESTAMP WITH TIME ZONE"),
     ],
+    "inbox_conversions": [
+        ("workspace_id", "INTEGER"),
+        ("inbox_item_id", "INTEGER"),
+        ("target_type", "VARCHAR(32)"),
+        ("target_id", "INTEGER"),
+        ("conversion_status", "VARCHAR(32)"),
+        ("conversion_notes", "TEXT"),
+        ("operator_notes", "TEXT"),
+        ("created_at", "TIMESTAMP WITH TIME ZONE"),
+        ("updated_at", "TIMESTAMP WITH TIME ZONE"),
+    ],
     "operator_interventions": [
         ("workspace_id", "INTEGER"),
         ("title", "VARCHAR(255)"),

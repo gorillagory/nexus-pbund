@@ -159,6 +159,29 @@ class OrchestrationInboxItem(Base):
     updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
+class InboxConversion(Base):
+    __tablename__ = "inbox_conversions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    workspace_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("workspaces.id"), nullable=False
+    )
+    inbox_item_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("orchestration_inbox_items.id"), nullable=False
+    )
+    target_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    target_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    conversion_status: Mapped[str] = mapped_column(
+        String(32), nullable=False, default="converted", server_default="converted"
+    )
+    conversion_notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    operator_notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
 class OperatorIntervention(Base):
     __tablename__ = "operator_interventions"
 
