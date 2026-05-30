@@ -42,6 +42,8 @@ window.NexusApp = {
     latestPacketBranchStatus: null,
     orchestrationInboxItems: [],
     selectedOrchestrationInboxItem: null,
+    operatorInterventions: [],
+    selectedOperatorIntervention: null,
     promptVaultTemplates: [],
     selectedPromptTemplate: null,
 
@@ -52,6 +54,7 @@ window.NexusApp = {
             board: "board",
             git: "git-explorer",
             inbox: "orchestration-inbox",
+            interventions: "operator-interventions",
             prompts: "prompt-vault",
             history: "history",
             canvas: "canvas",
@@ -69,6 +72,7 @@ window.NexusApp = {
             board: "board",
             "git-explorer": "git",
             "orchestration-inbox": "inbox",
+            "operator-interventions": "interventions",
             "prompt-vault": "prompts",
             history: "history",
             canvas: "canvas",
@@ -82,6 +86,7 @@ window.NexusApp = {
             board: "Orchestration Board",
             "git-explorer": "Git Explorer",
             "orchestration-inbox": "Orchestration Inbox",
+            "operator-interventions": "Operator Intervention Queue",
             "prompt-vault": "Prompt Vault",
             history: "Project History",
             canvas: "Architecture Canvas",
@@ -129,6 +134,11 @@ window.NexusApp = {
 
         if (tab === "inbox") {
             this.loadOrchestrationInboxItems();
+            return;
+        }
+
+        if (tab === "interventions") {
+            this.loadOperatorInterventions();
             return;
         }
 
@@ -2845,6 +2855,210 @@ window.NexusApp = {
             NexusCore.showToast("Inbox item discarded.", "success");
         } catch (error) {
             NexusCore.showToast(`Discard error: ${error.message}`, "error");
+        }
+    },
+
+    async loadOperatorInterventions() {
+        const list = document.getElementById("operator-intervention-list");
+        const statusFilter = document.getElementById("operator-intervention-status-filter");
+        const severityFilter = document.getElementById("operator-intervention-severity-filter");
+        const params = new URLSearchParams();
+        if (statusFilter?.value) params.set("status", statusFilter.value);
+        if (severityFilter?.value) params.set("severity", severityFilter.value);
+        if (list) {
+            list.textContent = "Loading Operator Intervention Queue...";
+        }
+        try {
+            const query = params.toString() ? `?${params.toString()}` : "";
+            const response = await fetch(`/api/operator-interventions${query}`);
+            const data = await response.json();
+            if (!response.ok || data.status !== "success") {
+                throw new Error(data.message || "Unable to load operator interventions.");
+            }
+            this.operatorInterventions = Array.isArray(data.items) ? data.items : [];
+            this.renderOperatorInterventionList();
+            const selectedId = this.selectedOperatorIntervention?.id;
+            const selected = this.operatorInterventions.find((item) => Number(item.id) === Number(selectedId))
+                || this.operatorInterventions[0]
+                || null;
+            this.renderOperatorInterventionDetail(selected);
+        } catch (error) {
+            if (list) {
+                list.textContent = `Operator Intervention Queue unavailable: ${error.message}`;
+            }
+            NexusCore.showToast(`Intervention queue error: ${error.message}`, "error");
+        }
+    },
+
+    renderOperatorInterventionList() {
+        const list = document.getElementById("operator-intervention-list");
+        const count = document.getElementById("operator-intervention-open-count");
+        if (count) {
+            const openCount = this.operatorInterventions.filter((item) => item.status === "open").length;
+            count.textContent = String(openCount);
+        }
+        if (!list) return;
+        if (!this.operatorInterventions.length) {
+            list.innerHTML = '<div class="text-secondary small">No intervention items match this filter.</div>';
+            return;
+        }
+        list.innerHTML = this.operatorInterventions.map((item) => `
+            <button type="button" class="operator-intervention-list-item" onclick="NexusApp.selectOperatorIntervention(${Number(item.id) || 0})">
+                <span class="operator-intervention-list-title">${this.escapeHtml(item.title || "Untitled")}</span>
+                <span class="operator-intervention-list-meta">
+                    <span class="prompt-vault-badge operator-intervention-status-${this.escapeHtml(item.status || "open")}">${this.escapeHtml(item.status || "open")}</span>
+                    <span class="prompt-vault-badge operator-intervention-severity-${this.escapeHtml(item.severity || "warning")}">${this.escapeHtml(item.severity || "warning")}</span>
+                    ${item.category ? `<span class="prompt-vault-badge">${this.escapeHtml(item.category)}</span>` : ""}
+                </span>
+                <span class="text-secondary small">${this.escapeHtml(item.source_type || "manual")} ${item.source_id ? `#${this.escapeHtml(item.source_id)}` : ""} | ${this.escapeHtml(this.formatFactoryTime(item.created_at))}</span>
+            </button>
+        `).join("");
+    },
+
+    selectOperatorIntervention(itemId) {
+        const item = this.operatorInterventions.find((candidate) => Number(candidate.id) === Number(itemId));
+        this.renderOperatorInterventionDetail(item || null);
+    },
+
+    renderOperatorInterventionDetail(item) {
+        this.selectedOperatorIntervention = item || null;
+        const emptyState = document.getElementById("operator-intervention-empty");
+        const form = document.getElementById("operator-intervention-detail-form");
+        const meta = document.getElementById("operator-intervention-detail-meta");
+        if (!form || !emptyState) return;
+
+        if (!item) {
+            emptyState.classList.remove("d-none");
+            form.classList.add("d-none");
+            return;
+        }
+
+        emptyState.classList.add("d-none");
+        form.classList.remove("d-none");
+        document.getElementById("operator-intervention-item-id").value = item.id || "";
+        document.getElementById("operator-intervention-detail-title").value = item.title || "";
+        document.getElementById("operator-intervention-detail-details").value = item.details || "";
+        document.getElementById("operator-intervention-detail-severity").value = item.severity || "warning";
+        document.getElementById("operator-intervention-detail-category").value = item.category || "";
+        document.getElementById("operator-intervention-detail-recommended-action").value = item.recommended_action || "";
+        document.getElementById("operator-intervention-detail-notes").value = item.operator_notes || "";
+        if (meta) {
+            meta.textContent = `Status ${item.status || "open"} | Source ${item.source_type || "manual"} | Created ${this.formatFactoryTime(item.created_at)} | Updated ${this.formatFactoryTime(item.updated_at)}`;
+        }
+    },
+
+    operatorInterventionCreateData() {
+        return {
+            title: document.getElementById("operator-intervention-title")?.value || "",
+            details: document.getElementById("operator-intervention-details")?.value || "",
+            severity: document.getElementById("operator-intervention-severity")?.value || "warning",
+            category: document.getElementById("operator-intervention-category")?.value || "",
+            source_type: document.getElementById("operator-intervention-source-type")?.value || "manual",
+            source_id: document.getElementById("operator-intervention-source-id")?.value || "",
+            recommended_action: document.getElementById("operator-intervention-recommended-action")?.value || "",
+        };
+    },
+
+    async createOperatorIntervention() {
+        const button = document.getElementById("operator-intervention-create-button");
+        const originalLabel = button?.textContent;
+        if (button) {
+            button.disabled = true;
+            button.textContent = "Adding...";
+        }
+        try {
+            const response = await fetch("/api/operator-interventions", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(this.operatorInterventionCreateData()),
+            });
+            const payload = await response.json();
+            if (!response.ok || payload.status !== "success") {
+                throw new Error(payload.message || "Unable to create intervention item.");
+            }
+            document.getElementById("operator-intervention-create-form")?.reset();
+            await this.loadOperatorInterventions();
+            this.renderOperatorInterventionDetail(payload.item);
+            NexusCore.showToast("Operator intervention item added.", "success");
+        } catch (error) {
+            NexusCore.showToast(`Intervention create error: ${error.message}`, "error");
+        } finally {
+            if (button) {
+                button.disabled = false;
+                button.textContent = originalLabel || "Add Intervention";
+            }
+        }
+    },
+
+    operatorInterventionUpdateData() {
+        return {
+            title: document.getElementById("operator-intervention-detail-title")?.value || "",
+            details: document.getElementById("operator-intervention-detail-details")?.value || "",
+            severity: document.getElementById("operator-intervention-detail-severity")?.value || "warning",
+            category: document.getElementById("operator-intervention-detail-category")?.value || "",
+            recommended_action: document.getElementById("operator-intervention-detail-recommended-action")?.value || "",
+            operator_notes: document.getElementById("operator-intervention-detail-notes")?.value || "",
+        };
+    },
+
+    async updateSelectedOperatorIntervention() {
+        const itemId = this.selectedOperatorIntervention?.id;
+        if (!itemId) return;
+        try {
+            const response = await fetch(`/api/operator-interventions/${itemId}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(this.operatorInterventionUpdateData()),
+            });
+            const payload = await response.json();
+            if (!response.ok || payload.status !== "success") {
+                throw new Error(payload.message || "Unable to update intervention item.");
+            }
+            await this.loadOperatorInterventions();
+            this.renderOperatorInterventionDetail(payload.item);
+            NexusCore.showToast("Operator intervention updated.", "success");
+        } catch (error) {
+            NexusCore.showToast(`Intervention update error: ${error.message}`, "error");
+        }
+    },
+
+    async changeSelectedOperatorInterventionStatus(action) {
+        const itemId = this.selectedOperatorIntervention?.id;
+        const labels = {
+            acknowledge: "Acknowledge",
+            resolve: "Resolve",
+            dismiss: "Dismiss",
+        };
+        const pastTense = {
+            acknowledge: "acknowledged",
+            resolve: "resolved",
+            dismiss: "dismissed",
+        };
+        if (!itemId || !labels[action]) return;
+        if (!(await NexusCore.confirmAction(`${labels[action]} this intervention item?`, {
+            title: `${labels[action]} Intervention`,
+            confirmLabel: labels[action],
+            variant: action === "dismiss" ? "warning" : "primary",
+        }))) {
+            return;
+        }
+        try {
+            const response = await fetch(`/api/operator-interventions/${itemId}/${action}`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    operator_notes: document.getElementById("operator-intervention-detail-notes")?.value || "",
+                }),
+            });
+            const payload = await response.json();
+            if (!response.ok || payload.status !== "success") {
+                throw new Error(payload.message || `Unable to ${action} intervention item.`);
+            }
+            await this.loadOperatorInterventions();
+            this.renderOperatorInterventionDetail(payload.item);
+            NexusCore.showToast(`Intervention item ${pastTense[action]}.`, "success");
+        } catch (error) {
+            NexusCore.showToast(`Intervention status error: ${error.message}`, "error");
         }
     },
 

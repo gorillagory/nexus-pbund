@@ -4,7 +4,7 @@
 - Current branch: `main`
 - Current commit at prior chat handoff: `208dbdbaecd646b013a590fae2db32d06daff408`
 - Prior chat handoff summary: `208dbdb add chat handoff for next session`
-- Latest Packet 024 baseline tag: `nexus-git-explorer-baseline-2026-05-30`
+- Latest Packet 026 baseline tag: `nexus-operator-intervention-queue-baseline-2026-05-30`
 - Recent visible baseline tags:
   - `nexus-workflow-lock-prompt-vault-baseline-2026-05-29`
   - `nexus-recovery-audit-baseline-2026-05-29`
@@ -26,6 +26,7 @@
 - Discord Event Router
 - Git Explorer
 - Branch Per Packet
+- Operator Intervention Queue
 - Workflow Lock docs
 - Orchestration-ready workflow foundation
 - Supervised packet runner
@@ -85,7 +86,7 @@
 - Packet 023 — Discord Event Router complete
 - Packet 024 — Git Explorer complete
 - Packet 025 — Branch Per Packet complete
-- Packet 026 — Operator Intervention Queue
+- Packet 026 — Operator Intervention Queue complete
 - Packet 027 — Trusted Packet Mode
 
 ## New Chat Startup Instructions
@@ -113,4 +114,4 @@ Prefer one pasteable Codex operator prompt for local execution. Reduce manual co
 
 Keep the safety rails in this document. Do not force push, reset, clean, run destructive database operations, expose API keys, or start Auto-Pilot unless the user explicitly asks for that exact work.
 
-Packet 025 adds the supervised Branch Per Packet foundation. After it is merged and tagged, continue with Packet 026 — Operator Intervention Queue unless repo docs say otherwise.
+Packet 026 adds the Operator Intervention Queue foundation. After it is merged and tagged, continue with Packet 027 — Trusted Packet Mode unless repo docs say otherwise.

@@ -30,6 +30,7 @@ PY_COMPILE_FILES = [
     "src/services/git_changes.py",
     "src/services/git_explorer.py",
     "src/services/orchestration_inbox.py",
+    "src/services/operator_interventions.py",
     "src/services/packet_branch.py",
     "src/services/prompt_vault.py",
 ]

@@ -99,6 +99,23 @@ FACTORY_COLUMNS = {
         ("created_at", "TIMESTAMP WITH TIME ZONE"),
         ("updated_at", "TIMESTAMP WITH TIME ZONE"),
     ],
+    "operator_interventions": [
+        ("workspace_id", "INTEGER"),
+        ("title", "VARCHAR(255)"),
+        ("details", "TEXT"),
+        ("source_type", "VARCHAR(64)"),
+        ("source_id", "VARCHAR(128)"),
+        ("severity", "VARCHAR(32)"),
+        ("status", "VARCHAR(32)"),
+        ("category", "VARCHAR(64)"),
+        ("recommended_action", "TEXT"),
+        ("operator_notes", "TEXT"),
+        ("context_json", "TEXT"),
+        ("created_at", "TIMESTAMP WITH TIME ZONE"),
+        ("updated_at", "TIMESTAMP WITH TIME ZONE"),
+        ("acknowledged_at", "TIMESTAMP WITH TIME ZONE"),
+        ("resolved_at", "TIMESTAMP WITH TIME ZONE"),
+    ],
 }
 
 

@@ -338,6 +338,9 @@
                 <button type="button" id="tab-inbox-btn" class="nav-link text-start" onclick="NexusApp.showView('orchestration-inbox')">
                     <i class="bi bi-inbox me-3"></i>Orchestration Inbox
                 </button>
+                <button type="button" id="tab-interventions-btn" class="nav-link text-start" onclick="NexusApp.showView('operator-interventions')">
+                    <i class="bi bi-clipboard-check me-3"></i>Intervention Queue
+                </button>
                 <button type="button" id="tab-prompts-btn" class="nav-link text-start" onclick="NexusApp.showView('prompt-vault')">
                     <i class="bi bi-journal-text me-3"></i>Prompt Vault
                 </button>
@@ -827,6 +830,149 @@
                                         </form>
                                     </section>
                                     <span class="d-none">/api/orchestration-inbox/items Orchestration Inbox captured triaged staged discarded</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="view-operator-interventions" class="spa-view d-none">
+                    <div class="card bg-white border-0 shadow-sm">
+                        <div class="card-header bg-white border-bottom p-4 d-flex justify-content-between align-items-start gap-3 flex-wrap">
+                            <div>
+                                <h3 class="h5 mb-1 text-dark">Operator Intervention Queue</h3>
+                                <p class="text-secondary mb-0">Human review and decision tracking only. It records blockers without running tasks, packets, Codex, recovery, Git actions, or Auto-Pilot.</p>
+                            </div>
+                            <button type="button" class="btn btn-outline-primary btn-sm" onclick="NexusApp.loadOperatorInterventions()">
+                                <i class="bi bi-arrow-repeat me-2"></i>Refresh Queue
+                            </button>
+                        </div>
+                        <div class="card-body p-4">
+                            <div class="row g-4">
+                                <div class="col-xl-4">
+                                    <form id="operator-intervention-create-form" class="operator-intervention-panel mb-3" onsubmit="NexusApp.createOperatorIntervention(); return false;">
+                                        <h4 class="h6 fw-semibold mb-3">Add Intervention</h4>
+                                        <div class="mb-2">
+                                            <label for="operator-intervention-title" class="form-label small text-secondary mb-1">Title</label>
+                                            <input id="operator-intervention-title" class="form-control form-control-sm" maxlength="255" autocomplete="off" required>
+                                        </div>
+                                        <div class="mb-2">
+                                            <label for="operator-intervention-details" class="form-label small text-secondary mb-1">Details</label>
+                                            <textarea id="operator-intervention-details" class="form-control form-control-sm" rows="5" required></textarea>
+                                        </div>
+                                        <div class="row g-2 mb-2">
+                                            <div class="col-6">
+                                                <label for="operator-intervention-severity" class="form-label small text-secondary mb-1">Severity</label>
+                                                <select id="operator-intervention-severity" class="form-select form-select-sm">
+                                                    <option value="warning">warning</option>
+                                                    <option value="info">info</option>
+                                                    <option value="blocked">blocked</option>
+                                                    <option value="critical">critical</option>
+                                                </select>
+                                            </div>
+                                            <div class="col-6">
+                                                <label for="operator-intervention-category" class="form-label small text-secondary mb-1">Category</label>
+                                                <input id="operator-intervention-category" class="form-control form-control-sm" maxlength="64" placeholder="review, blocker">
+                                            </div>
+                                        </div>
+                                        <div class="row g-2 mb-2">
+                                            <div class="col-6">
+                                                <label for="operator-intervention-source-type" class="form-label small text-secondary mb-1">Source</label>
+                                                <input id="operator-intervention-source-type" class="form-control form-control-sm" maxlength="64" value="manual">
+                                            </div>
+                                            <div class="col-6">
+                                                <label for="operator-intervention-source-id" class="form-label small text-secondary mb-1">Source ID</label>
+                                                <input id="operator-intervention-source-id" class="form-control form-control-sm" maxlength="128">
+                                            </div>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label for="operator-intervention-recommended-action" class="form-label small text-secondary mb-1">Recommended Action</label>
+                                            <textarea id="operator-intervention-recommended-action" class="form-control form-control-sm" rows="3"></textarea>
+                                        </div>
+                                        <button id="operator-intervention-create-button" type="submit" class="btn btn-primary btn-sm">Add Intervention</button>
+                                    </form>
+
+                                    <div class="operator-intervention-panel">
+                                        <div class="d-flex justify-content-between align-items-center gap-2 mb-3">
+                                            <h4 class="h6 fw-semibold mb-0">Queue Items</h4>
+                                            <span id="operator-intervention-open-count" class="badge text-bg-light border text-secondary">0</span>
+                                        </div>
+                                        <div class="row g-2 mb-3">
+                                            <div class="col-6">
+                                                <label for="operator-intervention-status-filter" class="form-label small text-secondary mb-1">Status</label>
+                                                <select id="operator-intervention-status-filter" class="form-select form-select-sm" onchange="NexusApp.loadOperatorInterventions()">
+                                                    <option value="">All</option>
+                                                    <option value="open">open</option>
+                                                    <option value="acknowledged">acknowledged</option>
+                                                    <option value="resolved">resolved</option>
+                                                    <option value="dismissed">dismissed</option>
+                                                </select>
+                                            </div>
+                                            <div class="col-6">
+                                                <label for="operator-intervention-severity-filter" class="form-label small text-secondary mb-1">Severity</label>
+                                                <select id="operator-intervention-severity-filter" class="form-select form-select-sm" onchange="NexusApp.loadOperatorInterventions()">
+                                                    <option value="">All</option>
+                                                    <option value="info">info</option>
+                                                    <option value="warning">warning</option>
+                                                    <option value="blocked">blocked</option>
+                                                    <option value="critical">critical</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div id="operator-intervention-list" class="operator-intervention-list text-secondary small">Load queue items to begin.</div>
+                                    </div>
+                                </div>
+                                <div class="col-xl-8">
+                                    <section class="operator-intervention-detail">
+                                        <div id="operator-intervention-empty" class="text-secondary small">Select an intervention item to review it.</div>
+                                        <form id="operator-intervention-detail-form" class="d-none" onsubmit="NexusApp.updateSelectedOperatorIntervention(); return false;">
+                                            <input id="operator-intervention-item-id" type="hidden">
+                                            <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-3">
+                                                <div>
+                                                    <h4 class="h5 fw-semibold mb-1">Review Intervention</h4>
+                                                    <div id="operator-intervention-detail-meta" class="text-secondary small"></div>
+                                                </div>
+                                                <div class="d-flex gap-2 flex-wrap">
+                                                    <button type="submit" class="btn btn-primary btn-sm">Save Notes</button>
+                                                    <button type="button" class="btn btn-outline-secondary btn-sm" onclick="NexusApp.changeSelectedOperatorInterventionStatus('acknowledge')">Acknowledge</button>
+                                                    <button type="button" class="btn btn-outline-success btn-sm" onclick="NexusApp.changeSelectedOperatorInterventionStatus('resolve')">Resolve</button>
+                                                    <button type="button" class="btn btn-outline-warning btn-sm" onclick="NexusApp.changeSelectedOperatorInterventionStatus('dismiss')">Dismiss</button>
+                                                </div>
+                                            </div>
+                                            <div class="mb-2">
+                                                <label for="operator-intervention-detail-title" class="form-label small text-secondary mb-1">Title</label>
+                                                <input id="operator-intervention-detail-title" class="form-control form-control-sm" maxlength="255" autocomplete="off">
+                                            </div>
+                                            <div class="mb-2">
+                                                <label for="operator-intervention-detail-details" class="form-label small text-secondary mb-1">Details</label>
+                                                <textarea id="operator-intervention-detail-details" class="form-control form-control-sm" rows="6"></textarea>
+                                            </div>
+                                            <div class="row g-2 mb-2">
+                                                <div class="col-md-6">
+                                                    <label for="operator-intervention-detail-severity" class="form-label small text-secondary mb-1">Severity</label>
+                                                    <select id="operator-intervention-detail-severity" class="form-select form-select-sm">
+                                                        <option value="info">info</option>
+                                                        <option value="warning">warning</option>
+                                                        <option value="blocked">blocked</option>
+                                                        <option value="critical">critical</option>
+                                                    </select>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <label for="operator-intervention-detail-category" class="form-label small text-secondary mb-1">Category</label>
+                                                    <input id="operator-intervention-detail-category" class="form-control form-control-sm" maxlength="64">
+                                                </div>
+                                            </div>
+                                            <div class="mb-2">
+                                                <label for="operator-intervention-detail-recommended-action" class="form-label small text-secondary mb-1">Recommended Action</label>
+                                                <textarea id="operator-intervention-detail-recommended-action" class="form-control form-control-sm" rows="4"></textarea>
+                                            </div>
+                                            <div class="mb-0">
+                                                <label for="operator-intervention-detail-notes" class="form-label small text-secondary mb-1">Operator Notes</label>
+                                                <textarea id="operator-intervention-detail-notes" class="form-control form-control-sm" rows="5"></textarea>
+                                            </div>
+                                        </form>
+                                    </section>
+                                    <span class="d-none">/api/operator-interventions Operator Intervention Queue open acknowledged resolved dismissed info warning blocked critical</span>
                                 </div>
                             </div>
                         </div>

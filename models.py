@@ -159,6 +159,31 @@ class OrchestrationInboxItem(Base):
     updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
+class OperatorIntervention(Base):
+    __tablename__ = "operator_interventions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    workspace_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("workspaces.id"), nullable=False
+    )
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    details: Mapped[str] = mapped_column(Text, nullable=False)
+    source_type: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    source_id: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    severity: Mapped[str] = mapped_column(String(32), nullable=False, default="warning", server_default="warning")
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="open", server_default="open")
+    category: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    recommended_action: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    operator_notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    context_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    acknowledged_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    resolved_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
 class WorkPacket(Base):
     __tablename__ = "work_packets"
 

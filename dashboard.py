@@ -69,6 +69,16 @@ from src.services.orchestration_inbox import (
     serialize_inbox_item,
     update_inbox_item,
 )
+from src.services.operator_interventions import (
+    acknowledge_intervention,
+    create_intervention,
+    dismiss_intervention,
+    get_intervention,
+    list_interventions,
+    resolve_intervention,
+    serialize_intervention,
+    update_intervention,
+)
 from src.services.packet_branch import packet_branch_status, prepare_packet_branch
 from src.services.prompt_vault import (
     archive_prompt_template,
@@ -2122,6 +2132,141 @@ class NexusDashboard:
             except Exception as exception:
                 db.rollback()
                 return jsonify({"status": "error", "message": "Inbox item could not be discarded: {}".format(exception)}), 503
+            finally:
+                db_context.close()
+
+        @self.app.route("/api/operator-interventions", methods=["GET"])
+        def get_operator_interventions_route():
+            status = request.args.get("status") or None
+            severity = request.args.get("severity") or None
+            db_context = get_db()
+            db = next(db_context)
+            try:
+                workspace_id = get_workspace_id(self.engine.target_dir)
+                if workspace_id is None:
+                    return jsonify({"status": "error", "message": "Active workspace not found."}), 400
+                items = list_interventions(db, workspace_id, status=status, severity=severity)
+                return jsonify(
+                    {
+                        "status": "success",
+                        "items": [serialize_intervention(item) for item in items],
+                    }
+                )
+            except Exception as exception:
+                return jsonify({"status": "error", "message": "Operator interventions unavailable: {}".format(exception)}), 503
+            finally:
+                db_context.close()
+
+        @self.app.route("/api/operator-interventions", methods=["POST"])
+        def post_operator_intervention_route():
+            payload = request.get_json(silent=True) or {}
+            if not isinstance(payload, dict):
+                return jsonify({"status": "error", "message": "JSON object is required."}), 400
+            db_context = get_db()
+            db = next(db_context)
+            try:
+                workspace_id = get_workspace_id(self.engine.target_dir)
+                if workspace_id is None:
+                    return jsonify({"status": "error", "message": "Active workspace not found."}), 400
+                item = create_intervention(db, workspace_id, payload)
+                return jsonify({"status": "success", "item": serialize_intervention(item)}), 201
+            except ValueError as exception:
+                db.rollback()
+                return jsonify({"status": "error", "message": str(exception)}), 400
+            except Exception as exception:
+                db.rollback()
+                return jsonify({"status": "error", "message": "Operator intervention could not be created: {}".format(exception)}), 503
+            finally:
+                db_context.close()
+
+        @self.app.route("/api/operator-interventions/<int:intervention_id>", methods=["PATCH"])
+        def patch_operator_intervention_route(intervention_id):
+            payload = request.get_json(silent=True) or {}
+            if not isinstance(payload, dict):
+                return jsonify({"status": "error", "message": "JSON object is required."}), 400
+            db_context = get_db()
+            db = next(db_context)
+            try:
+                workspace_id = get_workspace_id(self.engine.target_dir)
+                if workspace_id is None:
+                    return jsonify({"status": "error", "message": "Active workspace not found."}), 400
+                item = get_intervention(db, workspace_id, intervention_id)
+                if item is None:
+                    return jsonify({"status": "error", "message": "Operator intervention not found."}), 404
+                item = update_intervention(db, item, payload)
+                return jsonify({"status": "success", "item": serialize_intervention(item)})
+            except ValueError as exception:
+                db.rollback()
+                return jsonify({"status": "error", "message": str(exception)}), 400
+            except Exception as exception:
+                db.rollback()
+                return jsonify({"status": "error", "message": "Operator intervention could not be updated: {}".format(exception)}), 503
+            finally:
+                db_context.close()
+
+        @self.app.route("/api/operator-interventions/<int:intervention_id>/acknowledge", methods=["POST"])
+        def acknowledge_operator_intervention_route(intervention_id):
+            payload = request.get_json(silent=True) or {}
+            if not isinstance(payload, dict):
+                return jsonify({"status": "error", "message": "JSON object is required."}), 400
+            db_context = get_db()
+            db = next(db_context)
+            try:
+                workspace_id = get_workspace_id(self.engine.target_dir)
+                if workspace_id is None:
+                    return jsonify({"status": "error", "message": "Active workspace not found."}), 400
+                item = get_intervention(db, workspace_id, intervention_id)
+                if item is None:
+                    return jsonify({"status": "error", "message": "Operator intervention not found."}), 404
+                item = acknowledge_intervention(db, item, operator_notes=payload.get("operator_notes"))
+                return jsonify({"status": "success", "item": serialize_intervention(item)})
+            except Exception as exception:
+                db.rollback()
+                return jsonify({"status": "error", "message": "Operator intervention could not be acknowledged: {}".format(exception)}), 503
+            finally:
+                db_context.close()
+
+        @self.app.route("/api/operator-interventions/<int:intervention_id>/resolve", methods=["POST"])
+        def resolve_operator_intervention_route(intervention_id):
+            payload = request.get_json(silent=True) or {}
+            if not isinstance(payload, dict):
+                return jsonify({"status": "error", "message": "JSON object is required."}), 400
+            db_context = get_db()
+            db = next(db_context)
+            try:
+                workspace_id = get_workspace_id(self.engine.target_dir)
+                if workspace_id is None:
+                    return jsonify({"status": "error", "message": "Active workspace not found."}), 400
+                item = get_intervention(db, workspace_id, intervention_id)
+                if item is None:
+                    return jsonify({"status": "error", "message": "Operator intervention not found."}), 404
+                item = resolve_intervention(db, item, operator_notes=payload.get("operator_notes"))
+                return jsonify({"status": "success", "item": serialize_intervention(item)})
+            except Exception as exception:
+                db.rollback()
+                return jsonify({"status": "error", "message": "Operator intervention could not be resolved: {}".format(exception)}), 503
+            finally:
+                db_context.close()
+
+        @self.app.route("/api/operator-interventions/<int:intervention_id>/dismiss", methods=["POST"])
+        def dismiss_operator_intervention_route(intervention_id):
+            payload = request.get_json(silent=True) or {}
+            if not isinstance(payload, dict):
+                return jsonify({"status": "error", "message": "JSON object is required."}), 400
+            db_context = get_db()
+            db = next(db_context)
+            try:
+                workspace_id = get_workspace_id(self.engine.target_dir)
+                if workspace_id is None:
+                    return jsonify({"status": "error", "message": "Active workspace not found."}), 400
+                item = get_intervention(db, workspace_id, intervention_id)
+                if item is None:
+                    return jsonify({"status": "error", "message": "Operator intervention not found."}), 404
+                item = dismiss_intervention(db, item, operator_notes=payload.get("operator_notes"))
+                return jsonify({"status": "success", "item": serialize_intervention(item)})
+            except Exception as exception:
+                db.rollback()
+                return jsonify({"status": "error", "message": "Operator intervention could not be dismissed: {}".format(exception)}), 503
             finally:
                 db_context.close()
 

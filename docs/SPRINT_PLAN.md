@@ -18,6 +18,7 @@ Completed capabilities:
 - Packet 023 Discord Event Router foundation for authenticated Discord capture into the inbox.
 - Packet 024 Git Explorer foundation for read-only repository visibility.
 - Packet 025 Branch Per Packet foundation for supervised packet branch preparation.
+- Packet 026 Operator Intervention Queue foundation for human review and decision tracking.
 
 ## Sprint 2 Goal
 
@@ -30,7 +31,7 @@ Remote-operable supervised factory. The operator should be able to capture inten
 3. Discord Event Router. Complete as Packet 023 foundation.
 4. Git Explorer. Complete as Packet 024 foundation.
 5. Branch Per Packet. Complete as Packet 025 foundation.
-6. Operator Intervention Queue.
+6. Operator Intervention Queue. Complete as Packet 026 foundation.
 7. Trusted Packet Mode.
 
 Inbox capture rule: raw ideas are captured first, then triaged into a scoped task, work packet, document update, or explicit discard. The inbox must not execute work.
@@ -40,6 +41,8 @@ Discord router rule: Discord-originated intent is accepted only through the capt
 Git Explorer rule: dashboard Git inspection is read-only. It may show branch, status, commits, baseline tags, changed files, diff stat, and bounded redacted diff previews. It must not expose git write actions. Branch Per Packet remains Packet 025.
 
 Branch Per Packet rule: the app may only prepare a validated `factory/packet-###-safe-slug` branch from clean `main` after explicit operator confirmation. It must not commit, merge, push, pull, fetch, reset, clean, rebase, stash, tag, delete branches, or expose arbitrary checkout.
+
+Operator Intervention Queue rule: the queue records human review items, blockers, recommended actions, and operator notes. It may acknowledge, resolve, dismiss, and update queue records only. It must not execute tasks, run packets, run Codex, retry or continue failed runs, recover automatically, perform Git actions, or start Auto-Pilot.
 
 Local configuration:
 
