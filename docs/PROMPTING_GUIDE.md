@@ -44,6 +44,7 @@ Codex should inspect local context, make routine implementation decisions, run v
 - Use one Codex operator prompt.
 - Let Codex run git, verification, and report writing itself.
 - Write final reports to `/tmp`.
+- Use Simple Operator Flow as the primary lane for routine work: capture one request, generate and review one draft, prepare one work packet, explicitly approve one selected run, and track the result.
 - Keep reusable successful prompts in the Prompt Vault.
 - Use Packet Drafting Assistant to generate, edit, save, review, and copy packet prompts from Prompt Vault templates and selected context. It is draft-only and does not execute the prompt.
 - Use Work Packet Readiness Checklist before trust or supervised execution to identify missing safety, scope, verification, and report metadata. It is guidance only and does not trust or execute packets.
@@ -62,3 +63,4 @@ Codex should inspect local context, make routine implementation decisions, run v
 - Do not start Auto-Pilot unless explicitly building or testing it.
 - Do not force push, reset, clean, or delete data without explicit instruction.
 - Do not treat a generated packet draft as trusted or executable until the operator explicitly reviews and chooses the supervised execution path.
+- Do not use Simple Operator Flow to bypass Trusted Packet Mode, Auto-Pilot lock, Discord capture/notification boundaries, or explicit `confirm_run=true` approval.

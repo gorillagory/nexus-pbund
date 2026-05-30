@@ -131,6 +131,17 @@ from src.services.prompt_vault import (
     serialize_prompt_template,
     update_prompt_template,
 )
+from src.services.simple_operator_flow import (
+    create_simple_request,
+    evaluate_simple_readiness,
+    generate_simple_draft,
+    get_simple_flow_item,
+    list_simple_flows,
+    prepare_simple_work_packet,
+    serialize_simple_flow,
+    simple_run_blockers,
+    update_simple_draft,
+)
 from src.services.trusted_packets import (
     mark_packet_trusted,
     packet_trust_eligible,
@@ -3226,6 +3237,412 @@ class NexusDashboard:
                     "validation": validate_required_sections(payload.get("draft_body") or ""),
                 }
             )
+
+        @self.app.route("/api/simple-operator/status", methods=["GET"])
+        def get_simple_operator_status():
+            db_context = get_db()
+            db = next(db_context)
+            try:
+                workspace_id = get_workspace_id(self.engine.target_dir)
+                if workspace_id is None:
+                    return jsonify({"status": "error", "message": "Active workspace not found."}), 400
+                return jsonify(
+                    {
+                        "status": "success",
+                        "simple_operator": {
+                            "mode": "explicit_one_item_flow",
+                            "execution_mode": self.engine.get_execution_mode(),
+                            "automatic_analysis_enabled": self.engine.is_automatic_analysis_enabled(),
+                            "trusted_packet_mode_enabled": bool(self.engine.settings.get("trusted_packet_mode_enabled")),
+                            "flows": list_simple_flows(db, workspace_id, settings=self.engine.settings),
+                        },
+                    }
+                )
+            except Exception as exception:
+                return jsonify({"status": "error", "message": "Simple Operator Flow unavailable: {}".format(exception)}), 503
+            finally:
+                db_context.close()
+
+        @self.app.route("/api/simple-operator/request", methods=["POST"])
+        def create_simple_operator_request_route():
+            payload = request.get_json(silent=True) or {}
+            if not isinstance(payload, dict):
+                return jsonify({"status": "error", "message": "JSON object is required."}), 400
+            if payload.get("confirm_create") is not True:
+                return jsonify({"status": "error", "message": "confirm_create=true is required."}), 400
+            db_context = get_db()
+            db = next(db_context)
+            try:
+                workspace_id = get_workspace_id(self.engine.target_dir)
+                if workspace_id is None:
+                    return jsonify({"status": "error", "message": "Active workspace not found."}), 400
+                item = create_simple_request(db, workspace_id, payload)
+                _safe_create_review_event(
+                    db,
+                    workspace_id,
+                    event_type="simple_operator_flow",
+                    action="request_created",
+                    title="Simple Operator request captured",
+                    summary="Simple Operator Flow request #{} was captured for drafting.".format(item.id),
+                    source_type="orchestration_inbox_item",
+                    source_id=str(item.id),
+                    severity="info",
+                    status="captured",
+                )
+                return jsonify({"status": "success", "flow": serialize_simple_flow(db, workspace_id, item, settings=self.engine.settings)}), 201
+            except ValueError as exception:
+                db.rollback()
+                return jsonify({"status": "error", "message": str(exception)}), 400
+            except Exception as exception:
+                db.rollback()
+                return jsonify({"status": "error", "message": "Simple Operator request could not be captured: {}".format(exception)}), 503
+            finally:
+                db_context.close()
+
+        @self.app.route("/api/simple-operator/<int:flow_id>/draft", methods=["POST"])
+        def generate_simple_operator_draft_route(flow_id):
+            payload = request.get_json(silent=True) or {}
+            if not isinstance(payload, dict):
+                return jsonify({"status": "error", "message": "JSON object is required."}), 400
+            if payload.get("confirm_generate") is not True:
+                return jsonify({"status": "error", "message": "confirm_generate=true is required."}), 400
+            db_context = get_db()
+            db = next(db_context)
+            try:
+                workspace_id = get_workspace_id(self.engine.target_dir)
+                if workspace_id is None:
+                    return jsonify({"status": "error", "message": "Active workspace not found."}), 400
+                item = get_simple_flow_item(db, workspace_id, flow_id)
+                if item is None:
+                    return jsonify({"status": "error", "message": "Simple Operator request not found."}), 404
+                draft, validation = generate_simple_draft(db, workspace_id, item, payload)
+                _safe_create_review_event(
+                    db,
+                    workspace_id,
+                    event_type="simple_operator_flow",
+                    action="draft_generated",
+                    title="Simple Operator draft generated",
+                    summary="Simple Operator Flow draft #{} was generated for request #{}.".format(draft.id, item.id),
+                    source_type="packet_prompt_draft",
+                    source_id=str(draft.id),
+                    related_type="orchestration_inbox_item",
+                    related_id=str(item.id),
+                    severity="info",
+                    status="drafted",
+                )
+                return jsonify(
+                    {
+                        "status": "success",
+                        "draft": serialize_packet_prompt_draft(draft),
+                        "validation": validation,
+                        "flow": serialize_simple_flow(db, workspace_id, item, settings=self.engine.settings),
+                    }
+                )
+            except ValueError as exception:
+                db.rollback()
+                return jsonify({"status": "error", "message": str(exception)}), 400
+            except Exception as exception:
+                db.rollback()
+                return jsonify({"status": "error", "message": "Simple Operator draft could not be generated: {}".format(exception)}), 503
+            finally:
+                db_context.close()
+
+        @self.app.route("/api/simple-operator/<int:flow_id>/draft", methods=["PATCH"])
+        def update_simple_operator_draft_route(flow_id):
+            payload = request.get_json(silent=True) or {}
+            if not isinstance(payload, dict):
+                return jsonify({"status": "error", "message": "JSON object is required."}), 400
+            if payload.get("confirm_generate") is not True:
+                return jsonify({"status": "error", "message": "confirm_generate=true is required."}), 400
+            db_context = get_db()
+            db = next(db_context)
+            try:
+                workspace_id = get_workspace_id(self.engine.target_dir)
+                if workspace_id is None:
+                    return jsonify({"status": "error", "message": "Active workspace not found."}), 400
+                item = get_simple_flow_item(db, workspace_id, flow_id)
+                if item is None:
+                    return jsonify({"status": "error", "message": "Simple Operator request not found."}), 404
+                draft, validation = update_simple_draft(db, workspace_id, item, payload)
+                return jsonify(
+                    {
+                        "status": "success",
+                        "draft": serialize_packet_prompt_draft(draft),
+                        "validation": validation,
+                        "flow": serialize_simple_flow(db, workspace_id, item, settings=self.engine.settings),
+                    }
+                )
+            except ValueError as exception:
+                db.rollback()
+                return jsonify({"status": "error", "message": str(exception)}), 400
+            except Exception as exception:
+                db.rollback()
+                return jsonify({"status": "error", "message": "Simple Operator draft could not be updated: {}".format(exception)}), 503
+            finally:
+                db_context.close()
+
+        @self.app.route("/api/simple-operator/<int:flow_id>/prepare-work-packet", methods=["POST"])
+        def prepare_simple_operator_work_packet_route(flow_id):
+            payload = request.get_json(silent=True) or {}
+            if not isinstance(payload, dict):
+                return jsonify({"status": "error", "message": "JSON object is required."}), 400
+            if payload.get("confirm_prepare") is not True:
+                return jsonify({"status": "error", "message": "confirm_prepare=true is required."}), 400
+            db_context = get_db()
+            db = next(db_context)
+            try:
+                workspace_id = get_workspace_id(self.engine.target_dir)
+                if workspace_id is None:
+                    return jsonify({"status": "error", "message": "Active workspace not found."}), 400
+                item = get_simple_flow_item(db, workspace_id, flow_id)
+                if item is None:
+                    return jsonify({"status": "error", "message": "Simple Operator request not found."}), 404
+                work_packet = prepare_simple_work_packet(db, workspace_id, item, payload)
+                _safe_create_review_event(
+                    db,
+                    workspace_id,
+                    event_type="simple_operator_flow",
+                    action="work_packet_prepared",
+                    title="Simple Operator work packet prepared",
+                    summary="Simple Operator Flow prepared work packet #{} from request #{}.".format(work_packet.id, item.id),
+                    source_type="orchestration_inbox_item",
+                    source_id=str(item.id),
+                    related_type="work_packet",
+                    related_id=str(work_packet.id),
+                    severity="info",
+                    status="ready",
+                )
+                return jsonify({"status": "success", "flow": serialize_simple_flow(db, workspace_id, item, settings=self.engine.settings)})
+            except ValueError as exception:
+                db.rollback()
+                return jsonify({"status": "error", "message": str(exception)}), 400
+            except Exception as exception:
+                db.rollback()
+                return jsonify({"status": "error", "message": "Simple Operator work packet could not be prepared: {}".format(exception)}), 503
+            finally:
+                db_context.close()
+
+        @self.app.route("/api/simple-operator/<int:flow_id>/evaluate-readiness", methods=["POST"])
+        def evaluate_simple_operator_readiness_route(flow_id):
+            payload = request.get_json(silent=True) or {}
+            if not isinstance(payload, dict):
+                return jsonify({"status": "error", "message": "JSON object is required."}), 400
+            if payload.get("confirm_evaluate") is not True:
+                return jsonify({"status": "error", "message": "confirm_evaluate=true is required."}), 400
+            db_context = get_db()
+            db = next(db_context)
+            try:
+                workspace_id = get_workspace_id(self.engine.target_dir)
+                if workspace_id is None:
+                    return jsonify({"status": "error", "message": "Active workspace not found."}), 400
+                item = get_simple_flow_item(db, workspace_id, flow_id)
+                if item is None:
+                    return jsonify({"status": "error", "message": "Simple Operator request not found."}), 404
+                readiness = evaluate_simple_readiness(db, workspace_id, item, payload)
+                return jsonify(
+                    {
+                        "status": "success",
+                        "readiness": readiness,
+                        "flow": serialize_simple_flow(db, workspace_id, item, settings=self.engine.settings),
+                    }
+                )
+            except ValueError as exception:
+                db.rollback()
+                return jsonify({"status": "error", "message": str(exception)}), 400
+            except Exception as exception:
+                db.rollback()
+                return jsonify({"status": "error", "message": "Simple Operator readiness could not be evaluated: {}".format(exception)}), 503
+            finally:
+                db_context.close()
+
+        @self.app.route("/api/simple-operator/<int:flow_id>/approve-run", methods=["POST"])
+        def approve_simple_operator_run_route(flow_id):
+            payload = request.get_json(silent=True) or {}
+            if not isinstance(payload, dict):
+                return jsonify({"status": "error", "message": "JSON object is required."}), 400
+            if payload.get("confirm_run") is not True:
+                return jsonify({"status": "error", "message": "confirm_run=true is required."}), 400
+            execution_mode = self.engine.get_execution_mode()
+            db_context = get_db()
+            db = next(db_context)
+            try:
+                workspace_id = get_workspace_id(self.engine.target_dir)
+                if workspace_id is None:
+                    return jsonify({"status": "error", "message": "Active workspace not found."}), 400
+                item = get_simple_flow_item(db, workspace_id, flow_id)
+                if item is None:
+                    return jsonify({"status": "error", "message": "Simple Operator request not found."}), 404
+                flow = serialize_simple_flow(db, workspace_id, item, settings=self.engine.settings)
+                work_packet_id = (flow.get("work_packet") or {}).get("id")
+                work_packet = db.get(WorkPacket, work_packet_id) if work_packet_id else None
+                packet_links = []
+                packet_tasks = []
+                if work_packet is not None:
+                    packet_links = (
+                        db.execute(
+                            select(WorkPacketTask)
+                            .where(WorkPacketTask.work_packet_id == work_packet.id)
+                            .order_by(WorkPacketTask.position.asc(), WorkPacketTask.id.asc())
+                        )
+                        .scalars()
+                        .all()
+                    )
+                    for link in packet_links:
+                        task = db.get(Task, link.task_id)
+                        if task is not None and task.workspace_id == workspace_id:
+                            packet_tasks.append((link, task))
+                blockers = simple_run_blockers(self.engine.settings, work_packet, packet_tasks)
+                if work_packet is not None and len(packet_tasks) != 1:
+                    blockers.append("Simple Operator Flow can approve only one linked task.")
+                if execution_mode != "one_packet":
+                    blockers.append("Simple Operator Flow run approval requires execution mode one_packet.")
+                if blockers:
+                    try:
+                        intervention = create_intervention(
+                            db,
+                            workspace_id,
+                            {
+                                "title": "Simple Operator Flow blocked",
+                                "details": "Simple Operator request #{} is blocked: {}".format(item.id, "; ".join(blockers)),
+                                "source_type": "simple_operator_flow",
+                                "source_id": str(item.id),
+                                "severity": "blocked",
+                                "category": "simple_operator",
+                                "recommended_action": "Resolve the blocker, then approve one selected item again.",
+                                "context": {"flow_id": item.id, "work_packet_id": work_packet_id, "blockers": blockers},
+                            },
+                        )
+                        _ = intervention
+                    except Exception:
+                        db.rollback()
+                    _safe_send_operator_notification(
+                        db,
+                        workspace_id,
+                        self.engine.settings,
+                        event_type="simple_flow_blocked",
+                        severity="blocked",
+                        title="Simple Operator Flow blocked",
+                        summary="Request #{} blocked: {}".format(item.id, "; ".join(blockers)),
+                        dedupe_key="simple_flow_blocked:{}".format(item.id),
+                        dashboard_path="",
+                    )
+                    return jsonify(
+                        {
+                            "status": "blocked",
+                            "message": "Simple Operator Flow is blocked.",
+                            "blockers": blockers,
+                            "flow": serialize_simple_flow(db, workspace_id, item, settings=self.engine.settings),
+                        }
+                    ), 403
+
+                link, task = packet_tasks[0]
+                now = datetime.now(timezone.utc)
+                work_packet.status = "running"
+                work_packet.started_at = work_packet.started_at or now
+                link.status = "running"
+                link.started_at = now
+                _safe_db_commit(db)
+                _safe_create_factory_event(
+                    db,
+                    workspace_id,
+                    "simple_flow_run_started",
+                    "Simple Operator Flow run started: {}".format(work_packet.title),
+                    work_packet_id=work_packet.id,
+                    task_id=task.id,
+                    payload={"flow_id": item.id, "execution_mode": execution_mode},
+                )
+                _safe_send_operator_notification(
+                    db,
+                    workspace_id,
+                    self.engine.settings,
+                    event_type="simple_flow_run_started",
+                    severity="info",
+                    title="Simple Operator run started",
+                    summary="Simple Operator request #{} started packet #{}.".format(item.id, work_packet.id),
+                    dedupe_key="simple_flow_run_started:{}".format(item.id),
+                    dashboard_path="",
+                )
+                result = _execute_factory_task(
+                    db,
+                    db.get(Workspace, workspace_id),
+                    task,
+                    execution_mode,
+                    work_packet_id=work_packet.id,
+                    create_requested_event=True,
+                )
+                if result.get("status") == "success":
+                    link.status = "completed"
+                    link.completed_at = datetime.now(timezone.utc)
+                    work_packet.status = "completed"
+                    work_packet.completed_at = datetime.now(timezone.utc)
+                    item.status = "triaged"
+                    event_type = "simple_flow_run_passed"
+                    severity = "info"
+                    title = "Simple Operator run passed"
+                    message = "Simple Operator request #{} completed successfully.".format(item.id)
+                    status_code = 200
+                else:
+                    link.status = "failed"
+                    link.failed_at = datetime.now(timezone.utc)
+                    work_packet.status = "failed"
+                    work_packet.failed_at = datetime.now(timezone.utc)
+                    event_type = "simple_flow_run_failed"
+                    severity = "critical"
+                    title = "Simple Operator run failed"
+                    message = "Simple Operator request #{} failed with status {}.".format(item.id, result.get("status") or "failed")
+                    status_code = int(result.get("status_code") or 500)
+                _safe_create_factory_event(
+                    db,
+                    workspace_id,
+                    event_type,
+                    message,
+                    work_packet_id=work_packet.id,
+                    task_id=task.id,
+                    execution_run_id=result.get("execution_run_id"),
+                    payload={"flow_id": item.id, "result_status": result.get("status")},
+                )
+                _safe_send_operator_notification(
+                    db,
+                    workspace_id,
+                    self.engine.settings,
+                    event_type=event_type,
+                    severity=severity,
+                    title=title,
+                    summary=message,
+                    dedupe_key="{}:{}".format(event_type, item.id),
+                    dashboard_path="",
+                )
+                _safe_db_commit(db)
+                return jsonify(
+                    {
+                        "status": "success" if result.get("status") == "success" else "failed",
+                        "message": message,
+                        "result": result,
+                        "flow": serialize_simple_flow(db, workspace_id, item, settings=self.engine.settings),
+                    }
+                ), status_code
+            except Exception:
+                db.rollback()
+                raise
+            finally:
+                db_context.close()
+
+        @self.app.route("/api/simple-operator/<int:flow_id>/track", methods=["GET"])
+        def track_simple_operator_flow_route(flow_id):
+            db_context = get_db()
+            db = next(db_context)
+            try:
+                workspace_id = get_workspace_id(self.engine.target_dir)
+                if workspace_id is None:
+                    return jsonify({"status": "error", "message": "Active workspace not found."}), 400
+                item = get_simple_flow_item(db, workspace_id, flow_id)
+                if item is None:
+                    return jsonify({"status": "error", "message": "Simple Operator request not found."}), 404
+                return jsonify({"status": "success", "flow": serialize_simple_flow(db, workspace_id, item, settings=self.engine.settings)})
+            except Exception as exception:
+                return jsonify({"status": "error", "message": "Simple Operator tracking unavailable: {}".format(exception)}), 503
+            finally:
+                db_context.close()
 
         @self.app.route("/api/kill-process", methods=["POST"])
         def kill_process():

@@ -181,7 +181,11 @@ Packet 038 adds the Mobile Operator Notification Bridge. It may send outbound Di
 
 Packet 039 adds the Server-Side Codex Job Runner. It is a local operator CLI reliability utility only. It keeps long Codex work detached from fragile SSH clients and writes status/logs under `/tmp/nexus-codex-jobs`, while preserving the app/API, Discord, Auto-Pilot, packet execution, task execution, and Git-write boundaries.
 
-The recommended next packet is Packet 040 -- Simple Operator Flow. It should resume operator flow work only after using a server-side job runner or `tmux` for long Codex sessions.
+Packet 040 adds Simple Operator Flow as the primary operator lane. It composes existing capture, drafting, readiness, trust, supervised one-packet execution, tracking, review, and notification records into one mobile-friendly path: Input -> Draft -> Approve -> Execute one selected item -> Track.
+
+Simple Operator Flow may prepare an untrusted one-task work packet and may run exactly that selected item only after `confirm_run=true` and the existing supervised `one_packet` mode are present. Trusted Packet Mode remains authoritative: if enabled, untrusted packets are blocked until the operator explicitly trusts them through the existing trust flow. Simple Operator Flow must not start Auto-Pilot, call `/api/tasks/auto-run`, execute from Discord, retry or continue automatically, mark packets trusted automatically, bypass readiness/trust review, expose secrets, or add commit, merge, push, reset, clean, rebase, stash, tag, delete, or broad Git controls to the app.
+
+The recommended next packet is Packet 041 -- Work Packet Lifecycle State Map, focused on state visibility and metadata guidance after the primary lane is in place.
 
 ## Safety Rules
 

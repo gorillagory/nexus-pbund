@@ -4,7 +4,9 @@
 - Current branch: `main`
 - Current commit at prior chat handoff: `208dbdbaecd646b013a590fae2db32d06daff408`
 - Prior chat handoff summary: `208dbdb add chat handoff for next session`
-- Latest Packet 038 baseline tag: `nexus-mobile-operator-notifications-baseline-2026-05-30`
+- Latest Packet 040 baseline tag: `nexus-simple-operator-flow-baseline-2026-05-31`
+- Previous Packet 039 baseline tag: `nexus-server-side-codex-job-runner-baseline-2026-05-31`
+- Previous Packet 038 baseline tag: `nexus-mobile-operator-notifications-baseline-2026-05-30`
 - Previous Packet 037 baseline tag: `nexus-sprint-4-direction-baseline-2026-05-30`
 - Previous Packet 036 baseline tag: `nexus-deployment-operator-runbooks-baseline-2026-05-30`
 - Previous Packet 035 baseline tag: `nexus-discord-capture-hardening-baseline-2026-05-30`
@@ -42,6 +44,8 @@
 - Deployment and Operator Runbooks
 - Sprint 4 Direction Lock
 - Mobile Operator Notification Bridge
+- Server-Side Codex Job Runner
+- Simple Operator Flow
 - Workflow Lock docs
 - Orchestration-ready workflow foundation
 - Supervised packet runner
@@ -75,7 +79,7 @@
 - Do not call `/api/execute-codex` unless explicitly intended.
 - Do not set `execution_mode` to `autopilot` unless explicitly intended.
 - No `shell=True`.
-- No `subprocess.Popen`.
+- No `subprocess.Popen` in dashboard.py or src/services. The narrow local-operator exception is `scripts/nexus_codex_job.py`.
 - Codex can run routine operator commands: `git status`, `git log`, `git add`, `git commit`, `git merge`, `git tag`, `git push`, verification scripts, local `curl` endpoint checks, and report generation.
 - Prefer one pasteable Codex operator prompt that reduces manual copy/paste.
 
@@ -97,6 +101,8 @@
 9. Preflight/CI
 10. Baseline tag/push
 
+Simple Operator Flow is the primary lane for normal work: Input -> Draft -> Approve -> Execute one selected item -> Track. Advanced modules remain available but secondary.
+
 ## Current Roadmap
 - Packet 022 — Orchestration Inbox foundation complete
 - Packet 023 — Discord Event Router complete
@@ -115,7 +121,9 @@
 - Packet 036 — Deployment And Operator Runbooks complete
 - Packet 037 — Sprint 4 Direction Lock complete
 - Packet 038 — Mobile Operator Notification Bridge complete
-- Next — Packet 039 — Environment Validation And Startup Diagnostics
+- Packet 039 — Server-Side Codex Job Runner complete
+- Packet 040 — Simple Operator Flow complete
+- Next — Packet 041 — Work Packet Lifecycle State Map
 
 ## New Chat Startup Instructions
 Ask the user to run this local context capture before planning new implementation work:
@@ -148,4 +156,4 @@ Prefer one pasteable Codex operator prompt for local execution. Reduce manual co
 
 Keep the safety rails in this document. Do not force push, reset, clean, run destructive database operations, expose API keys, or start Auto-Pilot unless the user explicitly asks for that exact work.
 
-Packet 038 adds notification-only mobile operator Discord alerts. Sprint 3 is complete and Sprint 4 is active. The next recommended packet is Packet 039 — Environment Validation And Startup Diagnostics. Keep the work supervised: no Auto-Pilot, no direct Discord execution, no broad Git writes, no automatic recovery, no automatic trust, and no execution without explicit operator action.
+Packet 040 adds Simple Operator Flow as the primary mobile-friendly operator lane. Sprint 3 is complete and Sprint 4 is active. The next recommended packet is Packet 041 — Work Packet Lifecycle State Map. Keep the work supervised: no Auto-Pilot, no direct Discord execution, no broad Git writes, no automatic recovery, no automatic trust, and no execution without explicit operator action.

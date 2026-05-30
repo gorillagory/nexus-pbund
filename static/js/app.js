@@ -45,6 +45,8 @@ window.NexusApp = {
     latestInboxConversionOptions: null,
     latestPacketDrafting: null,
     selectedPacketPromptDraft: null,
+    latestSimpleOperator: null,
+    selectedSimpleOperatorFlow: null,
     latestWorkPacketReadiness: null,
     orchestrationInboxItems: [],
     selectedOrchestrationInboxItem: null,
@@ -240,6 +242,7 @@ window.NexusApp = {
             await this.loadFactoryConsoleSummary(false);
             this.renderFactoryConsole(data);
             this.loadOperatorNotifications(false);
+            this.loadSimpleOperatorStatus(false);
             this.loadFactoryPreflightStatus();
             this.loadFactoryCiStatus();
         } catch (error) {
@@ -583,6 +586,333 @@ window.NexusApp = {
                 button.disabled = false;
                 button.textContent = originalLabel || "Test Notification";
             }
+        }
+    },
+
+    async fetchSimpleOperatorJson(path, options = {}) {
+        const response = await fetch(path, options);
+        const contentType = response.headers.get("content-type") || "";
+        if (!contentType.toLowerCase().includes("application/json")) {
+            throw new Error(`${path} returned HTTP ${response.status} ${response.statusText || ""} with non-JSON response.`);
+        }
+        const data = await response.json();
+        if (!response.ok) {
+            throw new Error(data.message || `${path} returned HTTP ${response.status} ${response.statusText || ""}.`);
+        }
+        return data;
+    },
+
+    async loadSimpleOperatorStatus(showLoading = true) {
+        const target = document.getElementById("simple-operator-status");
+        if (showLoading && target) {
+            target.textContent = "Loading Simple Operator Flow...";
+        }
+        try {
+            const data = await this.fetchSimpleOperatorJson("/api/simple-operator/status");
+            this.latestSimpleOperator = data.simple_operator || {};
+            const flows = Array.isArray(this.latestSimpleOperator.flows) ? this.latestSimpleOperator.flows : [];
+            if (!this.selectedSimpleOperatorFlow && flows.length) {
+                this.selectedSimpleOperatorFlow = flows[0];
+            } else if (this.selectedSimpleOperatorFlow) {
+                const refreshed = flows.find((flow) => Number(flow.id) === Number(this.selectedSimpleOperatorFlow.id));
+                if (refreshed) {
+                    this.selectedSimpleOperatorFlow = refreshed;
+                }
+            }
+            this.renderSimpleOperatorFlow();
+        } catch (error) {
+            if (target) {
+                target.textContent = `Simple Operator Flow unavailable: ${error.message}`;
+            }
+        }
+    },
+
+    simpleOperatorFlowStatusClass(status) {
+        const normalized = String(status || "captured").toLowerCase();
+        if (["passed", "ready"].includes(normalized)) return "factory-status-pass";
+        if (["failed", "blocked"].includes(normalized)) return "factory-status-fail";
+        if (normalized === "running") return "factory-status-running";
+        if (normalized === "drafted") return "factory-status-neutral";
+        return "factory-status-idle";
+    },
+
+    selectSimpleOperatorFlow(flowId) {
+        const flows = this.latestSimpleOperator?.flows || [];
+        const flow = flows.find((item) => Number(item.id) === Number(flowId));
+        if (!flow) return;
+        this.selectedSimpleOperatorFlow = flow;
+        this.renderSimpleOperatorFlow();
+    },
+
+    renderSimpleOperatorFlow() {
+        const flow = this.selectedSimpleOperatorFlow || {};
+        const flows = Array.isArray(this.latestSimpleOperator?.flows) ? this.latestSimpleOperator.flows : [];
+        const statusTarget = document.getElementById("simple-operator-status");
+        const badge = document.getElementById("simple-operator-flow-status-badge");
+        const listTarget = document.getElementById("simple-operator-flow-list");
+        const trackingTarget = document.getElementById("simple-operator-tracking");
+        const draftInput = document.getElementById("simple-operator-draft");
+        const hasFlow = Boolean(flow.id);
+        const hasDraft = Boolean(flow.draft?.id);
+        const hasPacket = Boolean(flow.work_packet?.id);
+        const trustGate = flow.trust_gate || {};
+        const trustEligible = trustGate.eligible !== false;
+        const status = flow.status || "idle";
+
+        if (badge) {
+            badge.className = `factory-status-badge ${this.simpleOperatorFlowStatusClass(status)}`;
+            badge.textContent = status;
+        }
+        if (statusTarget) {
+            const mode = this.latestSimpleOperator?.execution_mode || this.executionMode || "manual";
+            statusTarget.innerHTML = `
+                <div class="d-flex flex-wrap gap-2 mb-2">
+                    <span class="prompt-vault-badge">${this.escapeHtml(mode)}</span>
+                    <span class="prompt-vault-badge">${this.escapeHtml(status)}</span>
+                    <span class="prompt-vault-badge">${trustGate.trusted_packet_mode_enabled ? "trusted mode enabled" : "trusted mode disabled"}</span>
+                </div>
+                <div class="factory-guidance-title">${this.escapeHtml(flow.next_action || "Capture a request to begin.")}</div>
+                ${flow.work_packet?.id ? `<div class="small text-secondary">Packet #${this.escapeHtml(flow.work_packet.id)} | Trust: ${this.escapeHtml(flow.work_packet.trust?.trust_status || "unreviewed")} | Readiness: ${this.escapeHtml(flow.work_packet.readiness_status || "incomplete")}</div>` : ""}
+            `;
+        }
+        if (draftInput && document.activeElement !== draftInput) {
+            draftInput.value = flow.draft?.draft_body || "";
+        }
+        const buttonStates = [
+            ["simple-operator-generate-btn", hasFlow],
+            ["simple-operator-save-draft-btn", hasDraft],
+            ["simple-operator-prepare-btn", hasDraft],
+            ["simple-operator-readiness-btn", hasPacket],
+            ["simple-operator-run-btn", hasPacket && trustEligible && String(this.latestSimpleOperator?.execution_mode || this.executionMode) === "one_packet"],
+        ];
+        buttonStates.forEach(([id, enabled]) => {
+            const button = document.getElementById(id);
+            if (button) button.disabled = !enabled;
+        });
+        if (listTarget) {
+            if (!flows.length) {
+                listTarget.textContent = "No Simple Operator requests yet.";
+            } else {
+                listTarget.innerHTML = flows.map((item) => `
+                    <button type="button" class="operator-intervention-list-item text-start w-100 ${Number(item.id) === Number(flow.id) ? "border-primary" : ""}" onclick="NexusApp.selectSimpleOperatorFlow(${Number(item.id) || 0})">
+                        <span class="operator-intervention-list-title">${this.escapeHtml(item.request?.title || `Request #${item.id}`)}</span>
+                        <span class="operator-intervention-list-meta">
+                            <span class="prompt-vault-badge ${this.simpleOperatorFlowStatusClass(item.status)}">${this.escapeHtml(item.status || "captured")}</span>
+                            ${item.work_packet?.id ? `<span class="prompt-vault-badge">packet #${this.escapeHtml(item.work_packet.id)}</span>` : ""}
+                            <span>${this.escapeHtml(this.formatFactoryTime(item.request?.updated_at || item.request?.created_at))}</span>
+                        </span>
+                    </button>
+                `).join("");
+            }
+        }
+        if (trackingTarget) {
+            const latestRun = Array.isArray(flow.runs) && flow.runs.length ? flow.runs[0] : null;
+            const changedFiles = Array.isArray(flow.changed_files) ? flow.changed_files : [];
+            const tasks = Array.isArray(flow.tasks) ? flow.tasks : [];
+            trackingTarget.innerHTML = `
+                <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap mb-3">
+                    <div>
+                        <h4 class="h6 fw-semibold mb-1">Run Tracking</h4>
+                        <div class="text-secondary small">${this.escapeHtml(flow.next_action || "No active Simple Operator request.")}</div>
+                    </div>
+                    ${hasFlow ? `<button type="button" class="btn btn-outline-secondary btn-sm" onclick="NexusApp.trackSimpleOperatorFlow()">Refresh Track</button>` : ""}
+                </div>
+                <div class="factory-run-detail-grid mb-3">
+                    <div><span>Status</span><strong>${this.escapeHtml(status)}</strong></div>
+                    <div><span>Packet</span><strong>${this.escapeHtml(flow.work_packet?.id || "-")}</strong></div>
+                    <div><span>Task</span><strong>${this.escapeHtml(tasks[0]?.id || "-")}</strong></div>
+                    <div><span>Verification</span><strong>${this.escapeHtml(latestRun?.verification_result || "-")}</strong></div>
+                    <div><span>Started</span><strong>${this.escapeHtml(this.formatFactoryTime(latestRun?.started_at))}</strong></div>
+                    <div><span>Finished</span><strong>${this.escapeHtml(this.formatFactoryTime(latestRun?.finished_at))}</strong></div>
+                </div>
+                ${flow.report_path ? `<div class="factory-console-panel mb-3"><span class="factory-summary-label">Report path</span><div class="font-monospace">${this.escapeHtml(flow.report_path)}</div></div>` : ""}
+                <details ${latestRun ? "open" : ""}>
+                    <summary class="small fw-semibold text-secondary">Advanced run details</summary>
+                    <div class="mt-2">
+                        <div class="factory-summary-label">stdout snippet</div>
+                        <pre class="factory-recovery-preview">${this.escapeHtml(latestRun?.stdout_snippet || "No stdout snippet.")}</pre>
+                        <div class="factory-summary-label">stderr snippet</div>
+                        <pre class="factory-recovery-preview">${this.escapeHtml(latestRun?.stderr_snippet || "No stderr snippet.")}</pre>
+                        <div class="factory-summary-label">changed files</div>
+                        ${changedFiles.length ? `<ul class="factory-changed-files mb-0">${changedFiles.map((file) => `<li class="factory-changed-file"><span class="factory-file-status">${this.escapeHtml(file.change_type || "?")}</span>${this.escapeHtml(file.file_path || "")}</li>`).join("")}</ul>` : `<div class="small text-secondary">No changed files recorded.</div>`}
+                    </div>
+                </details>
+            `;
+        }
+    },
+
+    async createSimpleOperatorRequest() {
+        const rawRequest = document.getElementById("simple-operator-request")?.value || "";
+        if (!rawRequest.trim()) {
+            NexusCore.showToast("Type a request before capturing.", "error");
+            return;
+        }
+        if (!(await NexusCore.confirmAction("Capture this request into the Simple Operator Flow?", {
+            title: "Capture Simple Request",
+            confirmLabel: "Capture",
+            variant: "primary",
+        }))) {
+            return;
+        }
+        try {
+            const data = await this.fetchSimpleOperatorJson("/api/simple-operator/request", {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({confirm_create: true, raw_request: rawRequest}),
+            });
+            this.selectedSimpleOperatorFlow = data.flow;
+            await this.loadSimpleOperatorStatus(false);
+            NexusCore.showToast("Simple Operator request captured.", "success");
+        } catch (error) {
+            NexusCore.showToast(`Simple Operator capture failed: ${error.message}`, "error");
+        }
+    },
+
+    async generateSimpleOperatorDraft() {
+        const flowId = this.selectedSimpleOperatorFlow?.id;
+        if (!flowId) {
+            NexusCore.showToast("Capture or select a request first.", "error");
+            return;
+        }
+        if (!(await NexusCore.confirmAction("Generate a structured Codex prompt draft for this request?", {
+            title: "Generate Simple Draft",
+            confirmLabel: "Generate",
+            variant: "primary",
+        }))) {
+            return;
+        }
+        try {
+            const data = await this.fetchSimpleOperatorJson(`/api/simple-operator/${flowId}/draft`, {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({confirm_generate: true}),
+            });
+            this.selectedSimpleOperatorFlow = data.flow;
+            await this.loadSimpleOperatorStatus(false);
+            NexusCore.showToast("Simple Operator draft generated.", "success");
+        } catch (error) {
+            NexusCore.showToast(`Draft generation failed: ${error.message}`, "error");
+        }
+    },
+
+    async updateSimpleOperatorDraft() {
+        const flowId = this.selectedSimpleOperatorFlow?.id;
+        const draftBody = document.getElementById("simple-operator-draft")?.value || "";
+        if (!flowId || !draftBody.trim()) {
+            NexusCore.showToast("Select a request with a draft first.", "error");
+            return;
+        }
+        if (!(await NexusCore.confirmAction("Save edits to this Simple Operator draft?", {
+            title: "Save Draft Edits",
+            confirmLabel: "Save",
+            variant: "primary",
+        }))) {
+            return;
+        }
+        try {
+            const data = await this.fetchSimpleOperatorJson(`/api/simple-operator/${flowId}/draft`, {
+                method: "PATCH",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({confirm_generate: true, draft_body: draftBody}),
+            });
+            this.selectedSimpleOperatorFlow = data.flow;
+            await this.loadSimpleOperatorStatus(false);
+            NexusCore.showToast("Simple Operator draft saved.", "success");
+        } catch (error) {
+            NexusCore.showToast(`Draft save failed: ${error.message}`, "error");
+        }
+    },
+
+    async prepareSimpleOperatorWorkPacket() {
+        const flowId = this.selectedSimpleOperatorFlow?.id;
+        if (!flowId) {
+            NexusCore.showToast("Select a drafted request first.", "error");
+            return;
+        }
+        if (!(await NexusCore.confirmAction("Prepare one untrusted work packet from this draft?", {
+            title: "Prepare Work Packet",
+            confirmLabel: "Prepare",
+            variant: "primary",
+        }))) {
+            return;
+        }
+        try {
+            const data = await this.fetchSimpleOperatorJson(`/api/simple-operator/${flowId}/prepare-work-packet`, {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({confirm_prepare: true}),
+            });
+            this.selectedSimpleOperatorFlow = data.flow;
+            await this.loadSimpleOperatorStatus(false);
+            NexusCore.showToast("Simple Operator work packet prepared.", "success");
+        } catch (error) {
+            NexusCore.showToast(`Prepare failed: ${error.message}`, "error");
+        }
+    },
+
+    async evaluateSimpleOperatorReadiness() {
+        const flowId = this.selectedSimpleOperatorFlow?.id;
+        if (!flowId) {
+            NexusCore.showToast("Prepare a work packet first.", "error");
+            return;
+        }
+        if (!(await NexusCore.confirmAction("Evaluate readiness for this Simple Operator work packet?", {
+            title: "Evaluate Readiness",
+            confirmLabel: "Evaluate",
+        }))) {
+            return;
+        }
+        try {
+            const data = await this.fetchSimpleOperatorJson(`/api/simple-operator/${flowId}/evaluate-readiness`, {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({confirm_evaluate: true}),
+            });
+            this.selectedSimpleOperatorFlow = data.flow;
+            await this.loadSimpleOperatorStatus(false);
+            NexusCore.showToast("Readiness evaluated.", "success");
+        } catch (error) {
+            NexusCore.showToast(`Readiness failed: ${error.message}`, "error");
+        }
+    },
+
+    async approveSimpleOperatorRun() {
+        const flowId = this.selectedSimpleOperatorFlow?.id;
+        if (!flowId) {
+            NexusCore.showToast("Prepare a work packet first.", "error");
+            return;
+        }
+        if (!(await NexusCore.confirmAction("Approve one supervised Simple Operator run now?", {
+            title: "Approve & Run One",
+            confirmLabel: "Run One",
+            variant: "primary",
+        }))) {
+            return;
+        }
+        try {
+            const data = await this.fetchSimpleOperatorJson(`/api/simple-operator/${flowId}/approve-run`, {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({confirm_run: true}),
+            });
+            this.selectedSimpleOperatorFlow = data.flow;
+            await this.loadSimpleOperatorStatus(false);
+            NexusCore.showToast(data.status === "success" ? "Simple Operator run completed." : "Simple Operator run finished with issues.", data.status === "success" ? "success" : "error");
+        } catch (error) {
+            NexusCore.showToast(`Simple Operator run blocked or failed: ${error.message}`, "error");
+            await this.loadSimpleOperatorStatus(false);
+        }
+    },
+
+    async trackSimpleOperatorFlow() {
+        const flowId = this.selectedSimpleOperatorFlow?.id;
+        if (!flowId) return;
+        try {
+            const data = await this.fetchSimpleOperatorJson(`/api/simple-operator/${flowId}/track`);
+            this.selectedSimpleOperatorFlow = data.flow;
+            this.renderSimpleOperatorFlow();
+        } catch (error) {
+            NexusCore.showToast(`Track failed: ${error.message}`, "error");
         }
     },
 

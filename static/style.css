@@ -485,6 +485,24 @@ pre {
     min-height: 3rem;
 }
 
+.simple-operator-flow-panel {
+    background: #fff;
+    border: 1px solid #d9e7f7;
+    border-radius: 8px;
+    box-shadow: 0 0.5rem 1.5rem rgba(33, 37, 41, 0.06);
+    padding: 1rem;
+}
+
+.simple-operator-request-input,
+.simple-operator-draft-input {
+    min-height: 10rem;
+    resize: vertical;
+}
+
+.simple-operator-draft-input {
+    min-height: 18rem;
+}
+
 .factory-summary-card,
 .factory-preflight-metric {
     background: #fff;

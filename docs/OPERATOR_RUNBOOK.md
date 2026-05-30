@@ -55,11 +55,32 @@ The stop command targets only the PID recorded for that job and verifies the pro
 
 ## Factory Console
 
+- Use Simple Operator Flow as the primary lane for normal work: type the request, generate and review the draft, prepare one work packet, evaluate readiness, explicitly approve one run, and track the result.
 - Use Command Center for mode, preflight, CI, Git Explorer summary, and Branch Per Packet status.
 - Use Intake & Triage for Orchestration Inbox, inbox conversion, and Discord capture status.
 - Use Packet Preparation for Work Packet Manager, Packet Drafting Assistant, Readiness Checklist, and Trusted Packet Mode.
 - Use Human Review for Operator Intervention Queue, Operator Review History, and recovery visibility.
 - Use Vault & Settings for Prompt Vault, provider settings, resources, and history.
+
+## Simple Operator Flow
+
+Simple Operator Flow is the default mobile-friendly path for normal supervised work:
+
+1. Type the operator request in the Simple Operator Flow panel.
+2. Confirm capture with `confirm_create=true`.
+3. Generate a structured Codex prompt draft with `confirm_generate=true`.
+4. Review or edit the draft before preparation.
+5. Prepare one untrusted work packet with `confirm_prepare=true`.
+6. Evaluate readiness with `confirm_evaluate=true`.
+7. If Trusted Packet Mode is enabled, explicitly trust the packet through the existing trust controls.
+8. Switch to `one_packet` mode and approve exactly one selected run with `confirm_run=true`.
+9. Track status, timestamps, stdout/stderr snippets, changed files, verification result, and report expectation from the tracking panel.
+
+Advanced modules remain available for deeper review, recovery, Prompt Vault management, Git Explorer, Branch Per Packet, and intervention history, but they are secondary to the Simple Operator lane for routine work.
+
+Execution requires explicit approval. Discord remains capture/notification-only.
+
+Simple Operator Flow does not start Auto-Pilot, does not call `/api/tasks/auto-run`, does not execute from Discord, does not retry or continue automatically, does not mark packets trusted automatically, does not bypass Trusted Packet Mode, and does not add Git commit, merge, push, reset, clean, rebase, stash, tag, delete, or broad write controls to the app.
 
 ## Mobile Operator Alerts
 

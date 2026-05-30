@@ -49,6 +49,7 @@ PY_COMPILE_FILES = [
     "src/services/packet_branch.py",
     "src/services/packet_drafting.py",
     "src/services/prompt_vault.py",
+    "src/services/simple_operator_flow.py",
     "src/services/trusted_packets.py",
     "src/services/work_packet_readiness.py",
 ]

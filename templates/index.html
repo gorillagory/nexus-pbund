@@ -494,6 +494,45 @@
                             </div>
                         </div>
                     </section>
+                    <section id="simple-operator-flow-panel" class="simple-operator-flow-panel mb-4">
+                        <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-3">
+                            <div>
+                                <h3 class="h5 fw-semibold mb-1">Simple Operator Flow</h3>
+                                <p class="text-secondary mb-0">Primary lane: Input → Draft → Approve → Execute one selected item → Track.</p>
+                            </div>
+                            <span id="simple-operator-flow-status-badge" class="factory-status-badge factory-status-idle">idle</span>
+                        </div>
+                        <div class="row g-3">
+                            <div class="col-lg-5">
+                                <label for="simple-operator-request" class="form-label small text-secondary mb-1">New Request</label>
+                                <textarea id="simple-operator-request" class="form-control simple-operator-request-input" rows="5" placeholder="Describe the next supervised change."></textarea>
+                                <div class="d-grid gap-2 mt-3">
+                                    <button type="button" class="btn btn-primary btn-lg" onclick="NexusApp.createSimpleOperatorRequest()">Capture Request</button>
+                                    <button id="simple-operator-generate-btn" type="button" class="btn btn-outline-primary btn-lg" onclick="NexusApp.generateSimpleOperatorDraft()" disabled>Generate Draft</button>
+                                </div>
+                            </div>
+                            <div class="col-lg-7">
+                                <div id="simple-operator-status" class="factory-console-panel small text-secondary mb-3">Simple Operator Flow not loaded.</div>
+                                <label for="simple-operator-draft" class="form-label small text-secondary mb-1">Draft Preview / Editor</label>
+                                <textarea id="simple-operator-draft" class="form-control font-monospace small simple-operator-draft-input" rows="9" placeholder="Generated draft appears here for review."></textarea>
+                                <div class="d-flex gap-2 flex-wrap mt-3">
+                                    <button id="simple-operator-save-draft-btn" type="button" class="btn btn-outline-primary btn-lg" onclick="NexusApp.updateSimpleOperatorDraft()" disabled>Save Draft Edits</button>
+                                    <button id="simple-operator-prepare-btn" type="button" class="btn btn-outline-success btn-lg" onclick="NexusApp.prepareSimpleOperatorWorkPacket()" disabled>Prepare Work Packet</button>
+                                    <button id="simple-operator-readiness-btn" type="button" class="btn btn-outline-secondary btn-lg" onclick="NexusApp.evaluateSimpleOperatorReadiness()" disabled>Evaluate Readiness</button>
+                                    <button id="simple-operator-run-btn" type="button" class="btn btn-success btn-lg" onclick="NexusApp.approveSimpleOperatorRun()" disabled>Approve & Run One</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row g-3 mt-1">
+                            <div class="col-lg-5">
+                                <div id="simple-operator-flow-list" class="operator-intervention-list small text-secondary">No Simple Operator requests loaded.</div>
+                            </div>
+                            <div class="col-lg-7">
+                                <div id="simple-operator-tracking" class="factory-console-panel small text-secondary">Run tracking appears after preparation or approval.</div>
+                            </div>
+                        </div>
+                        <span class="d-none">/api/simple-operator/status /api/simple-operator/request /api/simple-operator/&lt;id&gt;/draft /api/simple-operator/&lt;id&gt;/prepare-work-packet /api/simple-operator/&lt;id&gt;/evaluate-readiness /api/simple-operator/&lt;id&gt;/approve-run /api/simple-operator/&lt;id&gt;/track confirm_create confirm_generate confirm_prepare confirm_evaluate confirm_run Simple Operator Flow primary operator lane no Auto-Pilot no Discord execution</span>
+                    </section>
                     <div class="row g-4 mb-4">
                         <div class="col-lg-8">
                             <div class="card bg-white border-0 shadow-sm h-100">
