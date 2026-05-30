@@ -737,6 +737,80 @@
                             </button>
                         </div>
                         <div class="card-body p-4">
+                            <section class="operator-review-history-panel mb-4">
+                                <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-3">
+                                    <div>
+                                        <h4 class="h6 fw-semibold mb-1">Operator Review History</h4>
+                                        <p class="text-secondary small mb-0">Audit and visibility only. Review history records human decisions without executing, trusting, recovering, or changing Git state.</p>
+                                    </div>
+                                    <button type="button" class="btn btn-outline-secondary btn-sm" onclick="NexusApp.loadOperatorReviewHistory()">Refresh History</button>
+                                </div>
+                                <div class="row g-3">
+                                    <div class="col-lg-4">
+                                        <form id="operator-review-note-form" class="operator-intervention-panel h-100" onsubmit="NexusApp.createOperatorReviewNote(); return false;">
+                                            <h5 class="h6 fw-semibold mb-3">Manual Review Note</h5>
+                                            <div class="mb-2">
+                                                <label for="operator-review-note-title" class="form-label small text-secondary mb-1">Title</label>
+                                                <input id="operator-review-note-title" class="form-control form-control-sm" maxlength="255" autocomplete="off" required>
+                                            </div>
+                                            <div class="mb-2">
+                                                <label for="operator-review-note-summary" class="form-label small text-secondary mb-1">Summary</label>
+                                                <textarea id="operator-review-note-summary" class="form-control form-control-sm" rows="4" required></textarea>
+                                            </div>
+                                            <div class="row g-2 mb-2">
+                                                <div class="col-6">
+                                                    <label for="operator-review-note-severity" class="form-label small text-secondary mb-1">Severity</label>
+                                                    <select id="operator-review-note-severity" class="form-select form-select-sm">
+                                                        <option value="info">info</option>
+                                                        <option value="warning">warning</option>
+                                                        <option value="blocked">blocked</option>
+                                                        <option value="critical">critical</option>
+                                                    </select>
+                                                </div>
+                                                <div class="col-6">
+                                                    <label for="operator-review-note-source-type" class="form-label small text-secondary mb-1">Source</label>
+                                                    <input id="operator-review-note-source-type" class="form-control form-control-sm" maxlength="64" value="manual">
+                                                </div>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label for="operator-review-note-source-id" class="form-label small text-secondary mb-1">Source ID</label>
+                                                <input id="operator-review-note-source-id" class="form-control form-control-sm" maxlength="128">
+                                            </div>
+                                            <button id="operator-review-note-create-button" type="submit" class="btn btn-primary btn-sm">Add Review Note</button>
+                                        </form>
+                                    </div>
+                                    <div class="col-lg-8">
+                                        <div class="operator-intervention-panel h-100">
+                                            <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-3">
+                                                <h5 class="h6 fw-semibold mb-0">Review Timeline</h5>
+                                                <span id="operator-review-history-count" class="badge text-bg-light border text-secondary">0</span>
+                                            </div>
+                                            <div class="row g-2 mb-3">
+                                                <div class="col-md-4">
+                                                    <label for="operator-review-event-type-filter" class="form-label small text-secondary mb-1">Event Type</label>
+                                                    <select id="operator-review-event-type-filter" class="form-select form-select-sm" onchange="NexusApp.loadOperatorReviewHistory()">
+                                                        <option value="">All</option>
+                                                    </select>
+                                                </div>
+                                                <div class="col-md-4">
+                                                    <label for="operator-review-severity-filter" class="form-label small text-secondary mb-1">Severity</label>
+                                                    <select id="operator-review-severity-filter" class="form-select form-select-sm" onchange="NexusApp.loadOperatorReviewHistory()">
+                                                        <option value="">All</option>
+                                                    </select>
+                                                </div>
+                                                <div class="col-md-4">
+                                                    <label for="operator-review-source-type-filter" class="form-label small text-secondary mb-1">Source Type</label>
+                                                    <select id="operator-review-source-type-filter" class="form-select form-select-sm" onchange="NexusApp.loadOperatorReviewHistory()">
+                                                        <option value="">All</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                            <div id="operator-review-history-list" class="operator-intervention-list text-secondary small">Load review history to begin.</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <span class="d-none">/api/operator-review-history /api/operator-review-history/filters /api/operator-review-history/manual-note Operator Review History inbox_conversion readiness_check trust_decision intervention_decision recovery_decision draft_review manual_note audit visibility only</span>
+                            </section>
                             <div class="row g-4">
                                 <div class="col-xl-4">
                                     <form id="orchestration-inbox-capture-form" class="orchestration-inbox-panel mb-3" onsubmit="NexusApp.captureOrchestrationInboxItem(); return false;">

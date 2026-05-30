@@ -32,6 +32,7 @@ PY_COMPILE_FILES = [
     "src/services/inbox_triage_conversion.py",
     "src/services/orchestration_inbox.py",
     "src/services/operator_interventions.py",
+    "src/services/operator_review_history.py",
     "src/services/packet_branch.py",
     "src/services/packet_drafting.py",
     "src/services/prompt_vault.py",

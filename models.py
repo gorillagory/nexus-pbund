@@ -235,6 +235,32 @@ class OperatorIntervention(Base):
     resolved_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
+class OperatorReviewEvent(Base):
+    __tablename__ = "operator_review_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    workspace_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("workspaces.id"), nullable=False
+    )
+    event_type: Mapped[str] = mapped_column(String(64), nullable=False)
+    action: Mapped[str] = mapped_column(String(64), nullable=False)
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    summary: Mapped[str] = mapped_column(Text, nullable=False)
+    details: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    actor: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    source_type: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    source_id: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    related_type: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    related_id: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    severity: Mapped[str] = mapped_column(String(32), nullable=False, default="info", server_default="info")
+    status: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    metadata_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
 class WorkPacket(Base):
     __tablename__ = "work_packets"
 

@@ -156,6 +156,24 @@ FACTORY_COLUMNS = {
         ("acknowledged_at", "TIMESTAMP WITH TIME ZONE"),
         ("resolved_at", "TIMESTAMP WITH TIME ZONE"),
     ],
+    "operator_review_events": [
+        ("workspace_id", "INTEGER"),
+        ("event_type", "VARCHAR(64)"),
+        ("action", "VARCHAR(64)"),
+        ("title", "VARCHAR(255)"),
+        ("summary", "TEXT"),
+        ("details", "TEXT"),
+        ("actor", "VARCHAR(128)"),
+        ("source_type", "VARCHAR(64)"),
+        ("source_id", "VARCHAR(128)"),
+        ("related_type", "VARCHAR(64)"),
+        ("related_id", "VARCHAR(128)"),
+        ("severity", "VARCHAR(32)"),
+        ("status", "VARCHAR(64)"),
+        ("metadata_json", "TEXT"),
+        ("created_at", "TIMESTAMP WITH TIME ZONE"),
+        ("updated_at", "TIMESTAMP WITH TIME ZONE"),
+    ],
 }
 
 

@@ -45,7 +45,7 @@ Type: workflow, UI.
 
 Use Prompt Vault templates and inbox context to help draft packet text that the operator can review and copy or stage.
 
-Safety boundary: drafting and copying only. No automatic staging or execution. Next recommended packet.
+Safety boundary: drafting and copying only. No automatic staging or execution.
 
 Status: complete. Packet 030 adds a draft-only Packet Drafting Assistant with Prompt Vault template selection, inbox/work-packet/manual source context, deterministic structured prompt generation, saved draft records, review marking, and copy-to-clipboard. It does not execute generated drafts, stage automatically, trust packets, or call execution routes.
 
@@ -55,7 +55,7 @@ Type: safety, backend, UI.
 
 Track whether a staged packet includes mission, safety rules, files allowed, verification commands, trust metadata, and rollback/stop criteria.
 
-Safety boundary: readiness metadata only. Does not execute or bypass trust. Next recommended packet.
+Safety boundary: readiness metadata only. Does not execute or bypass trust.
 
 Status: complete. Packet 031 adds readiness metadata on work packets, deterministic checklist evaluation, readiness score/status/missing items, notes, and a Work Packet Manager panel. It is validation and guidance only: it does not execute packets, trust packets automatically, bypass Trusted Packet Mode, retry/continue runs, or perform Git actions.
 
@@ -65,7 +65,9 @@ Type: workflow, backend, UI.
 
 Create a consolidated audit trail for triage decisions, trust/revoke decisions, interventions, and recovery notes.
 
-Safety boundary: audit trail only. No automatic recovery, retry, continue, or execution. Next recommended packet.
+Safety boundary: audit trail only. No automatic recovery, retry, continue, or execution.
+
+Status: complete. Packet 032 adds Operator Review History as an append-only audit timeline for inbox conversions, audited discards, readiness decisions, trust/revoke decisions, intervention decisions, packet draft review, manual notes, and a narrow review-required recovery marker. It is audit/visibility only: it does not execute packets, trust packets automatically, replace source records, retry/continue runs, recover automatically, or perform Git actions.
 
 ### Packet 033 — Factory Console Consolidation
 
@@ -73,7 +75,7 @@ Type: UI.
 
 Reorganize Factory Console, Git Explorer, Branch Per Packet, Intervention Queue, and Trusted Packet surfaces for faster repeated operation.
 
-Safety boundary: UI organization only. No new execution route calls and no new Git write controls.
+Safety boundary: UI organization only. No new execution route calls and no new Git write controls. Next recommended packet.
 
 ### Packet 034 — Packet-Aware Preflight Expansion
 

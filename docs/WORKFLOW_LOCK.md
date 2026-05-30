@@ -54,6 +54,8 @@ Drafted work can be staged to Kanban when it is scoped and has safety rules. Sta
 
 Packet 031 added the Work Packet Readiness Checklist. It evaluates planning, safety, scope, verification, report, trust visibility, and branch-preparation metadata for a work packet. It may store readiness status, score, missing items, notes, and checker metadata. It is validation/guidance only and must not execute packets, trust packets automatically, bypass Trusted Packet Mode, perform Git writes, retry or continue runs, or start Auto-Pilot.
 
+Packet 032 added Operator Review History. It records human review decisions and governance events as append-only audit records, including inbox conversions, audited discards, readiness decisions, trust/revoke decisions, intervention decisions, packet draft review, manual notes, and narrow review-required recovery markers. It is audit/visibility only and does not replace source records; it must not execute packets, trust packets automatically, recover automatically, retry or continue runs, perform Git writes, or start Auto-Pilot.
+
 ## Supervised Execution Modes
 
 - `manual`: no automation. The operator inspects, edits, stages, and copies commands.
@@ -104,6 +106,8 @@ The dashboard Git Explorer is read-only. Operator/Codex may still perform routin
 Branch Per Packet is the narrow exception for app-level git writes. It may prepare one validated packet branch at a time after clean-worktree checks. Codex operator workflow may still perform verified commit, fast-forward merge, baseline tag, and push outside the app.
 
 The Operator Intervention Queue is record keeping only. It may create, acknowledge, resolve, dismiss, and update intervention records. It must not become a hidden execution, recovery, or Git write path.
+
+Operator Review History is consolidated audit visibility only. It may append review events and manual notes, but it must not replace inbox conversion, readiness, trust, intervention, recovery, or draft records, and it must not become a hidden execution, trust, recovery, or Git write path.
 
 Trusted Packet Mode is restrictive only. It may update packet trust metadata and settings, and it may block supervised packet execution for untrusted packets. It must not add autonomous execution, direct Codex execution, retry/continue automation, or Git write controls.
 

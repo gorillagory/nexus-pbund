@@ -49,6 +49,8 @@ window.NexusApp = {
     selectedOrchestrationInboxItem: null,
     operatorInterventions: [],
     selectedOperatorIntervention: null,
+    operatorReviewEvents: [],
+    operatorReviewFilters: null,
     promptVaultTemplates: [],
     selectedPromptTemplate: null,
 
@@ -144,6 +146,7 @@ window.NexusApp = {
 
         if (tab === "interventions") {
             this.loadOperatorInterventions();
+            this.loadOperatorReviewHistory();
             return;
         }
 
@@ -3743,6 +3746,140 @@ window.NexusApp = {
         }
     },
 
+    async loadOperatorReviewHistory() {
+        const list = document.getElementById("operator-review-history-list");
+        const typeFilter = document.getElementById("operator-review-event-type-filter");
+        const severityFilter = document.getElementById("operator-review-severity-filter");
+        const sourceTypeFilter = document.getElementById("operator-review-source-type-filter");
+        if (list) {
+            list.textContent = "Loading Operator Review History...";
+        }
+        try {
+            if (!this.operatorReviewFilters) {
+                const filtersResponse = await fetch("/api/operator-review-history/filters");
+                const filtersData = await filtersResponse.json();
+                if (!filtersResponse.ok || filtersData.status !== "success") {
+                    throw new Error(filtersData.message || "Unable to load review history filters.");
+                }
+                this.operatorReviewFilters = filtersData.filters || {};
+                this.renderOperatorReviewFilters();
+            }
+            const params = new URLSearchParams();
+            if (typeFilter?.value) params.set("event_type", typeFilter.value);
+            if (severityFilter?.value) params.set("severity", severityFilter.value);
+            if (sourceTypeFilter?.value) params.set("source_type", sourceTypeFilter.value);
+            params.set("limit", "75");
+            const response = await fetch(`/api/operator-review-history?${params.toString()}`);
+            const data = await response.json();
+            if (!response.ok || data.status !== "success") {
+                throw new Error(data.message || "Unable to load operator review history.");
+            }
+            this.operatorReviewEvents = Array.isArray(data.events) ? data.events : [];
+            this.renderOperatorReviewHistory();
+        } catch (error) {
+            if (list) {
+                list.textContent = `Operator Review History unavailable: ${error.message}`;
+            }
+            NexusCore.showToast(`Review history error: ${error.message}`, "error");
+        }
+    },
+
+    renderOperatorReviewFilters() {
+        const filters = this.operatorReviewFilters || {};
+        const fillSelect = (elementId, values) => {
+            const select = document.getElementById(elementId);
+            if (!select) return;
+            const selected = select.value;
+            select.innerHTML = '<option value="">All</option>' + (Array.isArray(values) ? values : []).map((value) => (
+                `<option value="${this.escapeHtml(value)}">${this.escapeHtml(value)}</option>`
+            )).join("");
+            select.value = selected;
+        };
+        fillSelect("operator-review-event-type-filter", filters.event_types);
+        fillSelect("operator-review-severity-filter", filters.severities);
+        fillSelect("operator-review-source-type-filter", filters.source_types);
+    },
+
+    renderOperatorReviewHistory() {
+        const list = document.getElementById("operator-review-history-list");
+        const count = document.getElementById("operator-review-history-count");
+        if (count) {
+            count.textContent = String(this.operatorReviewEvents.length);
+        }
+        if (!list) return;
+        if (!this.operatorReviewEvents.length) {
+            list.innerHTML = '<div class="text-secondary small">No review history events match this filter.</div>';
+            return;
+        }
+        list.innerHTML = this.operatorReviewEvents.map((event) => `
+            <div class="operator-intervention-list-item">
+                <span class="operator-intervention-list-title">${this.escapeHtml(event.title || "Untitled review event")}</span>
+                <span class="operator-intervention-list-meta">
+                    <span class="prompt-vault-badge">${this.escapeHtml(event.event_type || "manual_note")}</span>
+                    <span class="prompt-vault-badge">${this.escapeHtml(event.action || "noted")}</span>
+                    <span class="prompt-vault-badge operator-intervention-severity-${this.escapeHtml(event.severity || "info")}">${this.escapeHtml(event.severity || "info")}</span>
+                    ${event.status ? `<span class="prompt-vault-badge">${this.escapeHtml(event.status)}</span>` : ""}
+                </span>
+                <span>${this.escapeHtml(event.summary || "")}</span>
+                <span class="text-secondary small">
+                    ${this.escapeHtml(event.source_type || "manual")}${event.source_id ? ` #${this.escapeHtml(event.source_id)}` : ""}
+                    ${event.related_type ? ` | ${this.escapeHtml(event.related_type)}${event.related_id ? ` #${this.escapeHtml(event.related_id)}` : ""}` : ""}
+                    | ${this.escapeHtml(this.formatFactoryTime(event.created_at))}
+                </span>
+            </div>
+        `).join("");
+    },
+
+    operatorReviewNoteData() {
+        return {
+            confirm_create: true,
+            title: document.getElementById("operator-review-note-title")?.value || "",
+            summary: document.getElementById("operator-review-note-summary")?.value || "",
+            severity: document.getElementById("operator-review-note-severity")?.value || "info",
+            source_type: document.getElementById("operator-review-note-source-type")?.value || "manual",
+            source_id: document.getElementById("operator-review-note-source-id")?.value || "",
+        };
+    },
+
+    async createOperatorReviewNote() {
+        if (!(await NexusCore.confirmAction("Add this manual review note to Operator Review History?", {
+            title: "Add Review Note",
+            confirmLabel: "Add Note",
+            variant: "primary",
+        }))) {
+            return;
+        }
+        const button = document.getElementById("operator-review-note-create-button");
+        const originalLabel = button?.textContent;
+        if (button) {
+            button.disabled = true;
+            button.textContent = "Adding...";
+        }
+        try {
+            const response = await fetch("/api/operator-review-history/manual-note", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(this.operatorReviewNoteData()),
+            });
+            const payload = await response.json();
+            if (!response.ok || payload.status !== "success") {
+                throw new Error(payload.message || "Unable to create review note.");
+            }
+            document.getElementById("operator-review-note-form")?.reset();
+            const sourceType = document.getElementById("operator-review-note-source-type");
+            if (sourceType) sourceType.value = "manual";
+            await this.loadOperatorReviewHistory();
+            NexusCore.showToast("Operator review note added.", "success");
+        } catch (error) {
+            NexusCore.showToast(`Review note error: ${error.message}`, "error");
+        } finally {
+            if (button) {
+                button.disabled = false;
+                button.textContent = originalLabel || "Add Review Note";
+            }
+        }
+    },
+
     async loadOperatorInterventions() {
         const list = document.getElementById("operator-intervention-list");
         const statusFilter = document.getElementById("operator-intervention-status-filter");
@@ -3940,6 +4077,7 @@ window.NexusApp = {
                 throw new Error(payload.message || `Unable to ${action} intervention item.`);
             }
             await this.loadOperatorInterventions();
+            await this.loadOperatorReviewHistory();
             this.renderOperatorInterventionDetail(payload.item);
             NexusCore.showToast(`Intervention item ${pastTense[action]}.`, "success");
         } catch (error) {

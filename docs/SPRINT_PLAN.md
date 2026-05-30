@@ -18,6 +18,7 @@ Sprint 2 is complete. It delivered a remote-operable supervised factory foundati
 - Inbox Triage Conversion Flow for turning captured or triaged ideas into non-executing workflow records with audit notes.
 - Packet Drafting Assistant for deterministic Prompt Vault based packet prompt drafts.
 - Work Packet Readiness Checklist for planning, safety, and verification metadata review.
+- Operator Review History for consolidated human governance and decision audit events.
 - Packet 027 Trusted Packet Mode foundation.
 - Supervised packet runner and Run One Task.
 - Factory Console visibility, execution ledger, changed-file tracking, recovery controls, and recovery audit notes.
@@ -45,11 +46,12 @@ Packet drafting rule: Packet Drafting Assistant may generate, edit, save, review
 
 Readiness checklist rule: Work Packet Readiness Checklist evaluates and stores readiness metadata only. It does not bypass Trusted Packet Mode, execute packets, trust packets automatically, retry/continue runs, perform Git actions, or start Auto-Pilot.
 
+Operator review history rule: Operator Review History is audit and visibility only. It records human review decisions and governance events, preserves original source records, and must not execute packets, trust packets automatically, recover automatically, perform Git actions, retry/continue runs, or start Auto-Pilot.
+
 Auto-Pilot remains locked. Do not build, enable, or rely on Auto-Pilot unless a future packet explicitly scopes Auto-Pilot build/test work.
 
 ## Remaining Workflow Gaps
 
-- Trust/revoke, triage, intervention, and recovery decisions are not consolidated into one operator review history.
 - Factory Console and dashboard surfaces grew during Sprint 2 and need consolidation for repeated operator use.
 - Preflight coverage is broad but not yet packet-aware.
 - Discord capture is safe but lacks channel allowlisting or stronger signature-style verification.
@@ -67,8 +69,8 @@ Do not automatically choose Auto-Pilot. Auto-Pilot remains out of scope until ex
 2. Packet 029 — Inbox Triage Conversion Flow. Type: workflow, backend, UI. Boundary: converts inbox items into task, staged untrusted work packet, document update note, or discard audit only; no execution. Complete.
 3. Packet 030 — Packet Drafting Assistant. Type: workflow, backend, UI. Boundary: uses Prompt Vault templates and selected context to draft, save, review, and copy packet text; does not run Codex, stage automatically, or trust packets. Complete.
 4. Packet 031 — Work Packet Readiness Checklist. Type: safety, backend, UI. Boundary: validates safety rules, files allowed, verification commands, and trust visibility before readiness; does not execute or trust packets. Complete.
-5. Packet 032 — Operator Review History. Type: workflow, backend, UI. Boundary: records triage, trust/revoke, intervention, readiness, and recovery decisions; no automatic recovery or execution. Next recommended packet.
-6. Packet 033 — Factory Console Consolidation. Type: UI. Boundary: reorganizes existing visibility and controls; no new execution or Git write capability.
+5. Packet 032 — Operator Review History. Type: workflow, backend, UI. Boundary: records triage, trust/revoke, intervention, readiness, and recovery decisions; no automatic recovery or execution. Complete.
+6. Packet 033 — Factory Console Consolidation. Type: UI. Boundary: reorganizes existing visibility and controls; no new execution or Git write capability. Next recommended packet.
 7. Packet 034 — Packet-Aware Preflight Expansion. Type: safety, testing. Boundary: adds checks and reports only; no execution route calls.
 8. Packet 035 — Discord Capture Hardening. Type: integration, safety. Boundary: channel allowlisting or stronger verification for capture-only ingest; Discord still cannot execute work.
 9. Packet 036 — Deployment And Operator Runbooks. Type: docs/planning. Boundary: documentation only; no runtime changes unless verification requires a docs checker.

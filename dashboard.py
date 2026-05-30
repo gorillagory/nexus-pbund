@@ -87,6 +87,14 @@ from src.services.operator_interventions import (
     serialize_intervention,
     update_intervention,
 )
+from src.services.operator_review_history import (
+    build_timeline_filters,
+    create_manual_review_note,
+    create_review_event,
+    list_review_events,
+    serialize_review_event,
+    summarize_review_history,
+)
 from src.services.packet_branch import packet_branch_status, prepare_packet_branch
 from src.services.packet_drafting import (
     build_structured_packet_prompt,
@@ -731,6 +739,18 @@ def _safe_create_factory_event(db, workspace_id, event_type, message, **kwargs):
         except Exception:
             pass
         print("Factory event creation failed: {}".format(exception))
+        return None
+
+
+def _safe_create_review_event(db, workspace_id, **payload):
+    try:
+        return create_review_event(db, workspace_id, payload)
+    except Exception as exception:
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        print("Operator review event creation failed: {}".format(exception))
         return None
 
 
@@ -2205,6 +2225,21 @@ class NexusDashboard:
                 if item is None:
                     return jsonify({"status": "error", "message": "Inbox item not found."}), 404
                 result = convert_inbox_to_work_packet(db, workspace_id, item, payload)
+                _safe_create_review_event(
+                    db,
+                    workspace_id,
+                    event_type="inbox_conversion",
+                    action="convert_work_packet",
+                    title="Inbox converted to work packet",
+                    summary="Inbox item #{} converted to staged work packet #{}.".format(item_id, result["work_packet"].id),
+                    source_type="inbox_item",
+                    source_id=str(item_id),
+                    related_type="work_packet",
+                    related_id=str(result["work_packet"].id),
+                    severity="info",
+                    status="converted",
+                    metadata={"conversion_id": result["conversion"].id, "trust_status": result["trust"].get("trust_status")},
+                )
                 return jsonify(
                     {
                         "status": "success",
@@ -2240,6 +2275,21 @@ class NexusDashboard:
                 if item is None:
                     return jsonify({"status": "error", "message": "Inbox item not found."}), 404
                 result = convert_inbox_to_task(db, workspace_id, item, payload)
+                _safe_create_review_event(
+                    db,
+                    workspace_id,
+                    event_type="inbox_conversion",
+                    action="convert_task",
+                    title="Inbox converted to manual task",
+                    summary="Inbox item #{} converted to manual task #{}.".format(item_id, result["task"].id),
+                    source_type="inbox_item",
+                    source_id=str(item_id),
+                    related_type="task",
+                    related_id=str(result["task"].id),
+                    severity="info",
+                    status="converted",
+                    metadata={"conversion_id": result["conversion"].id},
+                )
                 return jsonify(
                     {
                         "status": "success",
@@ -2272,6 +2322,21 @@ class NexusDashboard:
                 if item is None:
                     return jsonify({"status": "error", "message": "Inbox item not found."}), 404
                 result = convert_inbox_to_document_update(db, workspace_id, item, payload)
+                _safe_create_review_event(
+                    db,
+                    workspace_id,
+                    event_type="inbox_conversion",
+                    action="document_update_candidate",
+                    title="Inbox marked as document update",
+                    summary="Inbox item #{} recorded as a document update candidate.".format(item_id),
+                    source_type="inbox_item",
+                    source_id=str(item_id),
+                    related_type="inbox_conversion",
+                    related_id=str(result["conversion"].id),
+                    severity="info",
+                    status="converted",
+                    metadata={"conversion_id": result["conversion"].id},
+                )
                 return jsonify(
                     {
                         "status": "success",
@@ -2303,6 +2368,21 @@ class NexusDashboard:
                 if item is None:
                     return jsonify({"status": "error", "message": "Inbox item not found."}), 404
                 result = discard_inbox_with_audit(db, workspace_id, item, payload)
+                _safe_create_review_event(
+                    db,
+                    workspace_id,
+                    event_type="inbox_conversion",
+                    action="discard_with_audit",
+                    title="Inbox discarded with audit",
+                    summary="Inbox item #{} discarded with an audit conversion record.".format(item_id),
+                    source_type="inbox_item",
+                    source_id=str(item_id),
+                    related_type="inbox_conversion",
+                    related_id=str(result["conversion"].id),
+                    severity="warning",
+                    status="discarded",
+                    metadata={"conversion_id": result["conversion"].id},
+                )
                 return jsonify(
                     {
                         "status": "success",
@@ -2338,6 +2418,78 @@ class NexusDashboard:
                 )
             except Exception as exception:
                 return jsonify({"status": "error", "message": "Operator interventions unavailable: {}".format(exception)}), 503
+            finally:
+                db_context.close()
+
+        @self.app.route("/api/operator-review-history", methods=["GET"])
+        def get_operator_review_history_route():
+            event_type = request.args.get("event_type") or None
+            severity = request.args.get("severity") or None
+            source_type = request.args.get("source_type") or None
+            limit = request.args.get("limit", type=int) or 50
+            db_context = get_db()
+            db = next(db_context)
+            try:
+                workspace_id = get_workspace_id(self.engine.target_dir)
+                if workspace_id is None:
+                    return jsonify({"status": "error", "message": "Active workspace not found."}), 400
+                events = list_review_events(
+                    db,
+                    workspace_id,
+                    event_type=event_type,
+                    severity=severity,
+                    source_type=source_type,
+                    limit=limit,
+                )
+                return jsonify(
+                    {
+                        "status": "success",
+                        "events": [serialize_review_event(event) for event in events],
+                        "summary": summarize_review_history(db, workspace_id),
+                    }
+                )
+            except Exception as exception:
+                return jsonify({"status": "error", "message": "Operator review history unavailable: {}".format(exception)}), 503
+            finally:
+                db_context.close()
+
+        @self.app.route("/api/operator-review-history/filters", methods=["GET"])
+        def get_operator_review_history_filters_route():
+            return jsonify({"status": "success", "filters": build_timeline_filters()})
+
+        @self.app.route("/api/operator-review-history/summary", methods=["GET"])
+        def get_operator_review_history_summary_route():
+            db_context = get_db()
+            db = next(db_context)
+            try:
+                workspace_id = get_workspace_id(self.engine.target_dir)
+                if workspace_id is None:
+                    return jsonify({"status": "error", "message": "Active workspace not found."}), 400
+                return jsonify({"status": "success", "summary": summarize_review_history(db, workspace_id)})
+            except Exception as exception:
+                return jsonify({"status": "error", "message": "Operator review history summary unavailable: {}".format(exception)}), 503
+            finally:
+                db_context.close()
+
+        @self.app.route("/api/operator-review-history/manual-note", methods=["POST"])
+        def post_operator_review_history_manual_note_route():
+            payload = request.get_json(silent=True) or {}
+            if not isinstance(payload, dict):
+                return jsonify({"status": "error", "message": "JSON object is required."}), 400
+            db_context = get_db()
+            db = next(db_context)
+            try:
+                workspace_id = get_workspace_id(self.engine.target_dir)
+                if workspace_id is None:
+                    return jsonify({"status": "error", "message": "Active workspace not found."}), 400
+                event = create_manual_review_note(db, workspace_id, payload)
+                return jsonify({"status": "success", "event": serialize_review_event(event)}), 201
+            except ValueError as exception:
+                db.rollback()
+                return jsonify({"status": "error", "message": str(exception)}), 400
+            except Exception as exception:
+                db.rollback()
+                return jsonify({"status": "error", "message": "Manual review note could not be created: {}".format(exception)}), 503
             finally:
                 db_context.close()
 
@@ -2403,6 +2555,18 @@ class NexusDashboard:
                 if item is None:
                     return jsonify({"status": "error", "message": "Operator intervention not found."}), 404
                 item = acknowledge_intervention(db, item, operator_notes=payload.get("operator_notes"))
+                _safe_create_review_event(
+                    db,
+                    workspace_id,
+                    event_type="intervention_decision",
+                    action="acknowledge",
+                    title="Intervention acknowledged",
+                    summary="Operator intervention #{} acknowledged.".format(item.id),
+                    source_type="operator_intervention",
+                    source_id=str(item.id),
+                    severity=item.severity,
+                    status=item.status,
+                )
                 return jsonify({"status": "success", "item": serialize_intervention(item)})
             except Exception as exception:
                 db.rollback()
@@ -2425,6 +2589,18 @@ class NexusDashboard:
                 if item is None:
                     return jsonify({"status": "error", "message": "Operator intervention not found."}), 404
                 item = resolve_intervention(db, item, operator_notes=payload.get("operator_notes"))
+                _safe_create_review_event(
+                    db,
+                    workspace_id,
+                    event_type="intervention_decision",
+                    action="resolve",
+                    title="Intervention resolved",
+                    summary="Operator intervention #{} resolved.".format(item.id),
+                    source_type="operator_intervention",
+                    source_id=str(item.id),
+                    severity=item.severity,
+                    status=item.status,
+                )
                 return jsonify({"status": "success", "item": serialize_intervention(item)})
             except Exception as exception:
                 db.rollback()
@@ -2447,6 +2623,18 @@ class NexusDashboard:
                 if item is None:
                     return jsonify({"status": "error", "message": "Operator intervention not found."}), 404
                 item = dismiss_intervention(db, item, operator_notes=payload.get("operator_notes"))
+                _safe_create_review_event(
+                    db,
+                    workspace_id,
+                    event_type="intervention_decision",
+                    action="dismiss",
+                    title="Intervention dismissed",
+                    summary="Operator intervention #{} dismissed.".format(item.id),
+                    source_type="operator_intervention",
+                    source_id=str(item.id),
+                    severity=item.severity,
+                    status=item.status,
+                )
                 return jsonify({"status": "success", "item": serialize_intervention(item)})
             except Exception as exception:
                 db.rollback()
@@ -2700,6 +2888,20 @@ class NexusDashboard:
                 if draft is None:
                     return jsonify({"status": "error", "message": "Packet draft not found."}), 404
                 draft = mark_packet_prompt_draft_reviewed(db, draft, payload)
+                _safe_create_review_event(
+                    db,
+                    workspace_id,
+                    event_type="draft_review",
+                    action="mark_reviewed",
+                    title="Packet draft marked reviewed",
+                    summary="Packet prompt draft #{} was marked reviewed.".format(draft.id),
+                    source_type="packet_prompt_draft",
+                    source_id=str(draft.id),
+                    related_type="work_packet" if draft.work_packet_id else None,
+                    related_id=str(draft.work_packet_id) if draft.work_packet_id else None,
+                    severity="info",
+                    status="reviewed",
+                )
                 return jsonify({"status": "success", "draft": serialize_packet_prompt_draft(draft)})
             except ValueError as exception:
                 db.rollback()
@@ -3004,6 +3206,21 @@ class NexusDashboard:
                     task_id=task.id,
                     payload=recovery,
                 )
+                _safe_create_review_event(
+                    db,
+                    workspace_id,
+                    event_type="recovery_decision",
+                    action="mark_review_required",
+                    title="Task marked review required",
+                    summary="Task #{} was moved to review by operator.".format(task.id),
+                    source_type="task",
+                    source_id=str(task.id),
+                    related_type="factory_event" if event is not None else None,
+                    related_id=str(event.id) if event is not None else None,
+                    severity="warning",
+                    status=task.status,
+                    metadata={"previous_status": previous_status},
+                )
                 return jsonify(
                     {
                         "status": "success",
@@ -3259,6 +3476,21 @@ class NexusDashboard:
                 if work_packet is None or work_packet.workspace_id != active_workspace_id:
                     return jsonify({"status": "error", "message": "Work packet not found."}), 404
                 work_packet = mark_packet_trusted(db, work_packet, payload)
+                _safe_create_review_event(
+                    db,
+                    active_workspace_id,
+                    event_type="trust_decision",
+                    action="trust",
+                    title="Work packet trusted",
+                    summary="Work packet #{} marked trusted by operator.".format(work_packet.id),
+                    source_type="work_packet",
+                    source_id=str(work_packet.id),
+                    related_type="work_packet",
+                    related_id=str(work_packet.id),
+                    severity="info",
+                    status=work_packet.trust_status,
+                    metadata={"trust_level": work_packet.trust_level},
+                )
                 return jsonify(
                     {
                         "status": "success",
@@ -3288,6 +3520,21 @@ class NexusDashboard:
                 if work_packet is None or work_packet.workspace_id != active_workspace_id:
                     return jsonify({"status": "error", "message": "Work packet not found."}), 404
                 work_packet = revoke_packet_trust(db, work_packet, payload)
+                _safe_create_review_event(
+                    db,
+                    active_workspace_id,
+                    event_type="trust_decision",
+                    action="revoke_trust",
+                    title="Work packet trust revoked",
+                    summary="Work packet #{} trust revoked by operator.".format(work_packet.id),
+                    source_type="work_packet",
+                    source_id=str(work_packet.id),
+                    related_type="work_packet",
+                    related_id=str(work_packet.id),
+                    severity="warning",
+                    status=work_packet.trust_status,
+                    metadata={"trust_level": work_packet.trust_level},
+                )
                 return jsonify(
                     {
                         "status": "success",
@@ -3338,6 +3585,21 @@ class NexusDashboard:
                 if work_packet is None or work_packet.workspace_id != active_workspace_id:
                     return jsonify({"status": "error", "message": "Work packet not found."}), 404
                 readiness = evaluate_and_store_readiness(db, work_packet, payload)
+                _safe_create_review_event(
+                    db,
+                    active_workspace_id,
+                    event_type="readiness_check",
+                    action="evaluate",
+                    title="Work packet readiness evaluated",
+                    summary="Work packet #{} readiness evaluated as {}.".format(work_packet.id, readiness.get("readiness_status")),
+                    source_type="work_packet",
+                    source_id=str(work_packet.id),
+                    related_type="work_packet",
+                    related_id=str(work_packet.id),
+                    severity="blocked" if readiness.get("readiness_status") == "blocked" else "info",
+                    status=readiness.get("readiness_status"),
+                    metadata={"readiness_score": readiness.get("readiness_score")},
+                )
                 return jsonify({"status": "success", "readiness": readiness})
             except ValueError as exception:
                 db.rollback()
@@ -3361,6 +3623,21 @@ class NexusDashboard:
                 if work_packet is None or work_packet.workspace_id != active_workspace_id:
                     return jsonify({"status": "error", "message": "Work packet not found."}), 404
                 readiness = update_readiness_metadata(db, work_packet, payload)
+                _safe_create_review_event(
+                    db,
+                    active_workspace_id,
+                    event_type="readiness_check",
+                    action="update",
+                    title="Work packet readiness updated",
+                    summary="Work packet #{} readiness metadata updated to {}.".format(work_packet.id, readiness.get("readiness_status")),
+                    source_type="work_packet",
+                    source_id=str(work_packet.id),
+                    related_type="work_packet",
+                    related_id=str(work_packet.id),
+                    severity="blocked" if readiness.get("readiness_status") == "blocked" else "info",
+                    status=readiness.get("readiness_status"),
+                    metadata={"readiness_score": readiness.get("readiness_score")},
+                )
                 return jsonify({"status": "success", "readiness": readiness})
             except ValueError as exception:
                 db.rollback()
